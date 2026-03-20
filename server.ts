@@ -22,9 +22,21 @@ async function startServer() {
       const result = await fetchYahooFinancePrice(ticker);
 
       if (result.price !== null) {
-        res.json({ price: result.price });
+        res.json({
+          price: result.price,
+          previousClose: result.previousClose,
+          currency: result.currency,
+          sourceUrl: result.sourceUrl,
+          normalizedTicker: result.yahooTicker,
+        });
       } else {
-        res.status(404).json({ error: result.error });
+        res.status(404).json({
+          error: result.error,
+          previousClose: result.previousClose,
+          currency: result.currency,
+          sourceUrl: result.sourceUrl,
+          normalizedTicker: result.yahooTicker,
+        });
       }
     } catch (error) {
       console.error("Error fetching finance data from Yahoo:", error);

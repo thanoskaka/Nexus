@@ -38,11 +38,13 @@ export async function fetchYahooFinancePrice(ticker: string) {
   const yahooData = await yahooResponse.json();
   const result = yahooData.chart?.result?.[0];
   const price = result?.meta?.regularMarketPrice;
+  const previousClose = result?.meta?.previousClose ?? result?.meta?.chartPreviousClose ?? result?.meta?.regularMarketPreviousClose;
   const currency = result?.meta?.currency;
 
   if (typeof price !== 'number') {
     return {
       price: null,
+      previousClose: typeof previousClose === 'number' ? previousClose : null,
       yahooTicker,
       currency,
       sourceUrl: `https://finance.yahoo.com/quote/${encodeURIComponent(yahooTicker)}`,
@@ -52,6 +54,7 @@ export async function fetchYahooFinancePrice(ticker: string) {
 
   return {
     price,
+    previousClose: typeof previousClose === 'number' ? previousClose : null,
     yahooTicker,
     currency,
     sourceUrl: `https://finance.yahoo.com/quote/${encodeURIComponent(yahooTicker)}`,

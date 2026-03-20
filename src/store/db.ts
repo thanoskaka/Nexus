@@ -12,6 +12,7 @@ export interface Asset {
   assetClass: string;
   autoUpdate: boolean;
   currentPrice?: number;
+  previousClose?: number;
   lastUpdated?: number;
   purchaseDate?: string;
   originalCurrency?: 'USD' | 'CAD' | 'INR';

@@ -38,13 +38,25 @@ export default defineConfig(() => {
               if (result.price == null) {
                 res.statusCode = 404;
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ error: result.error }));
+                res.end(JSON.stringify({
+                  error: result.error,
+                  previousClose: result.previousClose,
+                  currency: result.currency,
+                  sourceUrl: result.sourceUrl,
+                  normalizedTicker: result.yahooTicker,
+                }));
                 return;
               }
 
               res.statusCode = 200;
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ price: result.price }));
+              res.end(JSON.stringify({
+                price: result.price,
+                previousClose: result.previousClose,
+                currency: result.currency,
+                sourceUrl: result.sourceUrl,
+                normalizedTicker: result.yahooTicker,
+              }));
             } catch (error) {
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');

@@ -303,221 +303,197 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      <Card className="border-none shadow-sm rounded-2xl">
-        <CardContent className="p-6">
-          <div className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Live FX Rates</div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {relevantRates.map((rate) => (
-              <div key={rate.label} className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900" title={fxTrendCopy[rate.label] || 'Loading 7-day trend...'}>
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <span>{rate.label}</span>
-                  <Info className="h-3.5 w-3.5" />
-                </div>
-                <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{rate.value.toFixed(4)}</div>
-              </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_340px]">
+        <div className="space-y-6">
+          <div className={`grid gap-4 ${summaryCurrencies.length > 1 ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
+            {summaryCurrencies.map((currency) => {
+              const stats = getStatsForSelection(currency, filteredAssets);
+              const cardTitle = currencySelection === 'ORIGINAL'
+                ? scope === 'ALL'
+                  ? `${currency === 'INR' ? 'India' : 'Canada'} Holdings`
+                  : `${scope === 'INDIA' ? 'India' : 'Canada'} Holdings`
+                : `${scope === 'ALL' ? 'All Holdings' : scope === 'INDIA' ? 'India Holdings' : 'Canada Holdings'} in ${currency}`;
+
+              return (
+                <Card key={currency} className="overflow-hidden rounded-2xl border-none shadow-sm">
+                  <CardContent className="p-0">
+                    <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{currency}</p>
+                          <h3 className="truncate text-lg font-bold text-slate-900 dark:text-white">{cardTitle}</h3>
+                        </div>
+                        <div className="rounded-full bg-slate-100 p-2 dark:bg-slate-800">
+                          <Wallet className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 p-4 sm:grid-cols-2">
+                      <CompactMetricTile label="Invested" value={formatCurrency(stats.invested, currency)} icon={<Wallet className="h-4 w-4 text-slate-400" />} tone={stats.invested < 0 ? 'negative' : 'neutral'} />
+                      <CompactMetricTile label="Current" value={formatCurrency(stats.current, currency)} icon={<TrendingUp className="h-4 w-4 text-slate-400" />} tone={stats.current < 0 ? 'negative' : 'neutral'} />
+                      <CompactMetricTile label="Today's Change" value={formatCurrency(stats.todayChange, currency)} icon={<ArrowUpRight className="h-4 w-4 text-slate-400" />} tone={stats.todayChange >= 0 ? 'positive' : 'negative'} />
+                      <CompactMetricTile label="Returns" value={`${formatCurrency(stats.returns, currency)} · ${stats.retPct >= 0 ? '+' : ''}${stats.retPct.toFixed(2)}%`} icon={<TrendingUp className="h-4 w-4 text-slate-400" />} tone={stats.returns >= 0 ? 'positive' : 'negative'} />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {ownerStats.map((owner) => (
+              <Card key={owner.name} className="border-none shadow-sm rounded-2xl">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="w-12 h-12 rounded-full bg-[#00875A] flex items-center justify-center text-white text-xl font-bold">
+                      {owner.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-xl font-bold">{owner.name}</h3>
+                      <p className="text-sm text-slate-500">{owner.assetCount} assets</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="rounded-full"
+                      onClick={() => setMemberFilter(owner.name)}
+                      title={`View only ${owner.name}`}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {owner.valuesByCurrency.map((stats) => (
+                      <div key={stats.currency} className="rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
+                        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{stats.currency}</div>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <p className="text-sm text-slate-500 mb-1">Invested</p>
+                            <p className={`text-xl font-mono font-semibold ${stats.invested < 0 ? 'text-red-500' : ''}`}>{formatCurrency(stats.invested, stats.currency)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-slate-500 mb-1">Current</p>
+                            <p className={`text-xl font-mono font-semibold ${stats.current < 0 ? 'text-red-500' : ''}`}>{formatCurrency(stats.current, stats.currency)}</p>
+                          </div>
+                        </div>
+                        <div className={`rounded-xl p-4 flex justify-between items-center ${stats.returns >= 0 ? 'bg-[#E6F4EA] dark:bg-[#00875A]/20' : 'bg-red-50 dark:bg-red-500/10'}`}>
+                          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Returns</span>
+                          <span className={`font-mono font-semibold flex items-center ${stats.returns >= 0 ? 'text-[#00875A]' : 'text-red-500'}`}>
+                            {stats.returns >= 0 && <ArrowUpRight className="h-4 w-4 mr-1" />}
+                            {`${formatCurrency(stats.returns, stats.currency)} (${stats.returns >= 0 ? '+' : ''}${stats.retPct.toFixed(2)}%)`}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <div className={`grid gap-6 ${summaryCurrencies.length === 3 ? 'xl:grid-cols-3' : 'lg:grid-cols-1'}`}>
-        {summaryCurrencies.map((currency) => {
-          const stats = getStatsForSelection(currency, filteredAssets);
-          const cardTitle = currencySelection === 'ORIGINAL'
-            ? scope === 'ALL'
-              ? `${currency === 'INR' ? 'India' : 'Canada'} Holdings`
-              : `${scope === 'INDIA' ? 'India' : 'Canada'} Holdings`
-            : `${scope === 'ALL' ? 'All Holdings' : scope === 'INDIA' ? 'India Holdings' : 'Canada Holdings'} in ${currency}`;
-
-          return (
-            <Card key={currency} className="border-none shadow-sm rounded-2xl overflow-hidden">
-              <CardContent className="p-0">
-                <div className="border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{currency}</p>
-                      <h3 className="text-xl font-bold text-slate-900 dark:text-white">{cardTitle}</h3>
-                    </div>
-                    <div className="rounded-full bg-slate-100 p-2 dark:bg-slate-800">
-                      <Wallet className="h-4 w-4 text-slate-600 dark:text-slate-300" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 p-6 sm:grid-cols-2">
-                  <div className="min-w-0 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-500">Invested</p>
-                      <Wallet className="h-4 w-4 text-slate-400" />
-                    </div>
-                    <p className={`break-words text-2xl font-semibold tracking-tight ${stats.invested < 0 ? 'text-red-500' : ''}`}>{formatCurrency(stats.invested, currency)}</p>
-                  </div>
-                  <div className="min-w-0 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-500">Current</p>
-                      <TrendingUp className="h-4 w-4 text-slate-400" />
-                    </div>
-                    <p className={`break-words text-2xl font-semibold tracking-tight ${stats.current < 0 ? 'text-red-500' : ''}`}>{formatCurrency(stats.current, currency)}</p>
-                    <p className={`mt-2 text-sm font-medium ${stats.todayChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                      Today's Change: {formatCurrency(stats.todayChange, currency)}
-                    </p>
-                  </div>
-                  <div className="min-w-0 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-500">Returns</p>
-                      <ArrowUpRight className="h-4 w-4 text-slate-400" />
-                    </div>
-                    <p className={`break-words text-2xl font-semibold tracking-tight ${stats.returns >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {formatCurrency(stats.returns, currency)}
-                    </p>
-                  </div>
-                  <div className="min-w-0 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-500">Returns %</p>
-                      <TrendingUp className="h-4 w-4 text-slate-400" />
-                    </div>
-                    <p className={`break-words text-2xl font-semibold tracking-tight ${stats.retPct >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {stats.retPct >= 0 ? '+' : ''}
-                      {stats.retPct.toFixed(2)}%
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {ownerStats.map((owner) => (
-          <Card key={owner.name} className="border-none shadow-sm rounded-2xl">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 rounded-full bg-[#00875A] flex items-center justify-center text-white text-xl font-bold">
-                  {owner.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xl font-bold">{owner.name}</h3>
-                  <p className="text-sm text-slate-500">{owner.assetCount} assets</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full"
-                  onClick={() => setMemberFilter(owner.name)}
-                  title={`View only ${owner.name}`}
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
+        <div className="space-y-6">
+          <Card className="border-none shadow-sm rounded-2xl">
+            <CardContent className="p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Live FX Rates</div>
+                <Info className="h-4 w-4 text-slate-400" />
               </div>
-
-              <div className="space-y-4">
-                {owner.valuesByCurrency.map((stats) => (
-                  <div key={stats.currency} className="rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
-                    <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{stats.currency}</div>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm text-slate-500 mb-1">Invested</p>
-                        <p className={`text-xl font-mono font-semibold ${stats.invested < 0 ? 'text-red-500' : ''}`}>{formatCurrency(stats.invested, stats.currency)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-500 mb-1">Current</p>
-                        <p className={`text-xl font-mono font-semibold ${stats.current < 0 ? 'text-red-500' : ''}`}>{formatCurrency(stats.current, stats.currency)}</p>
-                      </div>
-                    </div>
-                    <div className={`rounded-xl p-4 flex justify-between items-center ${stats.returns >= 0 ? 'bg-[#E6F4EA] dark:bg-[#00875A]/20' : 'bg-red-50 dark:bg-red-500/10'}`}>
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Returns</span>
-                      <span className={`font-mono font-semibold flex items-center ${stats.returns >= 0 ? 'text-[#00875A]' : 'text-red-500'}`}>
-                        {stats.returns >= 0 && <ArrowUpRight className="h-4 w-4 mr-1" />}
-                        {`${formatCurrency(stats.returns, stats.currency)} (${stats.returns >= 0 ? '+' : ''}${stats.retPct.toFixed(2)}%)`}
-                      </span>
-                    </div>
+              <div className="space-y-3">
+                {relevantRates.map((rate) => (
+                  <div key={rate.label} className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900" title={fxTrendCopy[rate.label] || 'Loading 7-day trend...'}>
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{rate.label}</div>
+                    <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{rate.value.toFixed(4)}</div>
+                    <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{fxTrendCopy[rate.label] || 'Loading 7-day trend...'}</div>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
-        ))}
+
+          <Card className="border-none shadow-sm rounded-2xl">
+            <CardContent className="p-5">
+              <div className="mb-6 flex items-center gap-2">
+                <PieChartIcon className="h-5 w-5" />
+                <h3 className="text-lg font-semibold">By Asset Class</h3>
+              </div>
+              <div className="space-y-4">
+                {!chartCurrency ? (
+                  <div className="flex min-h-[220px] items-center justify-center text-center text-slate-500">
+                    Select a single-currency view, or filter Original down to one native currency, to view this chart.
+                  </div>
+                ) : assetClassData.length === 0 ? (
+                  <div className="flex min-h-[220px] items-center justify-center text-slate-500">No assets to chart yet</div>
+                ) : (
+                  <>
+                    <div className="h-[240px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={assetClassData} cx="50%" cy="50%" innerRadius={58} outerRadius={86} paddingAngle={4} dataKey="value">
+                            {assetClassData.map((entry, index) => (
+                              <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number) => formatCurrency(value, chartCurrency)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-3">
+                      {assetClassLegend.map((item) => (
+                        <div key={item.name} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-3 dark:bg-slate-900">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{item.name}</span>
+                          </div>
+                          <span className="text-sm font-semibold text-slate-900 dark:text-white">{item.percentage.toFixed(1)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-sm rounded-2xl">
+            <CardContent className="p-5">
+              <div className="mb-6 flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                <h3 className="text-lg font-semibold">By Country</h3>
+              </div>
+              <div className="space-y-4">
+                {!chartCurrency ? (
+                  <div className="flex min-h-[220px] items-center justify-center text-center text-slate-500">
+                    Country comparison needs a single display currency, so use USD/INR/CAD or filter Original down to one native bucket.
+                  </div>
+                ) : countryData.length === 0 ? (
+                  <div className="flex min-h-[220px] items-center justify-center text-slate-500">No assets to summarize yet</div>
+                ) : (
+                  countryData.map((country) => (
+                    <div key={country.name} className="flex items-center justify-between rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm dark:bg-slate-700">
+                          {country.name === 'India' ? '🇮🇳' : country.name === 'Canada' ? '🇨🇦' : '🌍'}
+                        </div>
+                        <div>
+                          <p className="font-medium">{country.name}</p>
+                          <p className="text-sm text-slate-500">{scope === 'ALL' ? `Shown in ${chartCurrency}` : 'Filtered view'}</p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-semibold">{formatCurrency(country.value, chartCurrency)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-none shadow-sm rounded-2xl">
-          <CardContent className="p-6">
-            <div className="mb-6 flex items-center gap-2">
-              <PieChartIcon className="h-5 w-5" />
-              <h3 className="text-lg font-semibold">By Asset Class</h3>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-              {!chartCurrency ? (
-                <div className="h-[320px] flex items-center justify-center text-center text-slate-500">
-                  Select a single-currency view, or filter Original down to one native currency, to view this chart.
-                </div>
-              ) : assetClassData.length === 0 ? (
-                <div className="h-[320px] flex items-center justify-center text-slate-500">No assets to chart yet</div>
-              ) : (
-                <>
-                  <div className="h-[320px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={assetClassData} cx="50%" cy="50%" innerRadius={65} outerRadius={95} paddingAngle={4} dataKey="value">
-                          {assetClassData.map((entry, index) => (
-                            <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value, chartCurrency)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="space-y-3">
-                    {assetClassLegend.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-3 dark:bg-slate-900">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                          <span className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{item.name}</span>
-                        </div>
-                        <span className="text-sm font-semibold text-slate-900 dark:text-white">{item.percentage.toFixed(1)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm rounded-2xl">
-          <CardContent className="p-6">
-            <div className="mb-6 flex items-center gap-2">
-              <Globe className="h-5 w-5" />
-              <h3 className="text-lg font-semibold">By Country</h3>
-            </div>
-            <div className="space-y-4">
-              {!chartCurrency ? (
-                <div className="h-[320px] flex items-center justify-center text-center text-slate-500">
-                  Country comparison needs a single display currency, so use USD/INR/CAD or filter Original down to one native bucket.
-                </div>
-              ) : countryData.length === 0 ? (
-                <div className="h-[320px] flex items-center justify-center text-slate-500">No assets to summarize yet</div>
-              ) : (
-                countryData.map((country) => (
-                  <div key={country.name} className="flex items-center justify-between rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm dark:bg-slate-700">
-                        {country.name === 'India' ? '🇮🇳' : country.name === 'Canada' ? '🇨🇦' : '🌍'}
-                      </div>
-                      <div>
-                        <p className="font-medium">{country.name}</p>
-                        <p className="text-sm text-slate-500">{scope === 'ALL' ? `Shown in ${chartCurrency}` : 'Filtered view'}</p>
-                      </div>
-                    </div>
-                    <span className="font-mono font-semibold">{formatCurrency(country.value, chartCurrency)}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
@@ -542,6 +518,34 @@ function HeroMetric({
     <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
       <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-100/80">{label}</div>
       <div className={`mt-2 text-lg font-semibold ${toneClass}`}>{value}</div>
+    </div>
+  );
+}
+
+function CompactMetricTile({
+  label,
+  value,
+  icon,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  tone?: 'neutral' | 'positive' | 'negative';
+}) {
+  const toneClass = tone === 'positive'
+    ? 'text-emerald-600'
+    : tone === 'negative'
+      ? 'text-red-500'
+      : 'text-slate-900 dark:text-slate-100';
+
+  return (
+    <div className="min-w-0 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+        {icon}
+      </div>
+      <p className={`break-words text-lg font-semibold tracking-tight ${toneClass}`}>{value}</p>
     </div>
   );
 }

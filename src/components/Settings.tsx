@@ -14,7 +14,9 @@ import { SYSTEM_ASSET_CLASSES } from '../lib/systemAssetClasses';
 import { Input } from './ui/input';
 import { Select } from './ui/select';
 
-export function Settings() {
+export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync';
+
+export function Settings({ initialSection }: { initialSection?: SettingsSection } = {}) {
   const {
     importAssets,
     importAssetClasses,
@@ -50,6 +52,14 @@ export function Settings() {
     setProviderForm(priceProviderSettings);
   }, [priceProviderSettings]);
 
+  React.useEffect(() => {
+    if (!initialSection) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(initialSection)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialSection]);
+
   const downloadIndiaTemplate = () => {
     const csv = "Purchase Date,Owner,Holding Name,Ticker,Type,Holding Platform,Comments,Qty,Average Purchase Price,Purchase Value,Current Price,Current Value";
     downloadCSV(csv, "india_holdings_template.csv");
@@ -63,6 +73,64 @@ export function Settings() {
   const downloadClassesTemplate = () => {
     const csv = "Country,Asset Class Name,Image URL";
     downloadCSV(csv, "asset_classes_template.csv");
+  };
+
+  const exportHoldings = (targetCountry: 'India' | 'Canada') => {
+    const countryAssets = assets.filter((asset) => asset.country === targetCountry);
+    if (countryAssets.length === 0) {
+      setAlertDialog({
+        open: true,
+        title: 'Nothing To Export',
+        description: `There are no ${targetCountry} holdings available to export right now.`,
+      });
+      return;
+    }
+
+    const rows = countryAssets.map((asset) => {
+      const quantity = Number.isFinite(asset.quantity) ? asset.quantity : 0;
+      const averagePurchasePrice = quantity > 0 ? asset.costBasis / quantity : 0;
+      const currentPrice = typeof asset.currentPrice === 'number' && Number.isFinite(asset.currentPrice) ? asset.currentPrice : 0;
+      const currentValue = currentPrice > 0 && quantity > 0 ? currentPrice * quantity : 0;
+
+      if (targetCountry === 'India') {
+        return {
+          'Purchase Date': asset.purchaseDate || '',
+          'Owner': asset.owner || '',
+          'Holding Name': asset.name || '',
+          'Ticker': asset.ticker || '',
+          'Type': asset.assetClass || '',
+          'Holding Platform': asset.holdingPlatform || '',
+          'Comments': asset.comments || '',
+          'Qty': quantity || '',
+          'Average Purchase Price': averagePurchasePrice || '',
+          'Purchase Value': asset.costBasis || '',
+          'Current Price': currentPrice || '',
+          'Current Value': currentValue || '',
+        };
+      }
+
+      return {
+        'Purchase Date': asset.purchaseDate || '',
+        'Owner': asset.owner || '',
+        'Holding Name': asset.name || '',
+        'Ticker': asset.ticker || '',
+        'Type': asset.assetClass || '',
+        'Holding Platform': asset.holdingPlatform || '',
+        'Comments': asset.comments || '',
+        'Qty': quantity || '',
+        'Avg Purchase Price': averagePurchasePrice || '',
+        'Purchase Value': asset.costBasis || '',
+        'Current Price': currentPrice || '',
+        'Current Value': currentValue || '',
+        'US or CAD': asset.originalCurrency === 'USD' ? 'USD' : 'CAD',
+      };
+    });
+
+    const csv = Papa.unparse(rows, { columns: Object.keys(rows[0]) });
+    downloadCSV(
+      csv,
+      targetCountry === 'India' ? 'india_holdings_export.csv' : 'canada_holdings_export.csv',
+    );
   };
 
   const downloadCSV = (csv: string, filename: string) => {
@@ -482,7 +550,7 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      <Card className="border-none shadow-sm rounded-2xl mb-6">
+      <Card id="member-access" className="border-none shadow-sm rounded-2xl mb-6">
         <CardHeader className="flex flex-row items-start justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -549,7 +617,7 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      <Card className="border-none shadow-sm rounded-2xl mb-6">
+      <Card id="price-providers" className="border-none shadow-sm rounded-2xl mb-6">
         <CardHeader>
           <div className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-slate-700 dark:text-slate-300" />
@@ -612,7 +680,7 @@ export function Settings() {
       </Card>
 
       {/* Asset Classes Card */}
-      <Card className="border-none shadow-sm rounded-2xl mb-6">
+      <Card id="asset-classes-overview" className="border-none shadow-sm rounded-2xl mb-6">
         <CardHeader className="flex flex-row items-start justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -694,7 +762,7 @@ export function Settings() {
       </Card>
 
       {/* Price Updates Card */}
-      <Card className="border-none shadow-sm rounded-2xl mb-12">
+      <Card id="price-updates" className="border-none shadow-sm rounded-2xl mb-12">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -721,7 +789,7 @@ export function Settings() {
           <p className="text-slate-500 dark:text-slate-400">Manage your raw data imports, exports, and cloud synchronization.</p>
         </div>
       
-      <Card className="border-none shadow-sm rounded-2xl">
+      <Card id="cloud-sync" className="border-none shadow-sm rounded-2xl">
         <CardHeader>
           <CardTitle>Cloud Sync</CardTitle>
           <CardDescription>Sync your portfolio data across devices using Google Drive.</CardDescription>
@@ -744,6 +812,10 @@ export function Settings() {
                 <Download className="mr-2 h-4 w-4" />
                 India Template
               </Button>
+              <Button variant="outline" onClick={() => exportHoldings('India')}>
+                <Download className="mr-2 h-4 w-4" />
+                Export India Holdings
+              </Button>
               <input type="file" accept=".csv,.tsv" className="hidden" ref={indiaFileRef} onChange={(e) => handleHoldingsUpload(e, 'India')} />
               <Button variant="outline" onClick={() => indiaFileRef.current?.click()}>
                 <Upload className="mr-2 h-4 w-4" />
@@ -758,6 +830,10 @@ export function Settings() {
               <Button variant="outline" onClick={downloadCanadaTemplate}>
                 <Download className="mr-2 h-4 w-4" />
                 Canada Template
+              </Button>
+              <Button variant="outline" onClick={() => exportHoldings('Canada')}>
+                <Download className="mr-2 h-4 w-4" />
+                Export Canada Holdings
               </Button>
               <input type="file" accept=".csv,.tsv" className="hidden" ref={canadaFileRef} onChange={(e) => handleHoldingsUpload(e, 'Canada')} />
               <Button variant="outline" onClick={() => canadaFileRef.current?.click()}>

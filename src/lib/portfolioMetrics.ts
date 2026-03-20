@@ -60,6 +60,25 @@ export function getCurrentTotal(asset: Asset) {
   return applyAssetClassSign(asset.assetClass, asset.quantity * Math.abs(asset.currentPrice || 0));
 }
 
+export function getPreviousClose(asset: Asset) {
+  const previousClose = asset.previousClose;
+  return typeof previousClose === 'number' && Number.isFinite(previousClose)
+    ? applyAssetClassSign(asset.assetClass, previousClose)
+    : null;
+}
+
+export function getDailyPriceChange(asset: Asset) {
+  const previousClose = getPreviousClose(asset);
+  if (previousClose == null || typeof asset.currentPrice !== 'number') return null;
+  return getCurrentPrice(asset) - previousClose;
+}
+
+export function getDailyTotalChange(asset: Asset) {
+  const priceChange = getDailyPriceChange(asset);
+  if (priceChange == null) return null;
+  return priceChange * asset.quantity;
+}
+
 export function getInvestmentPrice(asset: Asset) {
   if (!asset.quantity) return 0;
   return getInvestmentTotal(asset) / asset.quantity;

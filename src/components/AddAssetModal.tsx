@@ -89,9 +89,12 @@ export function AddAssetModal({ open, onOpenChange, assetToEdit }: AddAssetModal
       ? { price: undefined, value: undefined }
       : resolveCurrentTriangle(resolvedPurchase.quantity, currentPrice, currentValue);
 
+    const normalizedTicker = ticker.trim() || undefined;
+    const hasTickerControls = isTickerApplicable || Boolean(assetToEdit?.ticker) || Boolean(ticker.trim());
+
     const assetData = {
       name,
-      ticker: isTickerApplicable ? ticker : undefined,
+      ticker: hasTickerControls ? normalizedTicker : undefined,
       quantity: resolvedPurchase.quantity,
       costBasis: resolvedPurchase.value,
       currency,
@@ -103,7 +106,7 @@ export function AddAssetModal({ open, onOpenChange, assetToEdit }: AddAssetModal
       purchaseDate: purchaseDate || undefined,
       holdingPlatform: holdingPlatform.trim() || undefined,
       comments: comments.trim() || undefined,
-      preferredPriceProvider,
+      preferredPriceProvider: hasTickerControls ? preferredPriceProvider : undefined,
     };
 
     if (assetToEdit) {
@@ -141,18 +144,19 @@ export function AddAssetModal({ open, onOpenChange, assetToEdit }: AddAssetModal
   };
 
   const isTickerApplicable = !['Gold', 'Cash', 'PF/NPS/FD', 'TFSA/RRSP/FHSA', 'Real Estate', 'Other', 'Credit Card'].includes(assetClass);
+  const showTickerControls = isTickerApplicable || Boolean(ticker) || Boolean(assetToEdit?.ticker);
 
   const purchaseSummary = resolvePurchaseTriangle(quantity, averagePurchasePrice, purchaseValue);
   const currentSummary = autoUpdate ? null : resolveCurrentTriangle(purchaseSummary.quantity, currentPrice, currentValue);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogHeader>
+      <DialogHeader className="space-y-1">
         <DialogTitle>{assetToEdit ? 'Edit Asset' : 'Add New Asset'}</DialogTitle>
         <DialogDescription>Enter a full holding record. The form auto-fills the missing purchase and current values when you provide any two related numbers.</DialogDescription>
       </DialogHeader>
-      <form onSubmit={handleSubmit} className="max-h-[75vh] space-y-5 overflow-y-auto py-4 pr-1">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <form onSubmit={handleSubmit} className="max-h-[82vh] space-y-3 overflow-y-auto py-1 pr-1">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,0.92fr)_minmax(0,0.9fr)_minmax(0,0.98fr)]">
           <div className="space-y-2">
             <label className="text-sm font-medium">Country</label>
             <Select value={country} onChange={(e) => {
@@ -178,23 +182,25 @@ export function AddAssetModal({ open, onOpenChange, assetToEdit }: AddAssetModal
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Asset Class</label>
-            <Select value={assetClass} onChange={(e) => setAssetClass(e.target.value)}>
-              {displayClasses.map(cls => (
-                <option key={cls} value={cls}>{cls}</option>
-              ))}
-            </Select>
-            <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-              <AssetClassLogo
-                name={assetClass || 'Asset Class'}
-                image={selectedAssetClassDef?.image}
-                className="h-10 w-10 shrink-0"
-              />
-              <span>Best-match logo for {assetClass || 'this class'}</span>
+            <div className="grid grid-cols-[minmax(0,180px)_minmax(0,1fr)] items-center gap-2">
+              <Select value={assetClass} onChange={(e) => setAssetClass(e.target.value)}>
+                {displayClasses.map(cls => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
+              </Select>
+              <div className="flex min-w-0 items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                <AssetClassLogo
+                  name={assetClass || 'Asset Class'}
+                  image={selectedAssetClassDef?.image}
+                  className="h-8 w-8 shrink-0"
+                />
+                <span className="truncate">Best-match logo for {assetClass || 'asset class'}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.15fr)_minmax(240px,0.47fr)]">
           <div className="space-y-2">
             <label className="text-sm font-medium">Owner</label>
             <Input required list="owner-options" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="e.g. Joint, Shubham..." />
@@ -214,12 +220,11 @@ export function AddAssetModal({ open, onOpenChange, assetToEdit }: AddAssetModal
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Asset Name</label>
-          <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Apple Inc, SBI Mutual Fund" />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Asset Name</label>
+            <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Apple Inc, SBI Mutual Fund" />
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Holding Platform</label>
             <Input value={holdingPlatform} onChange={(e) => setHoldingPlatform(e.target.value)} placeholder="e.g. IBKR, Wealthsimple, Groww" />
@@ -230,43 +235,56 @@ export function AddAssetModal({ open, onOpenChange, assetToEdit }: AddAssetModal
           </div>
         </div>
 
-        {isTickerApplicable && (
-          <div className="space-y-2 relative">
-            <label className="text-sm font-medium">
-              Ticker Symbol (optional)
-            </label>
-            <div className="relative">
-              <Input 
-                value={ticker} 
-                onChange={(e) => setTicker(e.target.value)} 
-                placeholder="e.g. NASDAQ:AAPL, NSE:RELIANCE, MUTF_IN:SBI_BLUE_CHIP" 
-                className="pr-10"
-              />
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-slate-400" />
+        {showTickerControls && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.38fr)_auto] md:items-end">
+            <div className="space-y-2 relative">
+              <label className="text-sm font-medium">
+                Ticker Symbol (optional)
+              </label>
+              <div className="relative">
+                <Input 
+                  value={ticker} 
+                  onChange={(e) => setTicker(e.target.value)} 
+                  placeholder="e.g. NASDAQ:AAPL, NSE:RELIANCE, MUTF_IN:SBI_BLUE_CHIP" 
+                  className="pr-10"
+                  disabled={!autoUpdate}
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+              <div className="text-[11px] leading-4 text-slate-500 mt-1">
+                Use ticker format `EXCHANGE:TICKER` when applicable (e.g., `NASDAQ:AAPL`, `NSE:RELIANCE`)
               </div>
             </div>
-            <div className="text-xs text-slate-500 mt-1">
-              Use ticker format `EXCHANGE:TICKER` when applicable (e.g., `NASDAQ:AAPL`, `NSE:RELIANCE`)
-            </div>
-            <div className="space-y-2 pt-2">
+            <div className="space-y-2">
               <label className="text-sm font-medium">Preferred Price Service</label>
-              <Select value={preferredPriceProvider} onChange={(e) => setPreferredPriceProvider(e.target.value as PriceProvider)}>
+              <Select value={preferredPriceProvider} onChange={(e) => setPreferredPriceProvider(e.target.value as PriceProvider)} disabled={!autoUpdate}>
                 <option value="yahoo">Yahoo Finance</option>
                 <option value="alphavantage">Alpha Vantage</option>
                 <option value="finnhub">Finnhub</option>
               </Select>
-              <p className="text-xs text-slate-500">Defaults to your app setting, but you can override it for this ticker.</p>
+              <p className="text-[11px] leading-4 text-slate-500">Override the app default for this asset.</p>
+            </div>
+            <div className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-800 dark:bg-slate-900">
+              <input 
+                type="checkbox" 
+                id="autoUpdate" 
+                checked={!autoUpdate} 
+                onChange={(e) => setAutoUpdate(!e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-[#00875A] focus:ring-[#00875A]"
+              />
+              <label htmlFor="autoUpdate" className="text-sm font-medium whitespace-nowrap">Manual entry</label>
             </div>
           </div>
         )}
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
             <Calculator className="h-4 w-4" />
             Purchase Details
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">Qty</label>
               <Input required type="number" step="any" value={quantity} onChange={(e) => setPurchaseField('quantity', e.target.value, { quantity, averagePurchasePrice, purchaseValue, setQuantity, setAveragePurchasePrice, setPurchaseValue })} placeholder="0.00" />
@@ -280,30 +298,19 @@ export function AddAssetModal({ open, onOpenChange, assetToEdit }: AddAssetModal
               <Input required type="number" step="any" value={purchaseValue} onChange={(e) => setPurchaseField('purchaseValue', e.target.value, { quantity, averagePurchasePrice, purchaseValue, setQuantity, setAveragePurchasePrice, setPurchaseValue })} placeholder="0.00" />
             </div>
           </div>
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            Enter any two purchase numbers and the third one will be calculated for you.
-            {purchaseSummary.quantity > 0 && purchaseSummary.value > 0 ? ` Current saved investment total: ${purchaseSummary.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
+          <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+            Enter any two numbers and the third will be calculated.
+            {purchaseSummary.quantity > 0 && purchaseSummary.value > 0 ? ` Saved total: ${purchaseSummary.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 pt-2">
-          <input 
-            type="checkbox" 
-            id="autoUpdate" 
-            checked={!autoUpdate} 
-            onChange={(e) => setAutoUpdate(!e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-[#00875A] focus:ring-[#00875A]"
-          />
-          <label htmlFor="autoUpdate" className="text-sm font-medium">Manual entry (no auto-update)</label>
-        </div>
-
         {!autoUpdate ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/60">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
               <Calculator className="h-4 w-4" />
               Current Valuation
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Current Price</label>
                 <Input required type="number" step="any" value={currentPrice} onChange={(e) => setCurrentField('price', e.target.value, purchaseSummary.quantity, { currentPrice, currentValue, setCurrentPrice, setCurrentValue })} placeholder="0.00" />
@@ -313,18 +320,14 @@ export function AddAssetModal({ open, onOpenChange, assetToEdit }: AddAssetModal
                 <Input required type="number" step="any" value={currentValue} onChange={(e) => setCurrentField('value', e.target.value, purchaseSummary.quantity, { currentPrice, currentValue, setCurrentPrice, setCurrentValue })} placeholder="0.00" />
               </div>
             </div>
-            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              With manual pricing, enter either current price or current value and the other field will be filled using quantity.
+            <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+              Enter either current price or current value and the other field will be filled using quantity.
               {currentSummary?.value ? ` Current total: ${currentSummary.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
             </p>
           </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/40 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
-            Auto-update is enabled. If you enter a working ticker, the app will fetch the latest current price for this asset.
-          </div>
-        )}
+        ) : null}
 
-        <div className="flex justify-end space-x-2 pt-4">
+        <div className="flex justify-end space-x-2 pt-1">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-full px-6">Cancel</Button>
           <Button type="submit" className="bg-[#00875A] hover:bg-[#007A51] text-white rounded-full px-6">
             {assetToEdit ? 'Update' : 'Create'}
@@ -399,6 +402,13 @@ function setPurchaseField(
     [field]: value,
   };
 
+  if (value.trim() === '') {
+    state.setQuantity(next.quantity);
+    state.setAveragePurchasePrice(next.averagePurchasePrice);
+    state.setPurchaseValue(next.purchaseValue);
+    return;
+  }
+
   const quantityNumber = parseNumberInput(next.quantity);
   const averageNumber = parseNumberInput(next.averagePurchasePrice);
   const valueNumber = parseNumberInput(next.purchaseValue);
@@ -440,6 +450,12 @@ function setCurrentField(
     currentPrice: field === 'price' ? value : state.currentPrice,
     currentValue: field === 'value' ? value : state.currentValue,
   };
+
+  if (value.trim() === '') {
+    state.setCurrentPrice(next.currentPrice);
+    state.setCurrentValue(next.currentValue);
+    return;
+  }
 
   const priceNumber = parseNumberInput(next.currentPrice);
   const valueNumber = parseNumberInput(next.currentValue);

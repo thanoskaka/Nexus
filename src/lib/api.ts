@@ -9,6 +9,7 @@ export interface PriceProviderSettings {
 
 export interface PriceFetchResult {
   price: number | null;
+  previousClose?: number | null;
   provider: PriceProvider;
   normalizedTicker?: string;
   currency?: string;
@@ -253,6 +254,7 @@ async function fetchYahooPrice(originalTicker: string, normalizedTicker: string)
   }
   return {
     price: typeof data?.price === 'number' ? data.price : null,
+    previousClose: typeof data?.previousClose === 'number' ? data.previousClose : null,
     provider: 'yahoo',
     normalizedTicker,
     currency: typeof data?.currency === 'string' ? data.currency : undefined,
@@ -282,10 +284,12 @@ async function fetchAlphaVantagePrice(ticker: string, apiKey: string): Promise<P
     };
   }
   const price = Number.parseFloat(data?.['Global Quote']?.['05. price']);
+  const previousClose = Number.parseFloat(data?.['Global Quote']?.['08. previous close']);
 
   if (Number.isFinite(price) && price > 0) {
     return {
       price,
+      previousClose: Number.isFinite(previousClose) ? previousClose : null,
       provider: 'alphavantage',
       normalizedTicker: ticker,
       currency: inferCurrencyFromTicker(ticker),
@@ -322,10 +326,12 @@ async function fetchFinnhubPrice(ticker: string, apiKey: string): Promise<PriceF
     };
   }
   const price = Number(data?.c);
+  const previousClose = Number(data?.pc);
 
   if (Number.isFinite(price) && price > 0) {
     return {
       price,
+      previousClose: Number.isFinite(previousClose) ? previousClose : null,
       provider: 'finnhub',
       normalizedTicker: ticker,
       currency: inferCurrencyFromTicker(ticker),

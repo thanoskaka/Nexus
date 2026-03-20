@@ -346,7 +346,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     setIsRefreshing(true);
     try {
       const currentRates = await loadRates() || rates;
-      const updatedAssets = await refreshAssetPrices(portfolio.assets, currentRates, portfolio.priceProviderSettings, false);
+      const updatedAssets = await refreshAssetPrices(portfolio.assets, currentRates, portfolio.priceProviderSettings, false, true);
       await mutatePortfolio((current) => ({
         ...current,
         assets: updatedAssets,
@@ -361,7 +361,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     try {
       const currentRates = await loadRates() || rates;
       const failedAssets = portfolio.assets.filter((asset) => asset.priceFetchStatus === 'failed');
-      const refreshedFailedAssets = await refreshAssetPrices(failedAssets, currentRates, portfolio.priceProviderSettings, true);
+      const refreshedFailedAssets = await refreshAssetPrices(failedAssets, currentRates, portfolio.priceProviderSettings, true, true);
       const refreshedById = new Map(refreshedFailedAssets.map((asset) => [asset.id, asset]));
 
       await mutatePortfolio((current) => ({
@@ -459,23 +459,12 @@ async function refreshAssetPrices(
     if (onlyFailedRows && asset.priceFetchStatus !== 'failed') return asset;
 
     let newPrice = asset.currentPrice;
+    let newPreviousClose = asset.previousClose;
     let priceFetchStatus: Asset['priceFetchStatus'] = asset.priceFetchStatus || 'idle';
     let priceFetchMessage = asset.priceFetchMessage;
     let priceProvider = asset.priceProvider;
 
-    if (asset.assetClass === 'Gold') {
-      const price = await getGoldPrice(asset.currency);
-      if (price) {
-        newPrice = price;
-        priceFetchStatus = 'success';
-        priceFetchMessage = undefined;
-        priceProvider = 'gold';
-      } else {
-        priceFetchStatus = 'failed';
-        priceFetchMessage = 'Gold price lookup failed.';
-        priceProvider = undefined;
-      }
-    } else if (asset.ticker) {
+    if (asset.ticker) {
       const providerOrder = asset.preferredPriceProvider
         ? [asset.preferredPriceProvider, priceProviderSettings.primaryProvider, priceProviderSettings.secondaryProvider]
         : [priceProviderSettings.primaryProvider, priceProviderSettings.secondaryProvider];
@@ -498,8 +487,20 @@ async function refreshAssetPrices(
               unit: unitFactor,
             })
           : null;
+        const previousCloseFormulaResult = asset.priceFormula && result.previousClose != null
+          ? applyPriceFormula(asset.priceFormula, {
+              price: result.previousClose,
+              fx: liveFxFactor,
+              unit: unitFactor,
+            })
+          : null;
 
         newPrice = formulaResult?.value != null ? formulaResult.value : result.price * effectiveFactor;
+        newPreviousClose = result.previousClose != null
+          ? previousCloseFormulaResult?.value != null
+            ? previousCloseFormulaResult.value
+            : result.previousClose * effectiveFactor
+          : asset.previousClose;
         priceFetchStatus = 'success';
         priceFetchMessage = formulaResult?.error || undefined;
         priceProvider = result.provider;
@@ -508,11 +509,25 @@ async function refreshAssetPrices(
         priceFetchMessage = result.error;
         priceProvider = result.provider;
       }
+    } else if (asset.assetClass === 'Gold') {
+      // Gold holdings without a custom ticker still fall back to the generic spot-price lookup.
+      const price = await getGoldPrice(asset.currency);
+      if (price) {
+        newPrice = price;
+        priceFetchStatus = 'success';
+        priceFetchMessage = undefined;
+        priceProvider = 'gold';
+      } else {
+        priceFetchStatus = 'failed';
+        priceFetchMessage = 'Gold price lookup failed.';
+        priceProvider = undefined;
+      }
     }
 
     return {
       ...asset,
       currentPrice: newPrice,
+      previousClose: newPreviousClose,
       lastUpdated: Date.now(),
       priceFetchStatus,
       priceFetchMessage,

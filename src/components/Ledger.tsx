@@ -13,23 +13,31 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { Select } from './ui/select';
 import { TickerRepairModal } from './TickerRepairModal';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Building2, ChevronDown, ChevronRight, Edit, Gem, Landmark, LineChart, PiggyBank, RefreshCw, ShieldCheck, Trash2, WalletCards } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Building2, Check, ChevronDown, Edit, Filter, Gem, Landmark, LineChart, PiggyBank, RefreshCw, ShieldCheck, Trash2, WalletCards } from 'lucide-react';
 import { convertAmount, formatCurrency, formatPercent, getAssetXirr, getCurrentPrice, getCurrentTotal, getGrowthTotal, getInvestmentPrice, getInvestmentTotal, isDebtAssetClass } from '../lib/portfolioMetrics';
 import { getTickerRecommendation } from '../lib/api';
 
 type LedgerCurrency = 'CAD' | 'INR' | 'USD' | 'ORIGINAL';
-type SortColumn = 'assetClass' | 'name' | 'owner' | 'investmentTotal' | 'currentTotal' | 'growthTotal' | 'xirr';
+type FilterColumnId = 'name' | 'assetClass' | 'position' | 'currentPrice' | 'marketValue' | 'performance' | 'notes';
+type FilterState = Record<FilterColumnId, { selected: string[]; search: string; min: string; max: string }>;
+
+const EMPTY_FILTER_STATE: FilterState = {
+  name: { selected: [], search: '', min: '', max: '' },
+  assetClass: { selected: [], search: '', min: '', max: '' },
+  position: { selected: [], search: '', min: '', max: '' },
+  currentPrice: { selected: [], search: '', min: '', max: '' },
+  marketValue: { selected: [], search: '', min: '', max: '' },
+  performance: { selected: [], search: '', min: '', max: '' },
+  notes: { selected: [], search: '', min: '', max: '' },
+};
 
 export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }) {
   const { assets, baseCurrency, rates, removeAsset, refreshAsset, refreshPrices, refreshFailedPrices, isRefreshing } = usePortfolio();
   const [canadaSorting, setCanadaSorting] = useState<SortingState>([
-    { id: 'assetClassGroup', desc: false },
     { id: 'name', desc: false },
   ]);
   const [indiaSorting, setIndiaSorting] = useState<SortingState>([
-    { id: 'assetClassGroup', desc: false },
     { id: 'name', desc: false },
   ]);
   const [memberFilter, setMemberFilter] = useState('ALL');
@@ -37,8 +45,9 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
   const [pricingFilter, setPricingFilter] = useState<'ALL' | 'AUTO' | 'MANUAL' | 'FAILED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [tickerRepairAsset, setTickerRepairAsset] = useState<Asset | undefined>(undefined);
-  const [collapsedClasses, setCollapsedClasses] = useState<string[]>([]);
   const [refreshingRowIds, setRefreshingRowIds] = useState<string[]>([]);
+  const [columnFilters, setColumnFilters] = useState<FilterState>(EMPTY_FILTER_STATE);
+  const [openColumnFilter, setOpenColumnFilter] = useState<FilterColumnId | null>(null);
 
   const handleRefreshRow = React.useCallback(async (assetId: string) => {
     setRefreshingRowIds((current) => current.includes(assetId) ? current : [...current, assetId]);
@@ -57,7 +66,20 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
     () => Array.from(new Set(assets.map((asset) => getCanonicalAssetClass(asset.assetClass)).filter(Boolean))).map(String).sort(),
     [assets],
   );
-  const filteredAssets = useMemo(
+  const getConvertedValue = React.useCallback(
+    (amount: number, assetCurrency: string, currency: LedgerCurrency) => {
+      if (currency === 'ORIGINAL') return amount;
+      return convertAmount(amount, assetCurrency, currency, rates);
+    },
+    [rates],
+  );
+
+  const getDisplayCurrency = React.useCallback(
+    (asset: Asset): 'CAD' | 'INR' | 'USD' => (baseCurrency === 'ORIGINAL' ? asset.currency : baseCurrency),
+    [baseCurrency],
+  );
+
+  const baseFilteredAssets = useMemo(
     () => assets.filter((asset) => {
       const matchesMember = memberFilter === 'ALL' || asset.owner === memberFilter;
       const matchesClass = assetClassFilter === 'ALL' || getCanonicalAssetClass(asset.assetClass) === assetClassFilter;
@@ -90,18 +112,110 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
     }
   }, [assetClassFilter, assetClassOptions]);
 
-  const getConvertedValue = React.useCallback(
-    (amount: number, assetCurrency: string, currency: LedgerCurrency) => {
-      if (currency === 'ORIGINAL') return amount;
-      return convertAmount(amount, assetCurrency, currency, rates);
-    },
-    [rates],
-  );
+  useEffect(() => {
+    const handleClickOutside = () => setOpenColumnFilter(null);
+    if (openColumnFilter) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openColumnFilter]);
 
-  const getDisplayCurrency = React.useCallback(
-    (asset: Asset): 'CAD' | 'INR' | 'USD' => (baseCurrency === 'ORIGINAL' ? asset.currency : baseCurrency),
-    [baseCurrency],
-  );
+  const getNumericFilterValue = React.useCallback((asset: Asset, columnId: FilterColumnId) => {
+    switch (columnId) {
+      case 'position':
+        return asset.quantity;
+      case 'currentPrice':
+        return getConvertedValue(getCurrentPrice(asset), asset.currency, baseCurrency);
+      case 'marketValue':
+        return getConvertedValue(getCurrentTotal(asset), asset.currency, baseCurrency);
+      case 'performance':
+        return getConvertedValue(getGrowthTotal(asset), asset.currency, baseCurrency);
+      default:
+        return 0;
+    }
+  }, [baseCurrency, getConvertedValue]);
+
+  const getTextFilterTokens = React.useCallback((asset: Asset, columnId: FilterColumnId) => {
+    if (columnId === 'name') return [asset.name];
+    if (columnId === 'assetClass') return [getCanonicalAssetClass(asset.assetClass)];
+    if (columnId === 'notes') {
+      const tags = [asset.autoUpdate ? (asset.priceFetchStatus === 'failed' ? 'Needs Attention' : 'Live Price') : 'Manual Pricing'];
+      tags.push(asset.comments ? 'Has Comments' : 'No Comments');
+      if (asset.holdingPlatform) tags.push(asset.holdingPlatform);
+      return tags;
+    }
+    return [];
+  }, []);
+
+  const columnFilterOptions = useMemo(() => {
+    const getDistinct = (columnId: FilterColumnId) =>
+      Array.from(new Set(baseFilteredAssets.flatMap((asset) => getTextFilterTokens(asset, columnId)))).filter(Boolean).sort();
+
+    return {
+      name: getDistinct('name'),
+      assetClass: getDistinct('assetClass'),
+      notes: getDistinct('notes'),
+    };
+  }, [baseFilteredAssets, getTextFilterTokens]);
+
+  const filteredAssets = useMemo(() => baseFilteredAssets.filter((asset) => {
+    return (Object.entries(columnFilters) as [FilterColumnId, FilterState[FilterColumnId]][]).every(([columnId, filter]) => {
+      const hasSelected = filter.selected.length > 0;
+      const hasRange = filter.min.trim() !== '' || filter.max.trim() !== '';
+
+      if ((columnId === 'name' || columnId === 'assetClass' || columnId === 'notes') && hasSelected) {
+        const tokens = getTextFilterTokens(asset, columnId);
+        if (!filter.selected.some((value) => tokens.includes(value))) return false;
+      }
+
+      if ((columnId === 'position' || columnId === 'currentPrice' || columnId === 'marketValue' || columnId === 'performance') && hasRange) {
+        const value = getNumericFilterValue(asset, columnId);
+        const min = filter.min.trim() === '' ? null : Number(filter.min);
+        const max = filter.max.trim() === '' ? null : Number(filter.max);
+        if (min !== null && Number.isFinite(min) && value < min) return false;
+        if (max !== null && Number.isFinite(max) && value > max) return false;
+      }
+
+      return true;
+    });
+  }), [baseFilteredAssets, columnFilters, getNumericFilterValue, getTextFilterTokens]);
+
+  const setColumnFilterSelected = React.useCallback((columnId: FilterColumnId, selected: string[]) => {
+    setColumnFilters((current) => ({
+      ...current,
+      [columnId]: {
+        ...current[columnId],
+        selected,
+      },
+    }));
+  }, []);
+
+  const setColumnFilterRange = React.useCallback((columnId: FilterColumnId, key: 'min' | 'max', value: string) => {
+    setColumnFilters((current) => ({
+      ...current,
+      [columnId]: {
+        ...current[columnId],
+        [key]: value,
+      },
+    }));
+  }, []);
+
+  const setColumnFilterSearch = React.useCallback((columnId: FilterColumnId, value: string) => {
+    setColumnFilters((current) => ({
+      ...current,
+      [columnId]: {
+        ...current[columnId],
+        search: value,
+      },
+    }));
+  }, []);
+
+  const clearColumnFilter = React.useCallback((columnId: FilterColumnId) => {
+    setColumnFilters((current) => ({
+      ...current,
+      [columnId]: EMPTY_FILTER_STATE[columnId],
+    }));
+  }, []);
 
   const columns = useMemo<ColumnDef<Asset, unknown>[]>(() => {
     const columnHelper = createColumnHelper<Asset>();
@@ -112,9 +226,10 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
         header: 'Asset',
         cell: (info) => {
           const asset = info.row.original;
-          const hasFailedPrice = asset.priceFetchStatus === 'failed';
+          const supportsTickerPricing = showsTickerManagement(asset);
+          const hasFailedPrice = supportsTickerPricing && asset.priceFetchStatus === 'failed';
           const providerForRecommendation = asset.priceProvider === 'finnhub' || asset.priceProvider === 'alphavantage' || asset.priceProvider === 'yahoo' ? asset.priceProvider : 'yahoo';
-          const assetMeta = [asset.ticker || 'No ticker', getCanonicalAssetClass(asset.assetClass), asset.owner].filter(Boolean).join(' • ');
+          const assetMeta = [asset.ticker || null, getCanonicalAssetClass(asset.assetClass), asset.owner].filter(Boolean).join(' • ');
           const isRowRefreshing = refreshingRowIds.includes(asset.id);
 
           return (
@@ -139,40 +254,46 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
                   {asset.holdingPlatform || getCanonicalAssetClass(asset.assetClass)}
                 </span>
               </div>
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setTickerRepairAsset(asset)}
-                    className={`inline-flex items-center gap-1 text-xs font-medium ${hasFailedPrice ? 'text-amber-600 hover:text-amber-700' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100'}`}
-                    title={hasFailedPrice ? `${asset.priceFetchMessage || 'Price fetch failed.'} ${getTickerRecommendation(asset.ticker || '', providerForRecommendation)}` : 'Check or update ticker/provider'}
-                  >
-                    {hasFailedPrice ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
-                    {asset.ticker ? 'Modify ticker' : 'Add ticker'}
-                  </button>
-                  {asset.ticker ? (
+              {supportsTickerPricing ? (
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => void handleRefreshRow(asset.id)}
-                      disabled={isRowRefreshing}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-slate-100"
-                      title="Refresh only this row"
+                      onClick={() => setTickerRepairAsset(asset)}
+                      className={`inline-flex items-center gap-1 text-xs font-medium ${hasFailedPrice ? 'text-amber-600 hover:text-amber-700' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100'}`}
+                      title={hasFailedPrice ? `${asset.priceFetchMessage || 'Price fetch failed.'} ${getTickerRecommendation(asset.ticker || '', providerForRecommendation)}` : 'Check or update ticker/provider'}
                     >
-                      <RefreshCw className={`h-3.5 w-3.5 ${isRowRefreshing ? 'animate-spin' : ''}`} />
-                      Refresh row
+                      {hasFailedPrice ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                      {asset.ticker ? 'Modify ticker' : 'Add ticker'}
                     </button>
-                  ) : null}
+                    {asset.ticker ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleRefreshRow(asset.id)}
+                        disabled={isRowRefreshing}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-slate-100"
+                        title="Refresh only this row"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${isRowRefreshing ? 'animate-spin' : ''}`} />
+                        Refresh row
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           );
         },
       }),
       columnHelper.accessor((row) => getCanonicalAssetClass(row.assetClass), {
-        id: 'assetClassGroup',
-        header: 'Group',
-        enableHiding: true,
-        cell: () => null,
+        id: 'assetClass',
+        header: 'Asset Class',
+        cell: (info) => (
+          <div className="space-y-1">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{info.getValue()}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">{info.row.original.country}</div>
+          </div>
+        ),
       }),
       columnHelper.accessor('quantity', {
         id: 'position',
@@ -213,7 +334,8 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
         cell: (info) => {
           const asset = info.row.original;
           const displayCurrency = getDisplayCurrency(asset);
-          const hasFailedPrice = asset.priceFetchStatus === 'failed';
+          const supportsTickerPricing = showsTickerManagement(asset);
+          const hasFailedPrice = supportsTickerPricing && asset.priceFetchStatus === 'failed';
           const providerForRecommendation = asset.priceProvider === 'finnhub' || asset.priceProvider === 'alphavantage' || asset.priceProvider === 'yahoo' ? asset.priceProvider : 'yahoo';
           const previousClose = getPreviousClose(asset);
           const currentPrice = hasFailedPrice
@@ -420,7 +542,7 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
                 <StatPill label="Manual" value={String(filteredAssets.filter((asset) => !asset.autoUpdate).length)} />
               </div>
               <div className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                Canada assets appear first, followed by India. Each section starts in alphabetical order and can be sorted from its own table headers.
+                Canada assets appear first, followed by India. Use the header filter icons for Excel-style column filtering and quick value selection.
               </div>
             </div>
           </div>
@@ -433,24 +555,34 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
           subtitle="Alphabetical by default. Click headers here to sort only Canada holdings."
           table={canadaTable}
           columnsLength={columns.length}
-          collapsedClasses={collapsedClasses}
-          setCollapsedClasses={setCollapsedClasses}
+          columnFilters={columnFilters}
+          openColumnFilter={openColumnFilter}
+          setOpenColumnFilter={setOpenColumnFilter}
+          columnFilterOptions={columnFilterOptions}
+          setColumnFilterSelected={setColumnFilterSelected}
+          setColumnFilterRange={setColumnFilterRange}
+          setColumnFilterSearch={setColumnFilterSearch}
+          clearColumnFilter={clearColumnFilter}
         />
         <CountryTableSection
           title="India Assets"
           subtitle="Alphabetical by default. Click headers here to sort only India holdings."
           table={indiaTable}
           columnsLength={columns.length}
-          collapsedClasses={collapsedClasses}
-          setCollapsedClasses={setCollapsedClasses}
+          columnFilters={columnFilters}
+          openColumnFilter={openColumnFilter}
+          setOpenColumnFilter={setOpenColumnFilter}
+          columnFilterOptions={columnFilterOptions}
+          setColumnFilterSelected={setColumnFilterSelected}
+          setColumnFilterRange={setColumnFilterRange}
+          setColumnFilterSearch={setColumnFilterSearch}
+          clearColumnFilter={clearColumnFilter}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:hidden">
         {[...canadaTable.getRowModel().rows, ...indiaTable.getRowModel().rows].length ? (
           [...canadaTable.getRowModel().rows, ...indiaTable.getRowModel().rows].map((row, index, allRows) => {
-            const previousClass = index > 0 ? allRows[index - 1].original.assetClass : null;
-            const showSeparator = index === 0 || previousClass !== row.original.assetClass;
             const asset = row.original;
             const displayCurrency = getDisplayCurrency(asset);
             const investmentTotal = getConvertedValue(getInvestmentTotal(asset), asset.currency, baseCurrency);
@@ -463,17 +595,6 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
 
             return (
               <React.Fragment key={row.id}>
-                {showSeparator && (
-                  <div className="pt-2">
-                    <div className="flex items-center gap-3">
-                      <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                      <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white dark:bg-slate-100 dark:text-slate-900">
-                        {asset.assetClass}
-                      </span>
-                      <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                    </div>
-                  </div>
-                )}
                 <div className="rounded-lg border p-4 bg-white dark:bg-slate-950 dark:border-slate-800 space-y-3 shadow-sm">
                   <div className="flex justify-between items-start">
                     <div>
@@ -504,34 +625,44 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
 
                   <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t">
                     <div>
+                      <div className="text-slate-500">Asset Class</div>
+                      <div>{getCanonicalAssetClass(asset.assetClass)}</div>
+                    </div>
+                    <div>
                       <div className="text-slate-500">Total Quantity</div>
                       <div>{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
                     </div>
-                    <div>
-                      <div className="text-slate-500">Ticker</div>
-                      <div>{asset.ticker || '-'}</div>
-                      <button
-                        type="button"
-                        onClick={() => setTickerRepairAsset(asset)}
-                        className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${asset.priceFetchStatus === 'failed' ? 'text-amber-600' : 'text-slate-500'}`}
-                        title={asset.priceFetchStatus === 'failed' ? asset.priceFetchMessage || 'Price fetch failed.' : 'Check or update ticker/provider'}
-                      >
-                        {asset.priceFetchStatus === 'failed' ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
-                        {asset.ticker ? 'Modify ticker' : 'Add ticker'}
-                      </button>
-                      {asset.ticker ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleRefreshRow(asset.id)}
-                          disabled={isRowRefreshing}
-                          className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
-                          title="Refresh only this row"
-                        >
-                          <RefreshCw className={`h-3.5 w-3.5 ${isRowRefreshing ? 'animate-spin' : ''}`} />
-                          Refresh row
-                        </button>
-                      ) : null}
-                    </div>
+                      <div>
+                        <div className="text-slate-500">Ticker</div>
+                        {showsTickerManagement(asset) ? (
+                          <>
+                            <div>{asset.ticker || '-'}</div>
+                            <button
+                              type="button"
+                              onClick={() => setTickerRepairAsset(asset)}
+                              className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${asset.priceFetchStatus === 'failed' ? 'text-amber-600' : 'text-slate-500'}`}
+                              title={asset.priceFetchStatus === 'failed' ? asset.priceFetchMessage || 'Price fetch failed.' : 'Check or update ticker/provider'}
+                            >
+                              {asset.priceFetchStatus === 'failed' ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                              {asset.ticker ? 'Modify ticker' : 'Add ticker'}
+                            </button>
+                            {asset.ticker ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleRefreshRow(asset.id)}
+                                disabled={isRowRefreshing}
+                                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                title="Refresh only this row"
+                              >
+                                <RefreshCw className={`h-3.5 w-3.5 ${isRowRefreshing ? 'animate-spin' : ''}`} />
+                                Refresh row
+                              </button>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div>Manual pricing</div>
+                        )}
+                      </div>
                     <div>
                       <div className="text-slate-500">Holding Platform</div>
                       <div>{asset.holdingPlatform || '-'}</div>
@@ -615,15 +746,27 @@ function CountryTableSection({
   subtitle,
   table,
   columnsLength,
-  collapsedClasses,
-  setCollapsedClasses,
+  columnFilters,
+  openColumnFilter,
+  setOpenColumnFilter,
+  columnFilterOptions,
+  setColumnFilterSelected,
+  setColumnFilterRange,
+  setColumnFilterSearch,
+  clearColumnFilter,
 }: {
   title: string;
   subtitle: string;
   table: ReturnType<typeof useReactTable<Asset>>;
   columnsLength: number;
-  collapsedClasses: string[];
-  setCollapsedClasses: React.Dispatch<React.SetStateAction<string[]>>;
+  columnFilters: FilterState;
+  openColumnFilter: FilterColumnId | null;
+  setOpenColumnFilter: (columnId: FilterColumnId | null) => void;
+  columnFilterOptions: Record<'name' | 'assetClass' | 'notes', string[]>;
+  setColumnFilterSelected: (columnId: FilterColumnId, selected: string[]) => void;
+  setColumnFilterRange: (columnId: FilterColumnId, key: 'min' | 'max', value: string) => void;
+  setColumnFilterSearch: (columnId: FilterColumnId, value: string) => void;
+  clearColumnFilter: (columnId: FilterColumnId) => void;
 }) {
   const tableRows = table.getRowModel().rows;
 
@@ -640,17 +783,54 @@ function CountryTableSection({
               {headerGroup.headers.map((header) => (
                 <TableHead key={header.id} className="min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400">
                   {header.isPlaceholder ? null : (
-                    <div
-                      className={header.column.getCanSort() ? 'flex cursor-pointer select-none items-center gap-2 hover:text-slate-700 dark:hover:text-slate-300' : 'flex items-center gap-2'}
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {{
-                        asc: <ArrowUp className="h-4 w-4" />,
-                        desc: <ArrowDown className="h-4 w-4" />,
-                      }[header.column.getIsSorted() as string] ?? (
-                        header.column.getCanSort() ? <ArrowUpDown className="h-4 w-4 text-slate-300" /> : null
-                      )}
+                    <div className="relative">
+                      <div
+                        className={header.column.getCanSort() ? 'flex cursor-pointer select-none items-center gap-2 hover:text-slate-700 dark:hover:text-slate-300' : 'flex items-center gap-2'}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {{
+                          asc: <ArrowUp className="h-4 w-4" />,
+                          desc: <ArrowDown className="h-4 w-4" />,
+                        }[header.column.getIsSorted() as string] ?? (
+                          header.column.getCanSort() ? <ArrowUpDown className="h-4 w-4 text-slate-300" /> : null
+                        )}
+                        {isFilterableColumn(header.column.id) ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const columnId = header.column.id as FilterColumnId;
+                              setOpenColumnFilter(openColumnFilter === columnId ? null : columnId);
+                            }}
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded-md border transition-colors ${
+                              isColumnFilterActive(columnFilters[header.column.id as FilterColumnId])
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : 'border-transparent text-slate-400 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-600 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-300'
+                            }`}
+                            title="Filter this column"
+                          >
+                            <Filter className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                      {isFilterableColumn(header.column.id) && openColumnFilter === header.column.id ? (
+                        <ColumnFilterMenu
+                          columnId={header.column.id as FilterColumnId}
+                          filter={columnFilters[header.column.id as FilterColumnId]}
+                          options={
+                            header.column.id === 'name' || header.column.id === 'assetClass' || header.column.id === 'notes'
+                              ? columnFilterOptions[header.column.id as 'name' | 'assetClass' | 'notes']
+                              : []
+                          }
+                          onClose={() => setOpenColumnFilter(null)}
+                          onClear={() => clearColumnFilter(header.column.id as FilterColumnId)}
+                          onSearchChange={(value) => setColumnFilterSearch(header.column.id as FilterColumnId, value)}
+                          onSelectedChange={(selected) => setColumnFilterSelected(header.column.id as FilterColumnId, selected)}
+                          onRangeChange={(key, value) => setColumnFilterRange(header.column.id as FilterColumnId, key, value)}
+                        />
+                      ) : null}
                     </div>
                   )}
                 </TableHead>
@@ -661,40 +841,15 @@ function CountryTableSection({
         <TableBody>
           {tableRows.length ? (
             tableRows.map((row, index) => {
-              const currentGroup = getCanonicalAssetClass(row.original.assetClass);
-              const previousClass = index > 0 ? getCanonicalAssetClass(tableRows[index - 1].original.assetClass) : null;
-              const showSeparator = index === 0 || previousClass !== currentGroup;
-              const isCollapsed = collapsedClasses.includes(currentGroup);
-
               return (
                 <React.Fragment key={row.id}>
-                  {showSeparator && (
-                    <TableRow className="bg-slate-50/90 dark:bg-slate-900/60 hover:bg-slate-50/90 dark:hover:bg-slate-900/60">
-                      <TableCell colSpan={columnsLength} className="border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => setCollapsedClasses((current) => current.includes(currentGroup) ? current.filter((item) => item !== currentGroup) : [...current, currentGroup])}
-                          className="flex w-full items-center gap-3 text-left"
-                        >
-                          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                          <span className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white dark:bg-slate-100 dark:text-slate-900">
-                            {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                            {currentGroup}
-                          </span>
-                          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                        </button>
+                  <TableRow className={`align-top transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50 ${index % 2 === 0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50/55 dark:bg-slate-900/40'}`}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="min-w-0 px-4 py-4 text-sm leading-6">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
-                    </TableRow>
-                  )}
-                  {!isCollapsed && (
-                    <TableRow className={`align-top transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50 ${index % 2 === 0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50/55 dark:bg-slate-900/40'}`}>
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="min-w-0 px-4 py-4 text-sm leading-6">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  )}
+                    ))}
+                  </TableRow>
                 </React.Fragment>
               );
             })
@@ -731,6 +886,14 @@ function getAssetIcon(assetClass: string) {
   return <ShieldCheck className="h-4 w-4" />;
 }
 
+function usesTickerPricing(asset: Asset) {
+  return asset.autoUpdate && !['Gold', 'Cash', 'PF/NPS/FD', 'TFSA/RRSP/FHSA', 'Real Estate', 'Other', 'Credit Card'].includes(asset.assetClass);
+}
+
+function showsTickerManagement(asset: Asset) {
+  return asset.autoUpdate && (Boolean(asset.ticker) || usesTickerPricing(asset));
+}
+
 function getPreviousClose(asset: Asset) {
   const candidate = (asset as Asset & { previousClose?: number }).previousClose;
   return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
@@ -750,4 +913,130 @@ function getCanonicalAssetClass(assetClass: string) {
   if (normalized === 'fd') return 'FD';
   if (normalized === 'nps') return 'NPS';
   return assetClass;
+}
+
+function isFilterableColumn(columnId: string): columnId is FilterColumnId {
+  return ['name', 'assetClass', 'position', 'currentPrice', 'marketValue', 'performance', 'notes'].includes(columnId);
+}
+
+function isColumnFilterActive(filter: FilterState[FilterColumnId]) {
+  return filter.selected.length > 0 || filter.min.trim() !== '' || filter.max.trim() !== '';
+}
+
+function ColumnFilterMenu({
+  columnId,
+  filter,
+  options,
+  onClose,
+  onClear,
+  onSearchChange,
+  onSelectedChange,
+  onRangeChange,
+}: {
+  columnId: FilterColumnId;
+  filter: FilterState[FilterColumnId];
+  options: string[];
+  onClose: () => void;
+  onClear: () => void;
+  onSearchChange: (value: string) => void;
+  onSelectedChange: (selected: string[]) => void;
+  onRangeChange: (key: 'min' | 'max', value: string) => void;
+}) {
+  const filteredOptions = useMemo(() => {
+    const query = filter.search.trim().toLowerCase();
+    if (!query) return options;
+    return options.filter((option) => option.toLowerCase().includes(query));
+  }, [filter.search, options]);
+
+  const toggleOption = (value: string) => {
+    if (filter.selected.includes(value)) {
+      onSelectedChange(filter.selected.filter((item) => item !== value));
+    } else {
+      onSelectedChange([...filter.selected, value]);
+    }
+  };
+
+  const isNumeric = columnId === 'position' || columnId === 'currentPrice' || columnId === 'marketValue' || columnId === 'performance';
+
+  return (
+    <div
+      className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-800 dark:bg-slate-950"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Column Filter</div>
+        <button type="button" onClick={onClose} className="text-[11px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-100">
+          Done
+        </button>
+      </div>
+
+      {isNumeric ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Min</label>
+              <Input value={filter.min} onChange={(event) => onRangeChange('min', event.target.value)} placeholder="No minimum" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Max</label>
+              <Input value={filter.max} onChange={(event) => onRangeChange('max', event.target.value)} placeholder="No maximum" />
+            </div>
+          </div>
+          <p className="text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+            Filters use the values currently shown in the table, including converted totals when a unified currency is active.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <Input
+            value={filter.search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Search values..."
+            className="h-9"
+          />
+          <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            <button
+              type="button"
+              onClick={() => onSelectedChange(filteredOptions)}
+              className="hover:text-slate-800 dark:hover:text-slate-100"
+            >
+              Select visible
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectedChange([])}
+              className="hover:text-slate-800 dark:hover:text-slate-100"
+            >
+              Clear selection
+            </button>
+          </div>
+          <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-1 dark:border-slate-800">
+            {filteredOptions.length ? filteredOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => toggleOption(option)}
+                className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900"
+              >
+                <span className="truncate">{option}</span>
+                {filter.selected.includes(option) ? <Check className="h-4 w-4 text-emerald-600" /> : null}
+              </button>
+            )) : (
+              <div className="px-2 py-3 text-sm text-slate-500 dark:text-slate-400">No matching values.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-800">
+        <button type="button" onClick={onClear} className="text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-100">
+          Reset filter
+        </button>
+        <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+          <ChevronDown className="h-3 w-3" />
+          Excel-style
+        </div>
+      </div>
+    </div>
+  );
 }
