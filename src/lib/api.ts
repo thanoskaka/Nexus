@@ -1,0 +1,371 @@
+export type PriceProvider = 'yahoo' | 'alphavantage' | 'finnhub';
+
+export interface PriceProviderSettings {
+  alphaVantageApiKey: string;
+  finnhubApiKey: string;
+  primaryProvider: PriceProvider;
+  secondaryProvider: PriceProvider;
+}
+
+export interface PriceFetchResult {
+  price: number | null;
+  provider: PriceProvider;
+  normalizedTicker?: string;
+  currency?: string;
+  sourceUrl?: string;
+  error?: string;
+}
+
+export const DEFAULT_PRICE_PROVIDER_SETTINGS: PriceProviderSettings = {
+  alphaVantageApiKey: '',
+  finnhubApiKey: '',
+  primaryProvider: 'yahoo',
+  secondaryProvider: 'alphavantage',
+};
+
+export async function fetchExchangeRates(base: string = 'USD') {
+  try {
+    const response = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+    const data = await response.json();
+    return data.rates;
+  } catch (error) {
+    console.error('Failed to fetch exchange rates:', error);
+    return null;
+  }
+}
+
+export async function fetchHistoricalExchangeRate(date: string, from: string, to: string) {
+  try {
+    const response = await fetch(`https://api.frankfurter.app/${date}?from=${from}&to=${to}`);
+    const data = await response.json();
+    if (data && data.rates && data.rates[to]) {
+      return data.rates[to];
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch historical exchange rate:', error);
+    return null;
+  }
+}
+
+export async function searchMutualFunds(query: string) {
+  void query;
+  return [];
+}
+
+export async function getMutualFundNav(ticker: string, settings: PriceProviderSettings = DEFAULT_PRICE_PROVIDER_SETTINGS) {
+  const result = await fetchStockPrice(ticker, settings.primaryProvider, settings);
+  return result.price;
+}
+
+export async function getStockPrice(ticker: string, settings: PriceProviderSettings = DEFAULT_PRICE_PROVIDER_SETTINGS) {
+  const result = await fetchStockPrice(ticker, settings.primaryProvider, settings);
+  return result.price;
+}
+
+export async function fetchPriceWithFallback(ticker: string, settings: PriceProviderSettings = DEFAULT_PRICE_PROVIDER_SETTINGS) {
+  return fetchPriceWithProviderOrder(ticker, [settings.primaryProvider, settings.secondaryProvider], settings);
+}
+
+export async function fetchPriceWithProviderOrder(
+  ticker: string,
+  providers: PriceProvider[],
+  settings: PriceProviderSettings = DEFAULT_PRICE_PROVIDER_SETTINGS,
+) {
+  const uniqueProviders = dedupeProviders(providers);
+  let lastFailure: PriceFetchResult | null = null;
+
+  for (let index = 0; index < uniqueProviders.length; index += 1) {
+    const provider = uniqueProviders[index];
+    const result = await fetchStockPrice(ticker, provider, settings);
+    if (result.price != null) {
+      return result;
+    }
+    lastFailure = result;
+    if (index < uniqueProviders.length - 1) {
+      await delay(500);
+    }
+  }
+
+  return lastFailure ?? {
+    price: null,
+    provider: settings.primaryProvider,
+    error: 'Price lookup failed.',
+  };
+}
+
+export async function fetchStockPrice(
+  ticker: string,
+  provider: PriceProvider,
+  settings: PriceProviderSettings = DEFAULT_PRICE_PROVIDER_SETTINGS,
+): Promise<PriceFetchResult> {
+  const normalizedTicker = normalizeTickerForProvider(ticker, provider);
+  if (!normalizedTicker) {
+    return {
+      price: null,
+      provider,
+      error: `Ticker format not recognized for ${provider}. ${getTickerRecommendation(ticker, provider)}`,
+    };
+  }
+
+  try {
+    switch (provider) {
+      case 'yahoo':
+        return await fetchYahooPrice(ticker, normalizedTicker);
+      case 'alphavantage':
+        return await fetchAlphaVantagePrice(normalizedTicker, settings.alphaVantageApiKey);
+      case 'finnhub':
+        return await fetchFinnhubPrice(normalizedTicker, settings.finnhubApiKey);
+      default:
+        return {
+          price: null,
+          provider,
+          normalizedTicker,
+          error: 'Unsupported provider.',
+        };
+    }
+  } catch (error) {
+    return {
+      price: null,
+      provider,
+      normalizedTicker,
+      error: error instanceof Error ? error.message : 'Unknown provider error',
+    };
+  }
+}
+
+export function normalizeTickerForProvider(ticker: string, provider: PriceProvider) {
+  const rawTicker = ticker.trim();
+  if (!rawTicker) return '';
+  if (!rawTicker.includes(':')) {
+    return rawTicker;
+  }
+
+  const [exchange, rawSymbol] = rawTicker.split(':');
+  const symbol = rawSymbol?.trim();
+  if (!exchange || !symbol) return rawTicker;
+
+  const upperExchange = exchange.toUpperCase();
+  const mappingByProvider: Record<PriceProvider, Record<string, string>> = {
+    yahoo: {
+      NASDAQ: symbol,
+      NYSE: symbol,
+      AMEX: symbol,
+      NSE: `${symbol}.NS`,
+      BOM: `${symbol}.BO`,
+      TSE: `${symbol}.TO`,
+      CVE: `${symbol}.V`,
+      LON: `${symbol}.L`,
+      FRA: `${symbol}.F`,
+      TYO: `${symbol}.T`,
+    },
+    alphavantage: {
+      NASDAQ: symbol,
+      NYSE: symbol,
+      AMEX: symbol,
+      NSE: `${symbol}.NSE`,
+      BOM: `${symbol}.BSE`,
+      TSE: `${symbol}.TO`,
+      CVE: `${symbol}.V`,
+      LON: `${symbol}.LON`,
+      FRA: `${symbol}.FRA`,
+      TYO: `${symbol}.TYO`,
+    },
+    finnhub: {
+      NASDAQ: symbol,
+      NYSE: symbol,
+      AMEX: symbol,
+      NSE: `${symbol}.NS`,
+      BOM: `${symbol}.BO`,
+      TSE: `${symbol}.TO`,
+      CVE: `${symbol}.V`,
+      LON: `${symbol}.L`,
+      FRA: `${symbol}.F`,
+      TYO: `${symbol}.T`,
+    },
+  };
+
+  return mappingByProvider[provider][upperExchange] || symbol;
+}
+
+export function inferCurrencyFromTicker(ticker: string) {
+  const upperTicker = ticker.toUpperCase();
+  if (upperTicker === 'GOLD' || upperTicker.includes('XAU')) {
+    return 'USD';
+  }
+  if (upperTicker.endsWith('.NS') || upperTicker.endsWith('.BO') || upperTicker.includes('.NSE') || upperTicker.includes('.BSE')) {
+    return 'INR';
+  }
+  if (upperTicker.endsWith('.TO') || upperTicker.endsWith('.V')) {
+    return 'CAD';
+  }
+  return 'USD';
+}
+
+export function getTickerRecommendation(ticker: string, provider: PriceProvider) {
+  const normalized = normalizeTickerForProvider(ticker, provider);
+  if (!ticker) {
+    return 'Add a ticker to enable live price fetching.';
+  }
+  if (normalized === ticker) {
+    return `Verify the ticker exists on ${provider}.`;
+  }
+  return `Try ${normalized} for ${provider.toUpperCase()}.`;
+}
+
+export async function getGoldPrice(currency: 'INR' | 'CAD' | 'USD') {
+  try {
+    const rates = await fetchExchangeRates('USD');
+    if (rates && rates.XAU) {
+      const usdPerOunce = 1 / rates.XAU;
+      const usdPerGram = usdPerOunce / 31.1034768;
+
+      if (currency === 'USD') return usdPerGram;
+      if (currency === 'INR') return usdPerGram * rates.INR;
+      if (currency === 'CAD') return usdPerGram * rates.CAD;
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch gold price:', error);
+    return null;
+  }
+}
+
+async function fetchYahooPrice(originalTicker: string, normalizedTicker: string): Promise<PriceFetchResult> {
+  const response = await fetch(`/api/finance?ticker=${encodeURIComponent(originalTicker)}`);
+  if (!response.ok) {
+    const data = await safeJson(response);
+    return {
+      price: null,
+      provider: 'yahoo',
+      normalizedTicker,
+      error: data?.error || `Yahoo returned ${response.status}`,
+    };
+  }
+  const data = await safeJson(response);
+  if (!data) {
+    return {
+      price: null,
+      provider: 'yahoo',
+      normalizedTicker,
+      error: 'Yahoo Finance proxy is unavailable from this app instance. Use the app server route or choose another provider.',
+    };
+  }
+  return {
+    price: typeof data?.price === 'number' ? data.price : null,
+    provider: 'yahoo',
+    normalizedTicker,
+    currency: typeof data?.currency === 'string' ? data.currency : undefined,
+    sourceUrl: typeof data?.sourceUrl === 'string' ? data.sourceUrl : buildProviderQuoteUrl('yahoo', normalizedTicker),
+    error: typeof data?.price === 'number' ? undefined : 'Yahoo did not return a usable price.',
+  };
+}
+
+async function fetchAlphaVantagePrice(ticker: string, apiKey: string): Promise<PriceFetchResult> {
+  if (!apiKey) {
+    return {
+      price: null,
+      provider: 'alphavantage',
+      normalizedTicker: ticker,
+      error: 'Missing Alpha Vantage API key.',
+    };
+  }
+
+  const response = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}&apikey=${encodeURIComponent(apiKey)}`);
+  const data = await safeJson(response);
+  if (!data) {
+    return {
+      price: null,
+      provider: 'alphavantage',
+      normalizedTicker: ticker,
+      error: 'Alpha Vantage returned an unreadable response.',
+    };
+  }
+  const price = Number.parseFloat(data?.['Global Quote']?.['05. price']);
+
+  if (Number.isFinite(price) && price > 0) {
+    return {
+      price,
+      provider: 'alphavantage',
+      normalizedTicker: ticker,
+      currency: inferCurrencyFromTicker(ticker),
+      sourceUrl: buildProviderQuoteUrl('alphavantage', ticker),
+    };
+  }
+
+  return {
+    price: null,
+    provider: 'alphavantage',
+    normalizedTicker: ticker,
+    error: data?.Note || data?.Information || data?.['Error Message'] || 'Alpha Vantage did not return a valid quote.',
+  };
+}
+
+async function fetchFinnhubPrice(ticker: string, apiKey: string): Promise<PriceFetchResult> {
+  if (!apiKey) {
+    return {
+      price: null,
+      provider: 'finnhub',
+      normalizedTicker: ticker,
+      error: 'Missing Finnhub API key.',
+    };
+  }
+
+  const response = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(apiKey)}`);
+  const data = await safeJson(response);
+  if (!data) {
+    return {
+      price: null,
+      provider: 'finnhub',
+      normalizedTicker: ticker,
+      error: 'Finnhub returned an unreadable response.',
+    };
+  }
+  const price = Number(data?.c);
+
+  if (Number.isFinite(price) && price > 0) {
+    return {
+      price,
+      provider: 'finnhub',
+      normalizedTicker: ticker,
+      currency: inferCurrencyFromTicker(ticker),
+      sourceUrl: buildProviderQuoteUrl('finnhub', ticker),
+    };
+  }
+
+  return {
+    price: null,
+    provider: 'finnhub',
+    normalizedTicker: ticker,
+    error: data?.error || 'Finnhub did not return a valid quote.',
+  };
+}
+
+async function safeJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function dedupeProviders(providers: PriceProvider[]) {
+  return Array.from(new Set(providers));
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildProviderQuoteUrl(provider: PriceProvider, ticker: string) {
+  switch (provider) {
+    case 'yahoo':
+      return `https://finance.yahoo.com/quote/${encodeURIComponent(ticker)}`;
+    case 'alphavantage':
+      return `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}`;
+    case 'finnhub':
+      return `https://finnhub.io/quote?symbol=${encodeURIComponent(ticker)}`;
+    default:
+      return undefined;
+  }
+}
