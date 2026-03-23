@@ -1,16 +1,30 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
+  collection,
   doc,
   onSnapshot,
+  query,
   runTransaction,
   serverTimestamp,
   setDoc,
+  where,
 } from 'firebase/firestore';
 import { Asset, AssetClassDef } from './db';
 import { DEFAULT_PRICE_PROVIDER_SETTINGS, PriceProviderSettings, fetchExchangeRates, fetchPriceWithProviderOrder, getGoldPrice } from '../lib/api';
-import { db, defaultPortfolioId } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import { applyPriceFormula } from '../lib/priceFormula';
+import {
+  buildPortfolioName,
+  createDefaultPortfolio,
+  getActivePortfolioStorageKey,
+  getPersonalPortfolioId,
+  normalizePortfolio,
+  type PortfolioDocument,
+  type PortfolioMember,
+  type PortfolioSummary,
+  selectActivePortfolioId,
+} from './portfolioHelpers';
 
 export interface ImportProgress {
   visible: boolean;
@@ -19,15 +33,13 @@ export interface ImportProgress {
   message: string;
 }
 
-export interface PortfolioMember {
-  email: string;
-  role: 'owner' | 'partner';
-}
-
 interface PortfolioContextType {
   assets: Asset[];
   assetClasses: AssetClassDef[];
   members: PortfolioMember[];
+  portfolios: PortfolioSummary[];
+  activePortfolioId: string | null;
+  setActivePortfolioId: (id: string) => void;
   currentUserRole: PortfolioMember['role'] | null;
   baseCurrency: 'CAD' | 'INR' | 'USD' | 'ORIGINAL';
   setBaseCurrency: (currency: 'CAD' | 'INR' | 'USD' | 'ORIGINAL') => Promise<void>;
@@ -64,30 +76,27 @@ interface PortfolioContextType {
   setImportProgress: (progress: ImportProgress) => void;
 }
 
-interface PortfolioDocument {
-  assets: Asset[];
-  assetClasses: AssetClassDef[];
-  baseCurrency: 'CAD' | 'INR' | 'USD' | 'ORIGINAL';
-  members: PortfolioMember[];
-  memberEmails: string[];
-  priceProviderSettings: PriceProviderSettings;
-  updatedAt?: unknown;
-}
-
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
 
 const EMPTY_PROGRESS: ImportProgress = { visible: false, current: 0, total: 0, message: '' };
+const EMPTY_PORTFOLIO: PortfolioDocument = {
+  assets: [],
+  assetClasses: [],
+  baseCurrency: 'ORIGINAL',
+  members: [],
+  memberEmails: [],
+  name: '',
+  ownerEmail: '',
+  ownerUid: '',
+  isPersonal: false,
+  priceProviderSettings: DEFAULT_PRICE_PROVIDER_SETTINGS,
+};
 
 export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [portfolio, setPortfolio] = useState<PortfolioDocument>({
-    assets: [],
-    assetClasses: [],
-    baseCurrency: 'ORIGINAL',
-    members: [],
-    memberEmails: [],
-    priceProviderSettings: DEFAULT_PRICE_PROVIDER_SETTINGS,
-  });
+  const [portfolio, setPortfolio] = useState<PortfolioDocument>(EMPTY_PORTFOLIO);
+  const [portfolios, setPortfolios] = useState<PortfolioSummary[]>([]);
+  const [activePortfolioId, setActivePortfolioIdState] = useState<string | null>(null);
   const [rates, setRates] = useState<Record<string, number> | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPortfolioLoading, setIsPortfolioLoading] = useState(true);
@@ -101,14 +110,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user?.email) {
-      setPortfolio({
-        assets: [],
-        assetClasses: [],
-        baseCurrency: 'ORIGINAL',
-        members: [],
-        memberEmails: [],
-        priceProviderSettings: DEFAULT_PRICE_PROVIDER_SETTINGS,
-      });
+      setPortfolio(EMPTY_PORTFOLIO);
+      setPortfolios([]);
+      setActivePortfolioIdState(null);
       setHasAccess(false);
       setAccessError(null);
       setIsPortfolioLoading(false);
@@ -116,51 +120,53 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsPortfolioLoading(true);
-    const portfolioRef = doc(db, 'portfolios', defaultPortfolioId);
-    let didBootstrap = false;
+    const personalPortfolioId = getPersonalPortfolioId(user.uid);
+    const personalPortfolioRef = doc(db, 'portfolios', personalPortfolioId);
+    void ensurePersonalPortfolio(personalPortfolioRef, user.email, user.uid);
+
+    const portfoliosQuery = query(
+      collection(db, 'portfolios'),
+      where('memberEmails', 'array-contains', user.email.toLowerCase()),
+    );
 
     const unsubscribe = onSnapshot(
-      portfolioRef,
-      async (snapshot) => {
-        if (!snapshot.exists() && !didBootstrap) {
-          didBootstrap = true;
-          try {
-            await setDoc(portfolioRef, {
-              ...createDefaultPortfolio(user.email),
-              updatedAt: serverTimestamp(),
-            });
-          } catch (error) {
-            setIsPortfolioLoading(false);
-            setHasAccess(false);
-            setAccessError(getFirestoreErrorMessage(error));
-          }
-          return;
-        }
+      portfoliosQuery,
+      (snapshot) => {
+        const availablePortfolios = snapshot.docs.map((portfolioDoc) => {
+          const normalized = normalizePortfolio(portfolioDoc.data() as Partial<PortfolioDocument>);
+          return {
+            id: portfolioDoc.id,
+            name: normalized.name || buildPortfolioName(normalized, portfolioDoc.id),
+            ownerEmail: normalized.ownerEmail || normalized.members[0]?.email || '',
+            isPersonal: normalized.isPersonal || portfolioDoc.id === personalPortfolioId,
+            document: normalized,
+          };
+        });
 
-        if (!snapshot.exists()) {
-          setPortfolio({
-            assets: [],
-            assetClasses: [],
-            baseCurrency: 'ORIGINAL',
-            members: [],
-            memberEmails: [],
-            priceProviderSettings: DEFAULT_PRICE_PROVIDER_SETTINGS,
-          });
+        if (availablePortfolios.length === 0) {
+          setPortfolio(EMPTY_PORTFOLIO);
+          setPortfolios([]);
+          setActivePortfolioIdState(null);
           setHasAccess(false);
-          setAccessError('Portfolio document was not found.');
+          setAccessError('No accessible portfolios were found yet. Your personal portfolio is being created.');
           setIsPortfolioLoading(false);
           return;
         }
 
-        const data = snapshot.data() as Partial<PortfolioDocument>;
-        const nextPortfolio = normalizePortfolio(data);
+        const persistedPortfolioId = window.localStorage.getItem(getActivePortfolioStorageKey(user.uid));
+        const nextActivePortfolioId = selectActivePortfolioId({
+          currentActivePortfolioId: activePortfolioId,
+          persistedPortfolioId,
+          availablePortfolios,
+          personalPortfolioId,
+        });
+        const activePortfolio = availablePortfolios.find((candidate) => candidate.id === nextActivePortfolioId) || availablePortfolios[0];
 
-        const email = user.email.toLowerCase();
-        const isAuthorized = nextPortfolio.members.some((member) => member.email.toLowerCase() === email);
-
-        setPortfolio(nextPortfolio);
-        setHasAccess(isAuthorized);
-        setAccessError(isAuthorized ? null : 'Access denied. Your email is not a member of this portfolio.');
+        setPortfolios(availablePortfolios.map(({ document: _document, ...summary }) => summary));
+        setActivePortfolioIdState(activePortfolio.id);
+        setPortfolio(activePortfolio.document);
+        setHasAccess(true);
+        setAccessError(null);
         setIsPortfolioLoading(false);
       },
       (error) => {
@@ -171,7 +177,16 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     );
 
     return unsubscribe;
-  }, [user?.email]);
+  }, [activePortfolioId, user?.email, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid || !activePortfolioId) return;
+    window.localStorage.setItem(getActivePortfolioStorageKey(user.uid), activePortfolioId);
+  }, [activePortfolioId, user?.uid]);
+
+  const setActivePortfolioId = (id: string) => {
+    setActivePortfolioIdState(id);
+  };
 
   const currentUserRole = useMemo(() => {
     if (!user?.email) return null;
@@ -179,12 +194,16 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   }, [portfolio.members, user?.email]);
 
   const mutatePortfolio = async (updater: (current: PortfolioDocument) => PortfolioDocument) => {
-    const portfolioRef = doc(db, 'portfolios', defaultPortfolioId);
+    if (!activePortfolioId) {
+      throw new Error('No active portfolio selected.');
+    }
+
+    const portfolioRef = doc(db, 'portfolios', activePortfolioId);
     await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(portfolioRef);
       const current = snapshot.exists()
         ? normalizePortfolio(snapshot.data() as Partial<PortfolioDocument>)
-        : createDefaultPortfolio(user?.email);
+        : createDefaultPortfolio(user?.email, user?.uid, activePortfolioId);
       const next = updater(current);
       transaction.set(portfolioRef, {
         ...stripUndefinedDeep({
@@ -419,6 +438,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       assets: portfolio.assets,
       assetClasses: portfolio.assetClasses,
       members: portfolio.members,
+      portfolios,
+      activePortfolioId,
+      setActivePortfolioId,
       currentUserRole,
       baseCurrency: portfolio.baseCurrency,
       setBaseCurrency,
@@ -460,34 +482,6 @@ export function usePortfolio() {
     throw new Error('usePortfolio must be used within a PortfolioProvider');
   }
   return context;
-}
-
-function createDefaultPortfolio(email?: string | null): PortfolioDocument {
-  const normalizedEmail = email?.trim().toLowerCase();
-  return {
-    assets: [],
-    assetClasses: [],
-    baseCurrency: 'ORIGINAL',
-    members: normalizedEmail ? [{ email: normalizedEmail, role: 'owner' }] : [],
-    memberEmails: normalizedEmail ? [normalizedEmail] : [],
-    priceProviderSettings: DEFAULT_PRICE_PROVIDER_SETTINGS,
-  };
-}
-
-function normalizePortfolio(data: Partial<PortfolioDocument>): PortfolioDocument {
-  return {
-    assets: Array.isArray(data.assets) ? data.assets : [],
-    assetClasses: Array.isArray(data.assetClasses) ? data.assetClasses : [],
-    baseCurrency: data.baseCurrency === 'CAD' || data.baseCurrency === 'INR' || data.baseCurrency === 'USD' || data.baseCurrency === 'ORIGINAL'
-      ? data.baseCurrency
-      : 'ORIGINAL',
-    members: Array.isArray(data.members) ? data.members : [],
-    memberEmails: Array.isArray(data.memberEmails) ? data.memberEmails : Array.isArray(data.members) ? data.members.map((member) => member.email).filter(Boolean) : [],
-    priceProviderSettings: {
-      ...DEFAULT_PRICE_PROVIDER_SETTINGS,
-      ...(data.priceProviderSettings || {}),
-    },
-  };
 }
 
 async function refreshAssetPrices(
@@ -656,4 +650,15 @@ function stripUndefinedDeep<T>(value: T): T {
   }
 
   return value;
+}
+
+async function ensurePersonalPortfolio(portfolioRef: ReturnType<typeof doc>, email: string, uid: string) {
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(portfolioRef);
+    if (snapshot.exists()) return;
+    transaction.set(portfolioRef, {
+      ...createDefaultPortfolio(email, uid, portfolioRef.id),
+      updatedAt: serverTimestamp(),
+    });
+  });
 }

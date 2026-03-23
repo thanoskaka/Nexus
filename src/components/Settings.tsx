@@ -17,6 +17,7 @@ import { Select } from './ui/select';
 export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync';
 
 export function Settings({ initialSection }: { initialSection?: SettingsSection } = {}) {
+  const showDeveloperMigrationTools = false;
   const {
     importAssets,
     importAssetClasses,
@@ -883,6 +884,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         </CardContent>
       </Card>
 
+      {showDeveloperMigrationTools && (
       <Card className="border-none shadow-sm rounded-2xl">
         <CardHeader>
           <CardTitle>Local To Cloud Migration</CardTitle>
@@ -960,6 +962,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           </div>
         </CardContent>
       </Card>
+      )}
 
       <Card className="border-none shadow-sm rounded-2xl">
         <CardHeader>

@@ -8,11 +8,12 @@ import { AddAssetModal } from './components/AddAssetModal';
 import { Settings } from './components/Settings';
 import { ImportProgressOverlay } from './components/ImportProgressOverlay';
 import { Button } from './components/ui/button';
+import { Select } from './components/ui/select';
 import { Plus, RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut } from 'lucide-react';
 
 function MainApp() {
   const { user, logout } = useAuth();
-  const { refreshPrices, isRefreshing } = usePortfolio();
+  const { refreshPrices, isRefreshing, portfolios, activePortfolioId, setActivePortfolioId } = usePortfolio();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
   const [currentView, setCurrentView] = useState<'dashboard' | 'assets' | 'settings'>('dashboard');
@@ -79,6 +80,23 @@ function MainApp() {
           </div>
 
           <div className="flex items-center justify-end gap-2 sm:gap-3 lg:justify-self-end">
+            {portfolios.length > 0 && (
+              <div className="hidden min-w-[220px] lg:block">
+                <Select
+                  value={activePortfolioId || ''}
+                  onChange={(event) => setActivePortfolioId(event.target.value)}
+                  className="rounded-lg border-slate-200 dark:border-slate-800"
+                  aria-label="Active portfolio"
+                >
+                  {portfolios.map((portfolio) => (
+                    <option key={portfolio.id} value={portfolio.id}>
+                      {portfolio.name}{portfolio.isPersonal ? '' : ` • ${portfolio.ownerEmail}`}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+
             <Button variant="outline" size="icon" onClick={refreshPrices} disabled={isRefreshing} className="rounded-lg border-slate-200 dark:border-slate-800">
               <RefreshCw className={`h-4 w-4 text-slate-600 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
@@ -143,8 +161,8 @@ function AuthenticatedApp() {
   if (!user) {
     return (
       <CenteredState
-        title="Sign in to your portfolio"
-        description={authError || 'This portfolio is cloud-synced with Firebase. Sign in with Google to continue.'}
+        title="Sign in to start your portfolio"
+        description={authError || 'Sign in with Google and we will create your personal portfolio automatically. You can also switch into any portfolio you have been invited to.'}
         action={(
           <Button onClick={() => void signInWithGoogle()} className="bg-[#00875A] hover:bg-[#007A51] text-white">
             Sign in with Google
@@ -157,8 +175,8 @@ function AuthenticatedApp() {
   if (!hasAccess) {
     return (
       <CenteredState
-        title="Access denied"
-        description={accessError || 'Your Google account is not listed as a member of this portfolio.'}
+        title="Preparing your portfolio"
+        description={accessError || 'We are creating or syncing the portfolios available to your Google account. Please refresh in a moment if this screen persists.'}
         action={(
           <Button variant="outline" onClick={() => void logout()}>
             Sign out
