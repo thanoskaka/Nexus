@@ -45,7 +45,7 @@ export function isDebtAssetClass(assetClass: string) {
 }
 
 function applyAssetClassSign(assetClass: string, amount: number) {
-  return isDebtAssetClass(assetClass) ? -Math.abs(amount) : amount;
+  return isDebtAssetClass(assetClass) ? -amount : amount;
 }
 
 function getFallbackUnitPrice(asset: Asset) {
@@ -70,7 +70,7 @@ export function getCurrentPrice(asset: Asset) {
 export function getCurrentTotal(asset: Asset) {
   const rawCurrentTotal =
     typeof asset.currentPrice === 'number' && Number.isFinite(asset.currentPrice)
-      ? asset.quantity * Math.abs(asset.currentPrice)
+      ? asset.quantity * asset.currentPrice
       : asset.costBasis;
   return applyAssetClassSign(asset.assetClass, rawCurrentTotal);
 }

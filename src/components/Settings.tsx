@@ -17,7 +17,9 @@ import { Select } from './ui/select';
 export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync';
 
 export function Settings({ initialSection }: { initialSection?: SettingsSection } = {}) {
-  const showDeveloperMigrationTools = false;
+  const showDeveloperMigrationTools =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
   const {
     importAssets,
     importAssetClasses,
@@ -94,7 +96,43 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   };
 
   const downloadClassesTemplate = () => {
-    const csv = "Country,Asset Class Name,Image URL";
+    const knownClasses = new Map<string, { country: string; name: string; imageUrl: string }>();
+
+    [...SYSTEM_ASSET_CLASSES, ...assetClasses].forEach((assetClass) => {
+      const key = `${assetClass.country}::${assetClass.name}`.toLowerCase();
+      if (!knownClasses.has(key)) {
+        knownClasses.set(key, {
+          country: assetClass.country,
+          name: assetClass.name,
+          imageUrl: assetClass.imageUrl || '',
+        });
+      }
+    });
+
+    assets.forEach((asset) => {
+      const key = `${asset.country}::${asset.assetClass}`.toLowerCase();
+      if (!knownClasses.has(key)) {
+        knownClasses.set(key, {
+          country: asset.country,
+          name: asset.assetClass,
+          imageUrl: '',
+        });
+      }
+    });
+
+    const rows = Array.from(knownClasses.values())
+      .sort((left, right) =>
+        left.country.localeCompare(right.country) || left.name.localeCompare(right.name),
+      )
+      .map((assetClass) => ({
+        'Country': assetClass.country,
+        'Asset Class Name': assetClass.name,
+        'Image URL': assetClass.imageUrl,
+      }));
+
+    const csv = Papa.unparse(rows, {
+      columns: ['Country', 'Asset Class Name', 'Image URL'],
+    });
     downloadCSV(csv, "asset_classes_template.csv");
   };
 

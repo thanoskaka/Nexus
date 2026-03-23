@@ -13,6 +13,62 @@ export interface PortfolioSummary {
   isPersonal: boolean;
 }
 
+export function isLegacySelfPortfolioCandidate<
+  T extends PortfolioSummary & { document?: Partial<PortfolioDocument> }
+>(
+  portfolio: T,
+  signedInEmail?: string | null,
+  personalPortfolioId?: string,
+) {
+  const normalizedEmail = signedInEmail?.trim().toLowerCase();
+  if (!normalizedEmail) return false;
+  if (portfolio.id === personalPortfolioId) return false;
+  if (portfolio.isPersonal) return false;
+
+  const ownerMatches = portfolio.ownerEmail.trim().toLowerCase() === normalizedEmail;
+  const legacyPersonalName = portfolio.name.trim().toLowerCase() === `${normalizedEmail}'s portfolio`;
+  const memberCount = Array.isArray(portfolio.document?.memberEmails)
+    ? portfolio.document?.memberEmails?.length
+    : Array.isArray(portfolio.document?.members)
+      ? portfolio.document?.members?.length
+      : 0;
+  const looksLikeSelfOnlyPortfolio = memberCount <= 1;
+
+  return ownerMatches && (legacyPersonalName || looksLikeSelfOnlyPortfolio);
+}
+
+export function removeLegacySelfPortfolioDuplicates<
+  T extends PortfolioSummary & { document?: Partial<PortfolioDocument> }
+>(
+  portfolios: T[],
+  signedInEmail?: string | null,
+): T[] {
+  const normalizedEmail = signedInEmail?.trim().toLowerCase();
+  const personalPortfolio = portfolios.find((portfolio) => portfolio.isPersonal);
+
+  if (!normalizedEmail || !personalPortfolio) return portfolios;
+
+  return portfolios.filter((portfolio) => {
+    if (portfolio.id === personalPortfolio.id) return true;
+    if (portfolio.isPersonal) return true;
+    return !isLegacySelfPortfolioCandidate(portfolio, normalizedEmail, personalPortfolio.id);
+  });
+}
+
+export function shouldHydratePersonalPortfolioFromLegacy(
+  personalPortfolio?: Partial<PortfolioDocument> | null,
+  legacyPortfolio?: Partial<PortfolioDocument> | null,
+) {
+  if (!personalPortfolio || !legacyPortfolio) return false;
+
+  const personalHasAssets = Array.isArray(personalPortfolio.assets) && personalPortfolio.assets.length > 0;
+  const personalHasClasses = Array.isArray(personalPortfolio.assetClasses) && personalPortfolio.assetClasses.length > 0;
+  const legacyHasAssets = Array.isArray(legacyPortfolio.assets) && legacyPortfolio.assets.length > 0;
+  const legacyHasClasses = Array.isArray(legacyPortfolio.assetClasses) && legacyPortfolio.assetClasses.length > 0;
+
+  return !personalHasAssets && !personalHasClasses && (legacyHasAssets || legacyHasClasses);
+}
+
 export interface PortfolioDocument {
   assets: Asset[];
   assetClasses: AssetClassDef[];

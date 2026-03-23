@@ -9,7 +9,7 @@ import { Settings } from './components/Settings';
 import { ImportProgressOverlay } from './components/ImportProgressOverlay';
 import { Button } from './components/ui/button';
 import { Select } from './components/ui/select';
-import { Plus, RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut } from 'lucide-react';
+import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut } from 'lucide-react';
 
 function MainApp() {
   const { user, logout } = useAuth();
@@ -44,7 +44,7 @@ function MainApp() {
   return (
     <div className={`min-h-screen bg-[#F8F9FA] text-slate-900 dark:bg-slate-900 dark:text-slate-50 transition-colors duration-200 font-sans`}>
       <header className="bg-white dark:bg-slate-950 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-800">
-        <div className="container mx-auto px-4 py-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
+        <div className="container mx-auto px-4 py-4 grid grid-cols-1 gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
           <div className="flex items-center gap-3 cursor-pointer min-w-0 lg:justify-self-start" onClick={() => setCurrentView('dashboard')}>
             <div className="w-10 h-10 bg-[#00875A] rounded-xl flex items-center justify-center shadow-sm">
               <Wallet className="text-white h-5 w-5" />
@@ -55,7 +55,7 @@ function MainApp() {
             </div>
           </div>
           
-          <div className="flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-1 rounded-full border border-slate-100 dark:border-slate-800 lg:justify-self-center">
+          <div className="flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-1 rounded-full border border-slate-100 dark:border-slate-800 xl:justify-self-center xl:min-w-0">
             <button 
               onClick={() => setCurrentView('dashboard')}
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${currentView === 'dashboard' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
@@ -79,13 +79,13 @@ function MainApp() {
             </button>
           </div>
 
-          <div className="flex items-center justify-end gap-2 sm:gap-3 lg:justify-self-end">
+          <div className="flex items-center justify-end gap-2 flex-wrap xl:flex-nowrap xl:justify-self-end">
             {portfolios.length > 0 && (
-              <div className="hidden min-w-[220px] lg:block">
+              <div className="hidden xl:block xl:w-[210px] 2xl:w-[240px] shrink-0">
                 <Select
                   value={activePortfolioId || ''}
                   onChange={(event) => setActivePortfolioId(event.target.value)}
-                  className="rounded-lg border-slate-200 dark:border-slate-800"
+                  className="h-11 rounded-lg border-slate-200 dark:border-slate-800 text-sm"
                   aria-label="Active portfolio"
                 >
                   {portfolios.map((portfolio) => (
@@ -97,15 +97,15 @@ function MainApp() {
               </div>
             )}
 
-            <Button variant="outline" size="icon" onClick={refreshPrices} disabled={isRefreshing} className="rounded-lg border-slate-200 dark:border-slate-800">
-              <RefreshCw className={`h-4 w-4 text-slate-600 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
+              <Button variant="outline" size="icon" onClick={refreshPrices} disabled={isRefreshing} className="h-11 w-11 rounded-lg border-slate-200 dark:border-slate-800 shrink-0">
+                <RefreshCw className={`h-4 w-4 text-slate-600 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </Button>
 
             <Button
               variant="outline"
               size="icon"
               onClick={toggleDarkMode}
-              className="rounded-lg border-slate-200 dark:border-slate-800"
+              className="h-11 w-11 rounded-lg border-slate-200 dark:border-slate-800 shrink-0"
               title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
               aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             >
@@ -113,27 +113,21 @@ function MainApp() {
             </Button>
 
             {user && (
-              <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 lg:flex">
-                <span className="max-w-44 truncate">{user.email}</span>
+              <div className="hidden xl:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 min-w-0 max-w-[250px]">
+                <span className="truncate">{user.email}</span>
                 <button type="button" onClick={() => void logout()} className="text-slate-500 hover:text-slate-900 dark:hover:text-white">
                   <LogOut className="h-4 w-4" />
                 </button>
               </div>
             )}
             
-            {currentView === 'assets' && (
-              <Button onClick={() => setIsAddModalOpen(true)} className="bg-[#00875A] hover:bg-[#007A51] text-white rounded-lg">
-                <Plus className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Add Asset</span>
-              </Button>
-            )}
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
         {currentView === 'dashboard' && <Dashboard />}
-        {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} />}
+        {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => setIsAddModalOpen(true)} />}
         {currentView === 'settings' && <Settings />}
       </main>
 

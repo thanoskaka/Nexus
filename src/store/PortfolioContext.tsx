@@ -19,7 +19,10 @@ import {
   createDefaultPortfolio,
   getActivePortfolioStorageKey,
   getPersonalPortfolioId,
+  isLegacySelfPortfolioCandidate,
   normalizePortfolio,
+  removeLegacySelfPortfolioDuplicates,
+  shouldHydratePersonalPortfolioFromLegacy,
   type PortfolioDocument,
   type PortfolioMember,
   type PortfolioSummary,
@@ -136,14 +139,32 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
           const normalized = normalizePortfolio(portfolioDoc.data() as Partial<PortfolioDocument>);
           return {
             id: portfolioDoc.id,
-            name: normalized.name || buildPortfolioName(normalized, portfolioDoc.id),
+            name: portfolioDoc.id === personalPortfolioId ? 'My Portfolio' : (normalized.name || buildPortfolioName(normalized, portfolioDoc.id)),
             ownerEmail: normalized.ownerEmail || normalized.members[0]?.email || '',
             isPersonal: normalized.isPersonal || portfolioDoc.id === personalPortfolioId,
             document: normalized,
           };
         });
+        const personalPortfolioCandidate = availablePortfolios.find((portfolio) => portfolio.id === personalPortfolioId);
+        const legacySelfPortfolioCandidate = availablePortfolios.find((portfolio) =>
+          isLegacySelfPortfolioCandidate(portfolio, user.email, personalPortfolioId)
+        );
+        if (
+          personalPortfolioCandidate &&
+          legacySelfPortfolioCandidate &&
+          shouldHydratePersonalPortfolioFromLegacy(
+            personalPortfolioCandidate.document,
+            legacySelfPortfolioCandidate.document,
+          )
+        ) {
+          void hydratePersonalPortfolioFromLegacy(
+            doc(db, 'portfolios', personalPortfolioId),
+            legacySelfPortfolioCandidate.document,
+          );
+        }
+        const visiblePortfolios = removeLegacySelfPortfolioDuplicates(availablePortfolios, user.email);
 
-        if (availablePortfolios.length === 0) {
+        if (visiblePortfolios.length === 0) {
           setPortfolio(EMPTY_PORTFOLIO);
           setPortfolios([]);
           setActivePortfolioIdState(null);
@@ -157,12 +178,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         const nextActivePortfolioId = selectActivePortfolioId({
           currentActivePortfolioId: activePortfolioId,
           persistedPortfolioId,
-          availablePortfolios,
+          availablePortfolios: visiblePortfolios,
           personalPortfolioId,
         });
-        const activePortfolio = availablePortfolios.find((candidate) => candidate.id === nextActivePortfolioId) || availablePortfolios[0];
+        const activePortfolio = visiblePortfolios.find((candidate) => candidate.id === nextActivePortfolioId) || visiblePortfolios[0];
 
-        setPortfolios(availablePortfolios.map(({ document: _document, ...summary }) => summary));
+        setPortfolios(visiblePortfolios.map(({ document: _document, ...summary }) => summary));
         setActivePortfolioIdState(activePortfolio.id);
         setPortfolio(activePortfolio.document);
         setHasAccess(true);
@@ -660,5 +681,32 @@ async function ensurePersonalPortfolio(portfolioRef: ReturnType<typeof doc>, ema
       ...createDefaultPortfolio(email, uid, portfolioRef.id),
       updatedAt: serverTimestamp(),
     });
+  });
+}
+
+async function hydratePersonalPortfolioFromLegacy(
+  personalPortfolioRef: ReturnType<typeof doc>,
+  legacyPortfolio: PortfolioDocument,
+) {
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(personalPortfolioRef);
+    const currentPersonal = snapshot.exists()
+      ? normalizePortfolio(snapshot.data() as Partial<PortfolioDocument>)
+      : createDefaultPortfolio('', '', personalPortfolioRef.id);
+
+    if (!shouldHydratePersonalPortfolioFromLegacy(currentPersonal, legacyPortfolio)) {
+      return;
+    }
+
+    transaction.set(personalPortfolioRef, {
+      ...stripUndefinedDeep({
+        ...currentPersonal,
+        assets: legacyPortfolio.assets,
+        assetClasses: legacyPortfolio.assetClasses,
+        baseCurrency: legacyPortfolio.baseCurrency ?? currentPersonal.baseCurrency,
+        priceProviderSettings: legacyPortfolio.priceProviderSettings ?? currentPersonal.priceProviderSettings,
+      }),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
   });
 }

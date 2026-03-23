@@ -32,6 +32,15 @@ const YAHOO_HEADERS = {
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
 };
 
+const SERVER_YAHOO_COOLDOWN_MS = 5 * 60 * 1000;
+const serverYahooCache = new Map<string, {
+  price: number;
+  previousClose: number | null;
+  currency: string | null;
+  savedAt: number;
+}>();
+let serverYahooCooldownUntil = 0;
+
 async function safeJson(response: Response) {
   try {
     return await response.json();
@@ -58,11 +67,48 @@ function buildYahooResult(
   };
 }
 
+function readServerYahooCache(yahooTicker: string) {
+  return serverYahooCache.get(yahooTicker) ?? null;
+}
+
+function writeServerYahooCache(yahooTicker: string, price: number, previousClose: number | null, currency: string | null) {
+  serverYahooCache.set(yahooTicker, {
+    price,
+    previousClose,
+    currency,
+    savedAt: Date.now(),
+  });
+}
+
+function isServerYahooCooldownActive() {
+  return serverYahooCooldownUntil > Date.now();
+}
+
+function setServerYahooCooldown() {
+  serverYahooCooldownUntil = Date.now() + SERVER_YAHOO_COOLDOWN_MS;
+}
+
+function clearServerYahooCooldown() {
+  serverYahooCooldownUntil = 0;
+}
+
 export async function fetchYahooFinancePrice(ticker: string) {
   const yahooTicker = getYahooTicker(ticker);
+  const cachedResult = readServerYahooCache(yahooTicker);
   const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     yahooTicker,
   )}`;
+
+  if (isServerYahooCooldownActive() && cachedResult) {
+    return buildYahooResult(
+      ticker,
+      yahooTicker,
+      cachedResult.price,
+      cachedResult.previousClose,
+      cachedResult.currency,
+      'Yahoo is temporarily rate-limiting requests. Using the last known server-side Yahoo price for now.',
+    );
+  }
 
   try {
     const yahooResponse = await fetch(yahooUrl, { headers: YAHOO_HEADERS });
@@ -75,6 +121,13 @@ export async function fetchYahooFinancePrice(ticker: string) {
     const chartCurrency = meta?.currency;
 
     if (yahooResponse.ok && typeof chartPrice === 'number') {
+      clearServerYahooCooldown();
+      writeServerYahooCache(
+        yahooTicker,
+        chartPrice,
+        typeof chartPreviousClose === 'number' ? chartPreviousClose : null,
+        typeof chartCurrency === 'string' ? chartCurrency : null,
+      );
       return buildYahooResult(
         ticker,
         yahooTicker,
@@ -97,6 +150,13 @@ export async function fetchYahooFinancePrice(ticker: string) {
     const quoteCurrency = quote?.currency;
 
     if (quoteResponse.ok && typeof quotePrice === 'number') {
+      clearServerYahooCooldown();
+      writeServerYahooCache(
+        yahooTicker,
+        quotePrice,
+        typeof quotePreviousClose === 'number' ? quotePreviousClose : null,
+        typeof quoteCurrency === 'string' ? quoteCurrency : null,
+      );
       return buildYahooResult(
         ticker,
         yahooTicker,
@@ -111,6 +171,21 @@ export async function fetchYahooFinancePrice(ticker: string) {
       .filter((status) => typeof status === 'number' && status > 0)
       .join('/');
 
+    const isRateLimited = yahooResponse.status === 429 || quoteResponse.status === 429;
+    if (isRateLimited) {
+      setServerYahooCooldown();
+      if (cachedResult) {
+        return buildYahooResult(
+          ticker,
+          yahooTicker,
+          cachedResult.price,
+          cachedResult.previousClose,
+          cachedResult.currency,
+          'Yahoo is temporarily rate-limiting requests. Using the last known server-side Yahoo price for now.',
+        );
+      }
+    }
+
     return buildYahooResult(
       ticker,
       yahooTicker,
@@ -122,6 +197,17 @@ export async function fetchYahooFinancePrice(ticker: string) {
         : `Price not found for ticker: ${ticker} (Yahoo: ${yahooTicker})`,
     );
   } catch {
+    if (cachedResult) {
+      setServerYahooCooldown();
+      return buildYahooResult(
+        ticker,
+        yahooTicker,
+        cachedResult.price,
+        cachedResult.previousClose,
+        cachedResult.currency,
+        'Yahoo is temporarily unavailable. Using the last known server-side Yahoo price for now.',
+      );
+    }
     return buildYahooResult(
       ticker,
       yahooTicker,

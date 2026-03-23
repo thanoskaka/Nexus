@@ -58,6 +58,19 @@ describe('portfolioMetrics', () => {
     expect(getCurrentTotal(debtAsset)).toBe(-5000);
   });
 
+  it('preserves the entered sign for credit card values before flipping into portfolio impact', () => {
+    const negativeDebtAsset = makeAsset({
+      assetClass: 'Credit Card',
+      quantity: 1,
+      costBasis: -500,
+      currentPrice: -500,
+    });
+
+    expect(getInvestmentTotal(negativeDebtAsset)).toBe(500);
+    expect(getCurrentPrice(negativeDebtAsset)).toBe(500);
+    expect(getCurrentTotal(negativeDebtAsset)).toBe(500);
+  });
+
   it('computes daily changes from previous close when available', () => {
     const asset = makeAsset({
       currentPrice: 125,

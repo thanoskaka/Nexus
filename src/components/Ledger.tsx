@@ -15,7 +15,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { TickerRepairModal } from './TickerRepairModal';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Building2, Check, ChevronDown, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, RefreshCw, ShieldCheck, Trash2, WalletCards } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Building2, Check, ChevronDown, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from 'lucide-react';
 import { convertAmount, formatCurrency, formatPercent, getAssetXirr, getCurrentPrice, getCurrentTotal, getGrowthTotal, getInvestmentPrice, getInvestmentTotal, isDebtAssetClass } from '../lib/portfolioMetrics';
 import { getTickerRecommendation } from '../lib/api';
 
@@ -23,7 +23,7 @@ type LedgerCurrency = 'CAD' | 'INR' | 'USD' | 'ORIGINAL';
 type FilterColumnId = 'name' | 'assetClass' | 'position' | 'currentPrice' | 'marketValue' | 'performance' | 'notes';
 type FilterState = Record<FilterColumnId, { selected: string[]; search: string; min: string; max: string }>;
 
-const TABLE_COLUMN_WIDTHS = ['30%', '10%', '10%', '12%', '12%', '10%', '10%', '6%'] as const;
+const TABLE_COLUMN_WIDTHS = ['34%', '10%', '10%', '13%', '13%', '10%', '8%', '2%'] as const;
 
 const EMPTY_FILTER_STATE: FilterState = {
   name: { selected: [], search: '', min: '', max: '' },
@@ -35,7 +35,7 @@ const EMPTY_FILTER_STATE: FilterState = {
   notes: { selected: [], search: '', min: '', max: '' },
 };
 
-export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }) {
+export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asset) => void; onAddAsset?: () => void }) {
   const { assets, baseCurrency, rates, priceProviderSettings, removeAsset, duplicateAsset, refreshAsset, refreshPrices, refreshFailedPrices, isRefreshing } = usePortfolio();
   const [canadaSorting, setCanadaSorting] = useState<SortingState>([
     { id: 'name', desc: false },
@@ -320,12 +320,13 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
           const asset = info.row.original;
           const displayCurrency = getDisplayCurrency(asset);
           const investmentPrice = getConvertedValue(getInvestmentPrice(asset), asset.currency, baseCurrency);
+          const showsAsDebt = isDebtAssetDisplay(asset);
 
           return (
             <div className="space-y-1" style={{ fontVariantNumeric: 'tabular-nums' }}>
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
-              <div className={`text-xs ${isDebtAssetClass(asset.assetClass) ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
-                {isDebtAssetClass(asset.assetClass) ? `Balance per unit: ${formatCurrency(investmentPrice, displayCurrency)}` : `Avg: ${formatCurrency(investmentPrice, displayCurrency)}`}
+              <div className={`text-xs ${showsAsDebt ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                {showsAsDebt ? `Balance per unit: ${formatCurrency(investmentPrice, displayCurrency)}` : `Avg: ${formatCurrency(investmentPrice, displayCurrency)}`}
               </div>
             </div>
           );
@@ -391,13 +392,14 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
           const displayCurrency = getDisplayCurrency(asset);
           const currentTotal = info.getValue() as number;
           const investmentTotal = getConvertedValue(getInvestmentTotal(asset), asset.currency, baseCurrency);
+          const showsAsDebt = isDebtAssetDisplay(asset);
           return (
             <div className="space-y-1" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              <div className={`text-sm font-semibold ${isDebtAssetClass(asset.assetClass) ? 'text-red-500' : 'text-slate-900 dark:text-slate-100'}`}>
+              <div className={`text-sm font-semibold ${showsAsDebt ? 'text-red-500' : 'text-slate-900 dark:text-slate-100'}`}>
                 {formatCurrency(currentTotal, displayCurrency)}
               </div>
-              <div className={`text-xs ${isDebtAssetClass(asset.assetClass) ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
-                {isDebtAssetClass(asset.assetClass) ? `Debt balance: ${formatCurrency(investmentTotal, displayCurrency)}` : `Cost basis: ${formatCurrency(investmentTotal, displayCurrency)}`}
+              <div className={`text-xs ${showsAsDebt ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                {showsAsDebt ? `Debt balance: ${formatCurrency(investmentTotal, displayCurrency)}` : `Cost basis: ${formatCurrency(investmentTotal, displayCurrency)}`}
               </div>
             </div>
           );
@@ -413,6 +415,7 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
           const investmentTotal = getConvertedValue(getInvestmentTotal(asset), asset.currency, baseCurrency);
           const growthPercent = investmentTotal !== 0 ? growthTotal / investmentTotal : 0;
           const xirr = getAssetXirr(asset, displayCurrency, rates);
+          const showsAsDebt = isDebtAssetDisplay(asset);
           const tone = growthTotal >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300';
 
           return (
@@ -426,7 +429,7 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
                 </span>
               </div>
               <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                {isDebtAssetClass(asset.assetClass) ? 'XIRR: Not applicable for debt' : `XIRR: ${formatPercent(xirr)}`}
+                {showsAsDebt ? 'XIRR: Not applicable for debt' : `XIRR: ${formatPercent(xirr)}`}
               </div>
             </div>
           );
@@ -562,15 +565,21 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
 
   return (
     <div className="space-y-6">
-      <div className="mb-8 flex justify-between items-start">
+      <div className="mb-8 flex justify-between items-start gap-3">
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">Assets</h1>
           <p className="text-lg text-slate-500 dark:text-slate-400">Manage your family's individual holdings</p>
         </div>
-        <Button variant="outline" onClick={refreshPrices} disabled={isRefreshing} className="hidden sm:flex items-center gap-2">
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh Rates
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={refreshPrices} disabled={isRefreshing} className="hidden sm:flex items-center gap-2">
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh Rates
+          </Button>
+          <Button onClick={onAddAsset} className="bg-[#00875A] hover:bg-[#007A51] text-white rounded-lg shrink-0 px-4">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Asset</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -678,6 +687,7 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
             const currentTotal = getConvertedValue(getCurrentTotal(asset), asset.currency, baseCurrency);
             const growthTotal = getConvertedValue(getGrowthTotal(asset), asset.currency, baseCurrency);
             const xirr = getAssetXirr(asset, displayCurrency, rates);
+            const showsAsDebt = isDebtAssetDisplay(asset);
             const isRowRefreshing = refreshingRowIds.includes(asset.id);
 
             return (
@@ -759,20 +769,20 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
                       <div>{asset.comments || '-'}</div>
                     </div>
                     <div>
-                      <div className="text-slate-500">{isDebtAssetClass(asset.assetClass) ? 'Debt Balance' : 'Investment Total'}</div>
-                      <div className={isDebtAssetClass(asset.assetClass) ? 'font-medium text-red-500' : ''}>{formatCurrency(investmentTotal, displayCurrency)}</div>
+                      <div className="text-slate-500">{showsAsDebt ? 'Debt Balance' : 'Investment Total'}</div>
+                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{formatCurrency(investmentTotal, displayCurrency)}</div>
                     </div>
                     <div>
-                      <div className="text-slate-500">{isDebtAssetClass(asset.assetClass) ? 'Balance per Unit' : 'Investment Price'}</div>
-                      <div className={isDebtAssetClass(asset.assetClass) ? 'font-medium text-red-500' : ''}>{formatCurrency(investmentPrice, displayCurrency)}</div>
+                      <div className="text-slate-500">{showsAsDebt ? 'Balance per Unit' : 'Investment Price'}</div>
+                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{formatCurrency(investmentPrice, displayCurrency)}</div>
                     </div>
                     <div>
-                      <div className="text-slate-500">{isDebtAssetClass(asset.assetClass) ? 'Current Balance per Unit' : 'Current Price'}</div>
-                      <div className={isDebtAssetClass(asset.assetClass) ? 'font-medium text-red-500' : ''}>{asset.currentPrice ? formatCurrency(currentPrice, displayCurrency) : '-'}</div>
+                      <div className="text-slate-500">{showsAsDebt ? 'Current Balance per Unit' : 'Current Price'}</div>
+                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{asset.currentPrice ? formatCurrency(currentPrice, displayCurrency) : '-'}</div>
                     </div>
                     <div>
-                      <div className="text-slate-500">{isDebtAssetClass(asset.assetClass) ? 'Current Debt' : 'Current Total'}</div>
-                      <div className={`font-semibold ${isDebtAssetClass(asset.assetClass) ? 'text-red-500' : ''}`}>{formatCurrency(currentTotal, displayCurrency)}</div>
+                      <div className="text-slate-500">{showsAsDebt ? 'Current Debt' : 'Current Total'}</div>
+                      <div className={`font-semibold ${showsAsDebt ? 'text-red-500' : ''}`}>{formatCurrency(currentTotal, displayCurrency)}</div>
                     </div>
                     <div>
                       <div className="text-slate-500">Total Growth</div>
@@ -782,7 +792,7 @@ export function Ledger({ onEditAsset }: { onEditAsset?: (asset: Asset) => void }
                     </div>
                     <div>
                       <div className="text-slate-500">XIRR</div>
-                      <div>{isDebtAssetClass(asset.assetClass) ? 'Not applicable for debt' : formatPercent(xirr)}</div>
+                      <div>{showsAsDebt ? 'Not applicable for debt' : formatPercent(xirr)}</div>
                     </div>
                   </div>
                 </div>
@@ -947,6 +957,7 @@ function CountryTableSection({
   clearColumnFilter: (columnId: FilterColumnId) => void;
 }) {
   const tableRows = table.getRowModel().rows;
+  const headerGroups = table.getHeaderGroups();
 
   return (
     <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -954,17 +965,21 @@ function CountryTableSection({
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
       </div>
-      <Table className="w-full table-fixed">
+      <Table className="min-w-[1280px] w-full table-fixed">
         <colgroup>
           {TABLE_COLUMN_WIDTHS.map((width) => (
             <col key={width} style={{ width }} />
           ))}
         </colgroup>
         <TableHeader className="sticky top-0 z-10 bg-white/95 backdrop-blur dark:bg-slate-950/95">
-          {table.getHeaderGroups().map((headerGroup) => (
+          {headerGroups.map((headerGroup) => (
             <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400">
+              {headerGroup.headers.map((header, index) => (
+                <TableHead
+                  key={header.id}
+                  style={{ width: TABLE_COLUMN_WIDTHS[index] }}
+                  className="min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
+                >
                   {header.isPlaceholder ? null : (
                     <div className="relative">
                       <div
@@ -1027,8 +1042,12 @@ function CountryTableSection({
               return (
                 <React.Fragment key={row.id}>
                   <TableRow className={`align-top transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50 ${index % 2 === 0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50/55 dark:bg-slate-900/40'}`}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="min-w-0 px-4 py-4 text-sm leading-6">
+                    {row.getVisibleCells().map((cell, cellIndex) => (
+                      <TableCell
+                        key={cell.id}
+                        style={{ width: TABLE_COLUMN_WIDTHS[cellIndex] }}
+                        className="min-w-0 px-4 py-4 text-sm leading-6"
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
@@ -1084,6 +1103,11 @@ function getPreviousClose(asset: Asset) {
 
 function getStatusColor(val: number) {
   return val >= 0 ? 'text-emerald-600' : 'text-red-600';
+}
+
+function isDebtAssetDisplay(asset: Asset) {
+  if (!isDebtAssetClass(asset.assetClass)) return false;
+  return getCurrentTotal(asset) < 0 || getInvestmentTotal(asset) < 0;
 }
 
 function getCanonicalAssetClass(assetClass: string) {

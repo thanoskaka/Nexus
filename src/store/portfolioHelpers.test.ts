@@ -4,7 +4,10 @@ import {
   createDefaultPortfolio,
   getActivePortfolioStorageKey,
   getPersonalPortfolioId,
+  isLegacySelfPortfolioCandidate,
   normalizePortfolio,
+  removeLegacySelfPortfolioDuplicates,
+  shouldHydratePersonalPortfolioFromLegacy,
   selectActivePortfolioId,
 } from './portfolioHelpers';
 
@@ -98,5 +101,103 @@ describe('portfolioHelpers', () => {
 
   it('generates a stable local-storage key per user', () => {
     expect(getActivePortfolioStorageKey('abc')).toBe('nexus-active-portfolio:abc');
+  });
+
+  it('removes a legacy self-owned duplicate when a personal portfolio exists', () => {
+    const portfolios = removeLegacySelfPortfolioDuplicates(
+      [
+        {
+          id: 'user-123',
+          name: 'My Portfolio',
+          ownerEmail: 'shubhamg266@gmail.com',
+          isPersonal: true,
+        },
+        {
+          id: 'default-portfolio',
+          name: "shubhamg266@gmail.com's Portfolio",
+          ownerEmail: 'shubhamg266@gmail.com',
+          isPersonal: false,
+        },
+        {
+          id: 'shared-1',
+          name: 'Mayuri Garg Portfolio',
+          ownerEmail: 'mayuri.garg1996@gmail.com',
+          isPersonal: false,
+        },
+      ],
+      'shubhamg266@gmail.com',
+    );
+
+    expect(portfolios).toHaveLength(2);
+    expect(portfolios.map((portfolio) => portfolio.id)).toEqual(['user-123', 'shared-1']);
+  });
+
+  it('removes a self-only legacy portfolio even if the name is custom', () => {
+    const portfolios = removeLegacySelfPortfolioDuplicates(
+      [
+        {
+          id: 'user-123',
+          name: 'My Portfolio',
+          ownerEmail: 'shubhamg266@gmail.com',
+          isPersonal: true,
+          document: { memberEmails: ['shubhamg266@gmail.com'] },
+        },
+        {
+          id: 'legacy-custom',
+          name: 'Shubham Main',
+          ownerEmail: 'shubhamg266@gmail.com',
+          isPersonal: false,
+          document: { memberEmails: ['shubhamg266@gmail.com'] },
+        },
+        {
+          id: 'shared-owned',
+          name: 'Family Shared',
+          ownerEmail: 'shubhamg266@gmail.com',
+          isPersonal: false,
+          document: { memberEmails: ['shubhamg266@gmail.com', 'mayuri.garg1996@gmail.com'] },
+        },
+      ],
+      'shubhamg266@gmail.com',
+    );
+
+    expect(portfolios.map((portfolio) => portfolio.id)).toEqual(['user-123', 'shared-owned']);
+  });
+
+  it('identifies a legacy self-only portfolio candidate', () => {
+    expect(isLegacySelfPortfolioCandidate(
+      {
+        id: 'legacy-custom',
+        name: 'Shubham Main',
+        ownerEmail: 'shubhamg266@gmail.com',
+        isPersonal: false,
+        document: { memberEmails: ['shubhamg266@gmail.com'] },
+      },
+      'shubhamg266@gmail.com',
+      'user-123',
+    )).toBe(true);
+  });
+
+  it('hydrates a personal portfolio only when it is still empty and the legacy one has data', () => {
+    expect(shouldHydratePersonalPortfolioFromLegacy(
+      {
+        assets: [],
+        assetClasses: [],
+      },
+      {
+        assets: [{ id: '1' } as never],
+        assetClasses: [],
+      },
+    )).toBe(true);
+
+    expect(shouldHydratePersonalPortfolioFromLegacy(
+      {
+        assets: [{ id: 'p1' } as never],
+        assetClasses: [],
+      },
+      {
+        assets: [{ id: '1' } as never],
+        assetClasses: [],
+      },
+    )).toBe(false);
   });
 });
