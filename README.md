@@ -1,97 +1,109 @@
 # Nexus Portfolio
 
-A shared household portfolio tracker for India and Canada holdings. The app now uses Firebase Authentication and Firestore so multiple authorized members can sign in, collaborate, and see updates in real time.
+Nexus Portfolio is a shared family wealth tracker built for people managing investments across India and Canada.
 
-## Stack
+It helps you track your full household balance sheet in one place, including:
+- stocks
+- mutual funds
+- TFSA, RRSP, and FHSA accounts
+- bank balances and cash
+- gold
+- PF, PPF, NPS, and fixed deposits
+- real estate and other manual assets
+- liabilities such as credit cards
 
-- React 19 + TypeScript
-- Vite
-- Firebase Auth + Firestore
-- Express + local Yahoo finance proxy
-- Tailwind CSS v4
+## What This App Is For
 
-## Run Locally
+Most portfolio apps are built for one person and one market.
 
-1. Install dependencies with `npm install`
-2. Copy `.env.example` to `.env.local`
-3. Fill in your Firebase config values
-4. Start the app with `npm run dev`
-5. Open the local URL shown in the terminal
+Nexus Portfolio is built for real families who need:
+- India and Canada holdings together
+- multiple family members in one shared portfolio
+- both live-priced and manually updated assets
+- clear views by owner, country, and currency
+- imports and exports that match how real data is stored
 
-## Environment Variables
+## Start Using It
 
-These are the values you should add locally and in hosting providers like Vercel:
+1. Open the live website
+2. Sign in with Google
+3. If you are an authorized member, your portfolio loads automatically
+4. Import your India and Canada holdings from `Settings`
+5. Review and manage all holdings from `Assets`
+6. Track totals, charts, and FX impact from `Dashboard`
 
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-- `NEXT_PUBLIC_FIREBASE_PORTFOLIO_ID`
-- `VITE_GOOGLE_CLIENT_ID` optional, only for Google Drive backup/export
+## What You Can Do
 
-This Vite app is configured to accept both `VITE_*` and `NEXT_PUBLIC_*` public variables, so the `NEXT_PUBLIC_*` names from Firebase/Next.js-style setups work here too.
+### Track Your Full Portfolio
+- manage India and Canada holdings in one place
+- track assets and liabilities together
+- view wealth by member, country, and asset class
 
-## Firebase Behavior
+### Use Shared Family Access
+- sign in with Google
+- invite family members
+- keep one shared cloud-synced portfolio
+- see updates across devices in real time
 
-- Users must sign in with Google before they can access the app
-- Portfolio data is stored in `portfolios/{portfolioId}`
-- The app listens with Firestore `onSnapshot`, so edits sync live across members
-- Access is controlled by the `members` array on the portfolio document
-- Owners can manage members from the Settings page
+### Import And Export Easily
+- import India holdings CSV
+- import Canada holdings CSV
+- import asset classes CSV
+- export India holdings in the same format
+- export Canada holdings in the same format
 
-## Firestore Document Shape
+### Work With Live Or Manual Pricing
+- use ticker-based live pricing
+- keep manual pricing for assets that should not auto-refresh
+- refresh a single row or refresh in bulk
+- fix broken tickers with a guided modal
+- apply FX conversion, unit conversion, and formulas to live prices
 
-```json
-{
-  "baseCurrency": "ORIGINAL",
-  "members": [
-    { "email": "owner@example.com", "role": "owner" },
-    { "email": "partner@example.com", "role": "partner" }
-  ],
-  "memberEmails": ["owner@example.com", "partner@example.com"],
-  "priceProviderSettings": {
-    "alphaVantageApiKey": "",
-    "finnhubApiKey": "",
-    "primaryProvider": "yahoo",
-    "secondaryProvider": "alphavantage"
-  },
-  "assets": [],
-  "assetClasses": []
-}
-```
+### Understand Your Wealth Better
+- see combined family wealth at a glance
+- track invested amount, current value, returns, and daily change
+- switch currency views
+- review country and owner breakdowns
+- monitor FX rates and allocation views
 
-## Firestore Security Rules
+### Manage Data Safely
+- duplicate assets
+- edit or delete holdings
+- review failed price rows
+- migrate local data into cloud when needed
 
-Use these rules to ensure only authorized members can read or write the portfolio:
+## Why People Like It
 
-```txt
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null;
-    }
+- built for actual family portfolio tracking, not just stock watching
+- handles both investing and debt
+- works for India and Canada together
+- useful for households with multiple owners and multiple account types
+- flexible enough for both market-linked and manual assets
 
-    function isMember(data) {
-      return isSignedIn() && request.auth.token.email in data.memberEmails;
-    }
+## Import Templates
 
-    match /portfolios/{portfolioId} {
-      allow create: if isSignedIn();
-      allow read: if isMember(resource.data);
-      allow update, delete: if isMember(resource.data);
-    }
-  }
-}
-```
+The app includes downloadable templates inside `Settings`.
 
-If you want only owners to manage member lists, move member changes behind a callable function or add stricter field-level validation in rules.
+Supported imports:
+- India holdings
+- Canada holdings
+- asset classes
 
-## Scripts
+Supported exports:
+- India holdings
+- Canada holdings
 
-- `npm run dev`: start the local app server
-- `npm run build`: build the app
-- `npm run preview`: preview the production build
-- `npm run lint`: TypeScript type check
+## For Developers
+
+If you want to run the app locally:
+
+1. `npm install`
+2. copy `.env.example` to `.env.local`
+3. add your Firebase config
+4. run `npm run dev`
+
+Useful scripts:
+- `npm run dev`
+- `npm run build`
+- `npm run lint`
+- `npm run test:run`
