@@ -145,9 +145,17 @@ export function createSplitwiseRouter(client?: SplitwiseClient) {
   <body>
     <script>
       (function () {
+        var payload = ${payload};
+        try {
+          localStorage.setItem('splitwise_oauth_result', JSON.stringify({
+            type: payload.type,
+            reason: payload.reason || '',
+            at: Date.now()
+          }));
+        } catch (_) {}
         try {
           if (window.opener) {
-            window.opener.postMessage(${payload}, '*');
+            window.opener.postMessage(payload, '*');
           }
         } catch (_) {}
         window.close();
