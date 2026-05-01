@@ -5,6 +5,7 @@ import { fetchAutoMatchedPrice } from './src/lib/financeServer';
 import { createSplitwiseRouter } from './src/server/splitwise/splitwiseRoutes';
 import { createUpstoxRouter } from './src/server/providers/upstox/upstoxRoutes';
 import { createSharedIntegrationsRouter } from './src/server/integrations/sharedRoutes';
+import { createScreenshotRouter } from './src/server/providers/screenshot/screenshotRoutes.js';
 
 function getNormalizedTicker(result: unknown) {
   const typed = result as { normalizedTicker?: string; yahooTicker?: string };
@@ -88,6 +89,8 @@ export function createApp() {
   app.use('/api/integrations', createSharedIntegrationsRouter());
   // Compatibility alias if redirect URI is configured without the /connections segment.
   app.use('/api/upstox', createUpstoxRouter());
+  app.use('/api/connections/screenshot', createScreenshotRouter());
+  app.use('/api/import', createScreenshotRouter());
 
   return app;
 }
