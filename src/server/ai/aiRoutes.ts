@@ -3,7 +3,8 @@ import type { Request, Response } from 'express';
 import { requireFirebaseUser } from '../auth/requireFirebaseUser.js';
 import { writeAiRun } from './aiRunStore.js';
 import { buildPortfolioSnapshot } from './contextBuilder.js';
-import { generatePortfolioAnswer, getGeminiApiKey } from './geminiClient.js';
+import { generatePortfolioAnswer, getGeminiApiKey, resolveAiConfigFromEnv } from './geminiClient.js';
+import { resolveAiApiKey } from '../user/aiCredentialsStore.js';
 import { getPersonalPortfolioByUid, getPortfolioById, isPortfolioMember } from './portfolioAccess.js';
 import { validateAiChatBody } from './validation.js';
 
@@ -16,8 +17,8 @@ function toSafeErrorMessage(error: unknown) {
   if (error instanceof Error) {
     const rawMessage = error.message || '';
     const message = rawMessage.toLowerCase();
-    if (message.includes('ai configuration missing')) {
-      return 'Missing GEMINI_API_KEY server configuration. Add GEMINI_API_KEY to .env.local.';
+    if (message.includes('ai configuration missing') || message.includes('api key is not configured')) {
+      return 'AI API key is not configured. Set one in Settings → Pricing → AI Provider & API Key, or add GEMINI_API_KEY to .env.local.';
     }
     if (message.includes('timeout') || message.includes('abort')) {
       return 'AI request timed out. Please try again.';
@@ -115,9 +116,10 @@ export function createAiRouter() {
     const startedAt = Date.now();
 
     try {
-      if (!getGeminiApiKey()) {
+      const aiConfig = await resolveAiApiKey(user.uid);
+      if (!aiConfig) {
         return res.status(500).json({
-          error: 'Missing GEMINI_API_KEY server configuration. Add GEMINI_API_KEY to .env.local.',
+          error: 'AI API key is not configured. Set one in Settings → Pricing → AI Provider & API Key, or add GEMINI_API_KEY to .env.local.',
         });
       }
 
@@ -154,6 +156,7 @@ export function createAiRouter() {
             'If question asks total/overall/combined, answer with portfolio totals.',
           ],
         },
+        aiConfig,
       });
       const latencyMs = clampLatency(startedAt);
 

@@ -2,6 +2,9 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import multer from 'multer';
 import { requireFirebaseUser } from '../../auth/requireFirebaseUser.js';
+import { resolveAiApiKey } from '../../user/aiCredentialsStore.js';
+import type { AiProviderConfig } from '../../ai/geminiClient.js';
+import type { AiProvider } from '../../user/aiCredentialsTypes.js';
 
 export type ExtractedAsset = {
   name: string;
@@ -22,12 +25,6 @@ type ExtractResponse = {
   candidates: ExtractedAsset[];
   errors: string[];
 };
-
-const DEFAULT_MODEL = 'gemini-2.5-flash';
-
-function getGeminiApiKey(): string {
-  return (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
-}
 
 function safeError(error: unknown): string {
   if (error instanceof Error) return error.message.slice(0, 500);
@@ -62,88 +59,23 @@ function buildExtractionPrompt(): string {
   ].join('\n');
 }
 
-async function callGeminiOcr(
-  imageBase64: string,
-  mimeType: string,
-): Promise<ExtractedAsset[]> {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error('Gemini API key is not configured. Set GEMINI_API_KEY or GOOGLE_API_KEY in environment.');
-  }
-
-  const model = process.env.SCREENSHOT_AI_MODEL || DEFAULT_MODEL;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const prompt = buildExtractionPrompt();
-
-  const body = {
-    generationConfig: {
-      temperature: 0.1,
-    },
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          { text: prompt },
-          {
-            inline_data: {
-              mime_type: mimeType,
-              data: imageBase64,
-            },
-          },
-        ],
-      },
-    ],
-  };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`Gemini OCR request failed: ${text.slice(0, 300) || `Status ${response.status}`}`);
-  }
-
-  const payload = await response.json() as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ text?: string }>;
-      };
-    }>;
-    error?: { message?: string };
-  };
-
-  if (payload.error?.message) {
-    throw new Error(payload.error.message.slice(0, 300));
-  }
-
-  const text = extractTextFromGeminiResponse(payload);
-  if (!text) {
-    throw new Error('Gemini returned an empty response.');
-  }
-
-  return parseExtractedJson(text);
-}
-
-function extractTextFromGeminiResponse(response: {
+type AiOcrResponse = {
   candidates?: Array<{
     content?: {
       parts?: Array<{ text?: string }>;
     };
   }>;
-}): string {
+  error?: { message?: string };
+};
+
+type DeepSeekOcrResponse = {
+  choices?: Array<{
+    message?: { content?: string };
+  }>;
+  error?: { message?: string };
+};
+
+function extractTextFromGeminiResponse(response: AiOcrResponse): string {
   const candidates = Array.isArray(response.candidates) ? response.candidates : [];
   for (const candidate of candidates) {
     const parts = candidate?.content?.parts;
@@ -155,6 +87,121 @@ function extractTextFromGeminiResponse(response: {
     if (text) return text;
   }
   return '';
+}
+
+async function callGeminiOcr(
+  config: AiProviderConfig,
+  imageBase64: string,
+  mimeType: string,
+  prompt: string,
+): Promise<string> {
+  const { model, apiKey } = config;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        generationConfig: { temperature: 0.1 },
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(text.slice(0, 300) || `Gemini OCR request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json() as AiOcrResponse;
+    if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
+
+    const text = extractTextFromGeminiResponse(payload);
+    if (!text) throw new Error('Gemini returned an empty response.');
+    return text;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function callDeepSeekOcr(
+  config: AiProviderConfig,
+  imageBase64: string,
+  mimeType: string,
+  prompt: string,
+): Promise<string> {
+  const { model, apiKey } = config;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.05,
+        max_tokens: 8192,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            ],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(text.slice(0, 300) || `DeepSeek OCR request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json() as DeepSeekOcrResponse;
+    if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
+
+    const text = payload.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error('DeepSeek returned an empty response.');
+    return text;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function callAiOcr(
+  config: AiProviderConfig,
+  imageBase64: string,
+  mimeType: string,
+): Promise<ExtractedAsset[]> {
+  const prompt = buildExtractionPrompt();
+
+  let rawText: string;
+  if (config.provider === 'deepseek') {
+    rawText = await callDeepSeekOcr(config, imageBase64, mimeType, prompt);
+  } else {
+    rawText = await callGeminiOcr(config, imageBase64, mimeType, prompt);
+  }
+
+  return parseExtractedJson(rawText);
 }
 
 function parseExtractedJson(text: string): ExtractedAsset[] {
@@ -173,11 +220,9 @@ function parseExtractedJson(text: string): ExtractedAsset[] {
       throw new Error('Response is not an array');
     }
 
-    return parsed.map((item: Record<string, unknown>, index: number) => {
+    return parsed.map((item: Record<string, unknown>) => {
       const name = String(item.name || '').trim();
-      if (!name) {
-        return null;
-      }
+      if (!name) return null;
 
       const quantity = typeof item.quantity === 'number' && Number.isFinite(item.quantity)
         ? item.quantity
@@ -207,7 +252,7 @@ function parseExtractedJson(text: string): ExtractedAsset[] {
       } satisfies ExtractedAsset;
     }).filter((item): item is ExtractedAsset => item !== null);
   } catch (error) {
-    throw new Error(`Failed to parse Gemini response as JSON: ${safeError(error)}. Raw text: ${cleaned.slice(0, 200)}`);
+    throw new Error(`Failed to parse AI response as JSON: ${safeError(error)}. Raw text: ${cleaned.slice(0, 200)}`);
   }
 }
 
@@ -246,6 +291,15 @@ export function createScreenshotRouter() {
         return res.status(400).json({ error: 'No screenshot files provided.' });
       }
 
+      const user = req.user!;
+      const aiConfig = await resolveAiApiKey(user.uid);
+      if (!aiConfig) {
+        return res.status(500).json({
+          candidates: [],
+          errors: ['AI API key is not configured. Set one in Settings → Pricing → AI Provider & API Key, or add GEMINI_API_KEY to .env.local.'],
+        });
+      }
+
       const allCandidates: ExtractedAsset[] = [];
       const allErrors: string[] = [];
 
@@ -253,7 +307,7 @@ export function createScreenshotRouter() {
         try {
           const mimeType = file.mimetype || 'image/png';
           const base64 = file.buffer.toString('base64');
-          const candidates = await callGeminiOcr(base64, mimeType);
+          const candidates = await callAiOcr(aiConfig, base64, mimeType);
           allCandidates.push(
             ...candidates.map((c) => ({
               ...c,

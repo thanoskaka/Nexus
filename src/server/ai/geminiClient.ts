@@ -1,4 +1,13 @@
 import type { GeminiUsage } from './types.js';
+import type { AiProvider } from '../user/aiCredentialsTypes.js';
+
+export type { AiProvider };
+
+export type AiProviderConfig = {
+  provider: AiProvider;
+  model: string;
+  apiKey: string;
+};
 
 type GeminiResponse = {
   candidates?: Array<{
@@ -7,9 +16,19 @@ type GeminiResponse = {
     };
   }>;
   usageMetadata?: GeminiUsage;
-  error?: {
-    message?: string;
+  error?: { message?: string };
+};
+
+type DeepSeekResponse = {
+  choices?: Array<{
+    message?: { content?: string };
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
   };
+  error?: { message?: string };
 };
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -27,7 +46,25 @@ function buildSystemPrompt() {
   ].join('\n');
 }
 
-function extractText(response: GeminiResponse) {
+export function getAiModelName() {
+  return (process.env.NEXUS_AI_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+}
+
+export function getGeminiApiKey() {
+  return (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+}
+
+export function resolveAiConfigFromEnv(): AiProviderConfig | null {
+  const envKey = getGeminiApiKey();
+  if (!envKey) return null;
+  return {
+    provider: 'gemini',
+    model: getAiModelName(),
+    apiKey: envKey,
+  };
+}
+
+function extractGeminiText(response: GeminiResponse): string {
   const candidates = Array.isArray(response.candidates) ? response.candidates : [];
   for (const candidate of candidates) {
     const parts = candidate?.content?.parts;
@@ -41,12 +78,111 @@ function extractText(response: GeminiResponse) {
   return '';
 }
 
-export function getAiModelName() {
-  return (process.env.NEXUS_AI_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+async function callGeminiChat(
+  config: AiProviderConfig,
+  systemPrompt: string,
+  userMessage: string,
+  abortController?: AbortController,
+) {
+  const { model, apiKey } = config;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { temperature: 0.2 },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+    }),
+    signal: abortController?.signal,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text.slice(0, 300) || `Gemini request failed with status ${response.status}`);
+  }
+
+  const payload = await response.json() as GeminiResponse;
+  if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
+
+  const answer = extractGeminiText(payload);
+  if (!answer) throw new Error('AI returned an empty response.');
+
+  return {
+    answer,
+    model,
+    usage: payload.usageMetadata,
+  };
 }
 
-export function getGeminiApiKey() {
-  return (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+async function callDeepSeekChat(
+  config: AiProviderConfig,
+  systemPrompt: string,
+  userMessage: string,
+  abortController?: AbortController,
+) {
+  const { model, apiKey } = config;
+
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+    }),
+    signal: abortController?.signal,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text.slice(0, 300) || `DeepSeek request failed with status ${response.status}`);
+  }
+
+  const payload = await response.json() as DeepSeekResponse;
+  if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
+
+  const answer = payload.choices?.[0]?.message?.content?.trim();
+  if (!answer) throw new Error('AI returned an empty response.');
+
+  return {
+    answer,
+    model,
+    usage: payload.usage
+      ? {
+          promptTokenCount: payload.usage.prompt_tokens,
+          candidatesTokenCount: payload.usage.completion_tokens,
+          totalTokenCount: payload.usage.total_tokens,
+        }
+      : undefined,
+  };
+}
+
+export async function callAiChat(
+  config: AiProviderConfig,
+  systemPrompt: string,
+  userMessage: string,
+): Promise<{ answer: string; model: string; usage?: GeminiUsage }> {
+  if (!config.apiKey) throw new Error('AI API key is not configured.');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    if (config.provider === 'deepseek') {
+      return await callDeepSeekChat(config, systemPrompt, userMessage, controller);
+    }
+    return await callGeminiChat(config, systemPrompt, userMessage, controller);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function generatePortfolioAnswer(input: {
@@ -64,14 +200,12 @@ export async function generatePortfolioAnswer(input: {
     };
     interpretationRules?: string[];
   };
+  aiConfig?: AiProviderConfig;
 }) {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error('AI configuration missing.');
+  const config = input.aiConfig || resolveAiConfigFromEnv();
+  if (!config || !config.apiKey) {
+    throw new Error('AI configuration missing. Set an API key in Settings or configure GEMINI_API_KEY in the server environment.');
   }
-
-  const model = getAiModelName();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const promptPayload = {
     contextSummary: input.contextSummary,
@@ -81,55 +215,9 @@ export async function generatePortfolioAnswer(input: {
     scopeHints: input.scopeHints || null,
   };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const systemPrompt = buildSystemPrompt();
+  const userMessage = JSON.stringify(promptPayload);
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: buildSystemPrompt() }],
-        },
-        generationConfig: {
-          temperature: 0.2,
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: JSON.stringify(promptPayload) }],
-          },
-        ],
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    const message = text.slice(0, 300) || `Gemini request failed with status ${response.status}`;
-    throw new Error(message);
-  }
-
-  const payload = await response.json() as GeminiResponse;
-  if (payload.error?.message) {
-    throw new Error(payload.error.message.slice(0, 300));
-  }
-
-  const answer = extractText(payload);
-  if (!answer) {
-    throw new Error('AI returned an empty response.');
-  }
-
-  return {
-    answer,
-    model,
-    usage: payload.usageMetadata,
-  };
+  const result = await callAiChat(config, systemPrompt, userMessage);
+  return result;
 }

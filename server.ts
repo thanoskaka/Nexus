@@ -6,6 +6,7 @@ import { createSplitwiseRouter } from './src/server/splitwise/splitwiseRoutes';
 import { createUpstoxRouter } from './src/server/providers/upstox/upstoxRoutes';
 import { createSharedIntegrationsRouter } from './src/server/integrations/sharedRoutes';
 import { createScreenshotRouter } from './src/server/providers/screenshot/screenshotRoutes.js';
+import { createAiCredentialsRouter } from './src/server/user/aiCredentialsRoutes.js';
 
 function getNormalizedTicker(result: unknown) {
   const typed = result as { normalizedTicker?: string; yahooTicker?: string };
@@ -91,6 +92,7 @@ export function createApp() {
   app.use('/api/upstox', createUpstoxRouter());
   app.use('/api/connections/screenshot', createScreenshotRouter());
   app.use('/api/import', createScreenshotRouter());
+  app.use('/api/user/ai-credentials', createAiCredentialsRouter());
 
   return app;
 }

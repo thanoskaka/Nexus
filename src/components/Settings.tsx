@@ -10,6 +10,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription } from './ui/dialo
 import { DEFAULT_PRICE_PROVIDER_SETTINGS, PriceProvider, PriceProviderSettings, fetchHistoricalExchangeRate } from '../lib/api';
 import { AddAssetClassModal } from './AddAssetClassModal';
 import { ScreenshotImportModal } from './ScreenshotImportModal';
+import { AiSettingsCard } from './AiSettingsCard';
 import { AssetClassLogo } from '../lib/assetClassBranding';
 import { SYSTEM_ASSET_CLASSES } from '../lib/systemAssetClasses';
 import { Input } from './ui/input';
@@ -1594,6 +1595,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         </CardContent>
       </Card>
       
+      <AiSettingsCard />
+
       <Card id="price-updates" className="border-none shadow-sm rounded-2xl mb-12">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
