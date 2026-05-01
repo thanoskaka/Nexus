@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Loader2, Send, Sparkles, X } from 'lucide-react';
+import { Bot, Loader2, Send, Settings, Sparkles, X } from 'lucide-react';
 import { sendAiChat } from '../lib/aiChat';
 
 type MessageRole = 'user' | 'assistant';
@@ -194,8 +194,25 @@ export function AiChatWidget({ userId, portfolioId }: { userId: string | null; p
               ) : null}
 
               {error ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
-                  {error}
+                <div className={`rounded-xl border px-3 py-2 text-xs ${
+                  error.includes('API key is not configured')
+                    ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200'
+                    : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300'
+                }`}>
+                  {error.includes('API key is not configured') ? (
+                    <div className="flex flex-col gap-2">
+                      <span>AI API key not configured.</span>
+                      <a
+                        href="/settings?section=pricing"
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-900 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                      >
+                        <Settings className="h-3 w-3" />
+                        Configure in Settings
+                      </a>
+                    </div>
+                  ) : (
+                    error
+                  )}
                 </div>
               ) : null}
               <div ref={endRef} />

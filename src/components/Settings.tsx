@@ -3,12 +3,14 @@ import Papa from 'papaparse';
 import { usePortfolio } from '../store/PortfolioContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2 } from 'lucide-react';
+import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera } from 'lucide-react';
 import { GoogleDriveSync } from './GoogleDriveSync';
 import { Asset, AssetClassDef, getAllAssetClasses, getAllAssets, getSetting } from '../store/db';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { DEFAULT_PRICE_PROVIDER_SETTINGS, PriceProvider, PriceProviderSettings, fetchHistoricalExchangeRate } from '../lib/api';
 import { AddAssetClassModal } from './AddAssetClassModal';
+import { ScreenshotImportModal } from './ScreenshotImportModal';
+import { AiSettingsCard } from './AiSettingsCard';
 import { AssetClassLogo } from '../lib/assetClassBranding';
 import { SYSTEM_ASSET_CLASSES } from '../lib/systemAssetClasses';
 import { Input } from './ui/input';
@@ -104,6 +106,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const [confirmDialog, setConfirmDialog] = React.useState<{ open: boolean, title: string, description: string, onConfirm: () => void }>({ open: false, title: '', description: '', onConfirm: () => {} });
   const [alertDialog, setAlertDialog] = React.useState<{ open: boolean, title: string, description: string }>({ open: false, title: '', description: '' });
   const [isAssetClassModalOpen, setIsAssetClassModalOpen] = React.useState(false);
+  const [isScreenshotModalOpen, setIsScreenshotModalOpen] = React.useState(false);
   const [classToEdit, setClassToEdit] = React.useState<AssetClassDef | null>(null);
   const [sharedProviderForm, setSharedProviderForm] = React.useState<PriceProviderSettings>(DEFAULT_PRICE_PROVIDER_SETTINGS);
   const [overrideForm, setOverrideForm] = React.useState<UserProviderOverrides>(DEFAULT_USER_PROVIDER_OVERRIDES);
@@ -1592,6 +1595,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         </CardContent>
       </Card>
       
+      <AiSettingsCard />
+
       <Card id="price-updates" className="border-none shadow-sm rounded-2xl mb-12">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -1840,6 +1845,27 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           <CardDescription>Import, export, or erase your asset holdings.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
+                <ScanLine className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Screenshot / AI Import</h3>
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Upload screenshots of your broker portfolio or transaction receipts. AI extracts asset names, quantities, and prices — then matches against your existing holdings.
+            </p>
+            <Button
+              className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]"
+              onClick={() => setIsScreenshotModalOpen(true)}
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              Import from Screenshots
+            </Button>
+          </div>
+
+          <hr className="border-slate-200 dark:border-slate-800" />
+
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">India Holdings</h3>
             <div className="flex flex-wrap gap-2">
@@ -2499,6 +2525,10 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         open={isAssetClassModalOpen} 
         onOpenChange={setIsAssetClassModalOpen} 
         classToEdit={classToEdit} 
+      />
+      <ScreenshotImportModal
+        open={isScreenshotModalOpen}
+        onOpenChange={setIsScreenshotModalOpen}
       />
     </div>
   );
