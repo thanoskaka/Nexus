@@ -240,7 +240,11 @@ export default defineConfig(({ mode }) => {
           name: 'Nexus Portfolio',
           short_name: 'Nexus',
           description: 'A private, multi-currency global wealth tracker.',
-          theme_color: '#ffffff',
+          theme_color: '#00875A',
+          background_color: '#F8F9FA',
+          display: 'standalone',
+          start_url: '/',
+          scope: '/',
           icons: [
             {
               src: 'pwa-192x192.png',

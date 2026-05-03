@@ -678,6 +678,47 @@ export function Dashboard() {
         </div>
       ) : null}
 
+      {assets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00875A]">
+            <WalletCards className="h-8 w-8 text-white" />
+          </div>
+          <h2 className="mb-2 text-2xl font-bold text-slate-900 dark:text-white">Welcome to Nexus Portfolio</h2>
+          <p className="mb-8 max-w-md text-base text-slate-500 dark:text-slate-400">
+            Start tracking your family's wealth. Add your first asset, import holdings from a statement, or connect an integration.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button onClick={onAddAsset} className="bg-[#00875A] hover:bg-[#007A51] text-white rounded-lg px-6">
+              <Plus className="mr-2 h-4 w-4" />
+              Add First Asset
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const link = document.querySelector<HTMLButtonElement>('[data-nav-settings]');
+                if (link) link.click();
+              }}
+              className="rounded-lg"
+            >
+              Import Holdings
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const link = document.querySelector<HTMLButtonElement>('[data-nav-settings]');
+                if (link) link.click();
+              }}
+              className="rounded-lg"
+            >
+              Go to Integrations
+            </Button>
+          </div>
+          <p className="mt-6 text-sm text-slate-400 dark:text-slate-500">
+            Supported formats: CSV, screenshot, and CAS statements.
+          </p>
+        </div>
+      ) : null}
+
       <Card className="overflow-hidden rounded-3xl border-none bg-[radial-gradient(circle_at_top_left,_rgba(0,135,90,0.22),_transparent_40%),linear-gradient(135deg,_#052e2b,_#0f3d37_55%,_#0b5b46)] text-white shadow-[0_30px_90px_rgba(5,46,43,0.28)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(61,255,191,0.18),_transparent_42%),linear-gradient(135deg,_#020617,_#052e2b_55%,_#0b5b46)]">
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
