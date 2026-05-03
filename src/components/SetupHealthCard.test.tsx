@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SetupHealthCard } from './SetupHealthCard';
@@ -270,5 +270,98 @@ describe('SetupHealthCard', () => {
     });
 
     expect(screen.getByText('partial')).toBeTruthy();
+  });
+
+  it('shows Ready text for configured items', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => fullStatus,
+    });
+
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(6);
+    });
+  });
+
+  it('shows Setup button and required badge for missing required item', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => emptyStatus,
+    });
+
+    render(<SetupHealthCard />);
+
+    const required = await screen.findAllByText('required');
+    expect(required.length).toBeGreaterThanOrEqual(1);
+
+    const setupButtons = await screen.findAllByText('Setup');
+    expect(setupButtons.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows View steps for missing optional item', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => emptyStatus,
+    });
+
+    render(<SetupHealthCard />);
+
+    const viewSteps = await screen.findAllByText('View steps');
+    expect(viewSteps.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('shows Setup button configured hint includes env var names for each missing item', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => emptyStatus,
+    });
+
+    render(<SetupHealthCard />);
+
+    await screen.findByText('Firebase Auth');
+
+    const hintText = document.body.textContent || '';
+    expect(hintText).toContain('FIREBASE_ADMIN_PROJECT_ID');
+    expect(hintText).toContain('UPSTOX_CLIENT_ID');
+    expect(hintText).toContain('SPLITWISE_CLIENT_ID');
+  });
+
+  it('shows detail panel when clicking AI Assistant View steps button', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => emptyStatus,
+    });
+
+    const user = userEvent.setup();
+    render(<SetupHealthCard />);
+
+    await screen.findByText('AI Assistant');
+
+    const viewSteps = await screen.findAllByText('View steps');
+    await user.click(viewSteps[5]);
+
+    await screen.findByText('Open AI Settings', {}, { timeout: 2000 });
+  });
+
+
+
+  it('never renders secret values from status endpoint', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => emptyStatus,
+    });
+
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('local')).toBeTruthy();
+    });
+
+    const body = document.body.textContent || '';
+    expect(body).not.toContain('super-secret');
+    expect(body).not.toContain('apiKey');
+    expect(body).not.toContain('-----BEGIN');
   });
 });
