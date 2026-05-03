@@ -21,6 +21,7 @@ import { useSplitwise } from '../store/SplitwiseContext';
 import { useConnectedAccounts } from '../store/ConnectedAccountsContext';
 import type { CurrencyAmount } from '../lib/splitwiseTypes';
 import { useAuth } from '../store/AuthContext';
+import { SetupHealthCard } from './SetupHealthCard';
 
 export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations';
 type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations';
@@ -1981,6 +1982,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Integrations</h2>
             <p className="text-slate-500 dark:text-slate-400">Connect cloud accounts to enrich Nexus with external financial context.</p>
           </div>
+
+          <SetupHealthCard />
 
           <Card className="border-none shadow-sm rounded-2xl">
             <CardHeader>
