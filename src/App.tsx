@@ -13,10 +13,11 @@ import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet
 import { SplitwiseProvider } from './store/SplitwiseContext';
 import { ConnectedAccountsProvider } from './store/ConnectedAccountsContext';
 import { parseInitialViewFromQuery } from './lib/appNavigation';
+import { GettingStartedChecklist } from './components/GettingStartedChecklist';
 
 function MainApp() {
   const { user, logout } = useAuth();
-  const { refreshPrices, isRefreshing, portfolios, activePortfolioId, setActivePortfolioId } = usePortfolio();
+  const { assets, refreshPrices, isRefreshing, portfolios, activePortfolioId, setActivePortfolioId } = usePortfolio();
   const initialView = parseInitialViewFromQuery();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
@@ -131,6 +132,13 @@ function MainApp() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {(currentView === 'settings' || (currentView === 'dashboard' && assets.length === 0)) && (
+          <GettingStartedChecklist
+            assetsLength={assets.length}
+            onNavigate={(view) => setCurrentView(view)}
+            onAddAsset={() => setIsAddModalOpen(true)}
+          />
+        )}
         {currentView === 'dashboard' && <Dashboard />}
         {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => setIsAddModalOpen(true)} />}
         {currentView === 'settings' && <Settings initialSection={settingsSection} />}
