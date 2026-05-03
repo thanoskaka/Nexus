@@ -272,7 +272,7 @@ describe('SetupHealthCard', () => {
     expect(screen.getByText('partial')).toBeTruthy();
   });
 
-  it('shows Ready text for configured items', async () => {
+  it('shows View setup button for configured items', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => fullStatus,
@@ -281,7 +281,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(6);
+      expect(screen.getAllByText('View setup').length).toBeGreaterThanOrEqual(6);
     });
   });
 

@@ -628,10 +628,15 @@ export function SetupHealthCard() {
                   </div>
                   <div className="flex items-center gap-2 pl-7">
                     {item.status === 'configured' ? (
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3" />
-                        Ready
-                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs rounded-full text-emerald-600 dark:text-emerald-400"
+                        onClick={() => setDetailItem(item)}
+                      >
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        View setup
+                      </Button>
                     ) : isOptional ? (
                       <>
                         <Button
