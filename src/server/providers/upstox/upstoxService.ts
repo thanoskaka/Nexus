@@ -373,7 +373,7 @@ export async function getUpstoxStatus(uid: string) {
   const [accounts, holdings, syncRuns] = await Promise.all([
     listExternalAccounts(uid, connection.id),
     listActiveExternalHoldings(uid, connection.id),
-    listLatestSyncRuns(uid, PROVIDER, 3),
+    listLatestSyncRuns(uid, PROVIDER, 10),
   ]);
 
   const totalsByCurrency = new Map<string, number>();

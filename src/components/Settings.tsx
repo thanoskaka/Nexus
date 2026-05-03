@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera } from 'lucide-react';
 import { GoogleDriveSync } from './GoogleDriveSync';
+import { SyncHistoryPanel } from './SyncHistoryPanel';
 import { Asset, AssetClassDef, getAllAssetClasses, getAllAssets, getSetting } from '../store/db';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { DEFAULT_PRICE_PROVIDER_SETTINGS, PriceProvider, PriceProviderSettings, fetchHistoricalExchangeRate } from '../lib/api';
@@ -2111,6 +2112,12 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
                       )}
                     </div>
                   </div>
+
+                  <SyncHistoryPanel
+                    syncRuns={upstox.syncRuns}
+                    loading={connectedAccountsLoading}
+                    onRefresh={() => void refreshUpstox()}
+                  />
                 </div>
               ) : null}
 
