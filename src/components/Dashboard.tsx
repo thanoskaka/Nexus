@@ -22,9 +22,11 @@ import {
   Globe,
   Info,
   Maximize2,
+  Plus,
   RefreshCw,
   TrendingUp,
   Wallet,
+  WalletCards,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Select } from './ui/select';
@@ -83,7 +85,7 @@ type ChartAnalytics = {
   };
 };
 
-export function Dashboard() {
+export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
   const { assets, rates, refreshPrices, isRefreshing, refreshQueue } = usePortfolio();
   const visibleAssets = useMemo(() => assets.filter((asset) => !asset.hiddenFromDashboard), [assets]);
   const [scope, setScope] = useState<DashboardScope>('ALL');

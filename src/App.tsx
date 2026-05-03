@@ -77,6 +77,7 @@ function MainApp() {
               <span className="hidden sm:inline">Assets</span>
             </button>
             <button 
+              data-nav-settings
               onClick={() => setCurrentView('settings')}
               className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${currentView === 'settings' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
             >
@@ -139,7 +140,7 @@ function MainApp() {
             onAddAsset={() => setIsAddModalOpen(true)}
           />
         )}
-        {currentView === 'dashboard' && <Dashboard />}
+        {currentView === 'dashboard' && <Dashboard onAddAsset={() => setIsAddModalOpen(true)} />}
         {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => setIsAddModalOpen(true)} />}
         {currentView === 'settings' && <Settings initialSection={settingsSection} />}
       </main>
