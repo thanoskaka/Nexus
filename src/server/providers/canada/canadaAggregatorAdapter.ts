@@ -1,4 +1,4 @@
-import type { ExternalConnection, ExternalProviderAdapter } from '../types.js';
+import type { ExternalAccount, ExternalConnection, ExternalHolding, ExternalProviderAdapter } from '../types.js';
 
 export const CANADA_AGGREGATOR_ENABLED = false;
 
@@ -14,11 +14,11 @@ export class CanadaAggregatorAdapter implements ExternalProviderAdapter {
     throw new Error('Canada aggregation is not enabled in this build.');
   }
 
-  async fetchAccounts(_connection: ExternalConnection) {
+  async fetchAccounts(_connection: ExternalConnection): Promise<ExternalAccount[]> {
     throw new Error('Canada aggregation is not enabled in this build.');
   }
 
-  async fetchHoldings(_connection: ExternalConnection) {
+  async fetchHoldings(_connection: ExternalConnection): Promise<ExternalHolding[]> {
     throw new Error('Canada aggregation is not enabled in this build.');
   }
 }

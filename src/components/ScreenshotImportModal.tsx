@@ -84,7 +84,7 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    const dropped = Array.from(e.dataTransfer.files || []);
+    const dropped: File[] = Array.from(e.dataTransfer.files || []);
     const imageFiles = dropped.filter((f) =>
       ['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif'].includes(f.type) ||
       f.name.match(/\.(png|jpe?g|webp|heic|heif)$/i),

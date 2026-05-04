@@ -220,7 +220,7 @@ function parseExtractedJson(text: string): ExtractedAsset[] {
       throw new Error('Response is not an array');
     }
 
-    return parsed.map((item: Record<string, unknown>) => {
+    return parsed.map((item: Record<string, unknown>): ExtractedAsset | null => {
       const name = String(item.name || '').trim();
       if (!name) return null;
 

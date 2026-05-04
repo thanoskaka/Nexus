@@ -1256,6 +1256,7 @@ function AssetClassFilterChip({
   active,
   onClick,
 }: {
+  key?: React.Key;
   label: string;
   image?: string;
   active: boolean;
@@ -1290,7 +1291,7 @@ function StatPill({ label, value, onClick }: React.PropsWithChildren<{ label: st
   );
 }
 
-function ClassTotalRow({ group, columnsLength }: { group: LedgerDisplayGroup; columnsLength: number }) {
+function ClassTotalRow({ group, columnsLength }: { key?: React.Key; group: LedgerDisplayGroup; columnsLength: number }) {
   const toneClasses = getAssetToneClasses(group.rows[0]?.original);
 
   return (
@@ -1331,7 +1332,7 @@ function ClassTotalRow({ group, columnsLength }: { group: LedgerDisplayGroup; co
   );
 }
 
-function MobileClassTotalCard({ group }: { group: LedgerDisplayGroup }) {
+function MobileClassTotalCard({ group }: { key?: React.Key; group: LedgerDisplayGroup }) {
   const toneClasses = getAssetToneClasses(group.rows[0]?.original);
 
   return (
@@ -1388,12 +1389,37 @@ function MetricTile({ label, value, tone = 'neutral' }: { label: string; value: 
   );
 }
 
-function normalizeBulkRefreshState(state: unknown) {
+type NormalizedBulkRefreshState = {
+  status: 'idle' | 'running' | 'queued' | 'completed' | 'partial';
+  counts: {
+    eligibleMarketLinked: number;
+    updatedNow: number;
+    usingCachedClose: number;
+    queued: number;
+    skippedManual: number;
+    blockedBySetup: number;
+    needsAttention: number;
+  };
+  queues: Array<{
+    provider: 'massive' | 'alphavantage';
+    pendingRequests: number;
+    pendingRows: number;
+    nextRunAt: number | null;
+  }>;
+  issues: Array<{
+    key: string;
+    label: string;
+    count: number;
+    tone: 'sky' | 'amber' | 'rose' | 'emerald' | 'slate';
+  }>;
+};
+
+function normalizeBulkRefreshState(state: unknown): NormalizedBulkRefreshState {
   const candidate = (state && typeof state === 'object') ? state as Record<string, unknown> : {};
   const rawCounts = (candidate.counts && typeof candidate.counts === 'object') ? candidate.counts as Record<string, unknown> : {};
   const rawQueues = Array.isArray(candidate.queues) ? candidate.queues : [];
   const rawIssues = Array.isArray(candidate.issues) ? candidate.issues : [];
-  const queues = rawQueues
+  const queues: NormalizedBulkRefreshState['queues'] = rawQueues
     .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
     .map((entry) => ({
       provider: entry.provider === 'alphavantage' ? 'alphavantage' : 'massive',
@@ -1401,7 +1427,7 @@ function normalizeBulkRefreshState(state: unknown) {
       pendingRows: typeof entry.pendingRows === 'number' ? entry.pendingRows : 0,
       nextRunAt: typeof entry.nextRunAt === 'number' ? entry.nextRunAt : null,
     }));
-  const issues = rawIssues
+  const issues: NormalizedBulkRefreshState['issues'] = rawIssues
     .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
     .map((entry) => ({
       key: typeof entry.key === 'string' ? entry.key : crypto.randomUUID(),
@@ -1461,7 +1487,7 @@ function getIssueBadgeClass(tone: 'sky' | 'amber' | 'rose' | 'emerald' | 'slate'
   }
 }
 
-function buildCompactRefreshSummary(state: ReturnType<typeof normalizeBulkRefreshState>) {
+function buildCompactRefreshSummary(state: NormalizedBulkRefreshState) {
   if (state.queues.length === 0) {
     return 'No provider queues are waiting right now.';
   }

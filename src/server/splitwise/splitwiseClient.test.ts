@@ -19,10 +19,10 @@ describe('SplitwiseClient OAuth2', () => {
   });
 
   it('exchanges code for token using oauth/token endpoint', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Partial<Response>> => ({
       ok: true,
       status: 200,
-      headers: { get: () => 'application/json' },
+      headers: new Headers({ 'content-type': 'application/json' }),
       text: async () => JSON.stringify({ access_token: 'access-1', refresh_token: 'refresh-1' }),
     }));
     vi.stubGlobal('fetch', fetchMock as any);

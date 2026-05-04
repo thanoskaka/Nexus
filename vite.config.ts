@@ -157,8 +157,8 @@ export default defineConfig(({ mode }) => {
                   previousClose: result.previousClose,
                   currency: result.currency,
                   sourceUrl: result.sourceUrl,
-                  normalizedTicker: 'provider' in result ? result.normalizedTicker : result.yahooTicker,
-                  provider: 'provider' in result ? result.provider : 'yahoo',
+                  normalizedTicker: result.normalizedTicker,
+                  provider: result.provider,
                 }));
                 return;
               }
@@ -170,8 +170,8 @@ export default defineConfig(({ mode }) => {
                 previousClose: result.previousClose,
                 currency: result.currency,
                 sourceUrl: result.sourceUrl,
-                normalizedTicker: 'provider' in result ? result.normalizedTicker : result.yahooTicker,
-                provider: 'provider' in result ? result.provider : 'yahoo',
+                normalizedTicker: result.normalizedTicker,
+                provider: result.provider,
               }));
             } catch (error) {
               res.statusCode = 500;

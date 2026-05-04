@@ -100,9 +100,13 @@ export function createSharedIntegrationsRouter() {
           ]);
         } catch (error) {
           upstoxStatus = {
+            id: `upstox-error-${uid}`,
+            uid,
             provider: 'upstox',
             status: 'error',
             displayName: 'Upstox',
+            connectedAt: 0,
+            updatedAt: Date.now(),
             accounts: [],
             holdingsSummary: {
               totalMarketValueByCurrency: [],

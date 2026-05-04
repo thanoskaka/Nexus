@@ -236,7 +236,7 @@ export async function fetchYahooFinancePrice(ticker: string) {
     return inFlightRequest;
   }
 
-  const request = (async () => {
+  const request: Promise<ReturnType<typeof buildYahooResult>> = (async () => {
     const quoteUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(
       yahooTicker,
     )}`;
@@ -466,7 +466,7 @@ async function fetchAlphaVantageCanadaClosePrice(ticker: string): Promise<Server
     `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(normalizedTicker)}` +
     `&outputsize=compact&apikey=${encodeURIComponent(apiKey)}`;
 
-  const request = (async () => {
+  const request: Promise<ServerPriceResult> = (async () => {
     const response = await fetch(url);
     const data = await safeJson(response);
     const timeSeries = data?.['Time Series (Daily)'];
@@ -505,7 +505,7 @@ async function fetchAlphaVantageCanadaClosePrice(ticker: string): Promise<Server
       normalizedTicker,
       provider: 'alphavantage',
       error: data?.Note || data?.Information || data?.['Error Message'] || `Alpha Vantage did not return a usable close price for ${normalizedTicker}.`,
-    };
+    } satisfies ServerPriceResult;
   })().catch(() => {
     if (isUsableServerMarketCloseCache(cachedResult)) {
       return buildCachedServerPriceResult(
@@ -521,7 +521,7 @@ async function fetchAlphaVantageCanadaClosePrice(ticker: string): Promise<Server
       normalizedTicker,
       provider: 'alphavantage',
       error: `Alpha Vantage lookup failed for ${normalizedTicker}.`,
-    };
+    } satisfies ServerPriceResult;
   }).finally(() => {
     if (inFlightKey) {
       inFlightCloseRequests.delete(inFlightKey);
@@ -621,7 +621,7 @@ async function fetchMassivePreviousClosePrice(ticker: string): Promise<ServerPri
       normalizedTicker,
       provider: 'massive',
       error: data?.error || data?.message || `Massive did not return a usable close price for ${normalizedTicker}.`,
-    };
+    } satisfies ServerPriceResult;
   })().catch(() => {
     if (isUsableServerMarketCloseCache(cachedResult)) {
       return buildCachedServerPriceResult(
@@ -637,7 +637,7 @@ async function fetchMassivePreviousClosePrice(ticker: string): Promise<ServerPri
       normalizedTicker,
       provider: 'massive',
       error: `Massive lookup failed for ${normalizedTicker}.`,
-    };
+    } satisfies ServerPriceResult;
   }).finally(() => {
     if (inFlightKey) {
       inFlightCloseRequests.delete(inFlightKey);

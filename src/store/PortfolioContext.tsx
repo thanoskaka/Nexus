@@ -1743,7 +1743,7 @@ function summarizeBulkRefreshRun(
     if (existing) {
       existing.count += 1;
     } else {
-      issuesMap.set(issue.key, { ...issue });
+      issuesMap.set(issue.key, { ...issue, count: 1 });
     }
   }
 

@@ -176,7 +176,7 @@ export function getEffectiveProviderOrder(
 ) {
   const requestedProviders = dedupeProviders(providers.length > 0 ? providers : [settings.primaryProvider, settings.secondaryProvider, 'yahoo']);
   const configuredProviders = requestedProviders.filter((provider) => isProviderConfigured(provider, settings));
-  const baseProviders = configuredProviders.length > 0 ? configuredProviders : ['yahoo'];
+  const baseProviders: PriceProvider[] = configuredProviders.length > 0 ? configuredProviders : ['yahoo'];
 
   return prioritizeAvailableProviders(baseProviders, settings);
 }
@@ -696,7 +696,7 @@ function readCachedPrice(ticker: string, provider: PriceProvider): CachedPriceRe
 
 function writeCachedPrice(ticker: string, result: PriceFetchResult) {
   const storage = getStorage();
-  if (!storage || result.price == null) return;
+  if (!storage || result.price == null || !isClientPriceProvider(result.provider)) return;
 
   const payload: CachedPriceResult = {
     price: result.price,
@@ -739,4 +739,8 @@ function buildProviderQuoteUrl(provider: ResolvedPriceProvider, ticker: string) 
 
 function isResolvedPriceProvider(value: unknown): value is ResolvedPriceProvider {
   return value === 'yahoo' || value === 'alphavantage' || value === 'finnhub' || value === 'massive' || value === 'amfi' || value === 'upstox' || value === 'gold';
+}
+
+function isClientPriceProvider(value: ResolvedPriceProvider): value is PriceProvider {
+  return value === 'yahoo' || value === 'alphavantage' || value === 'finnhub';
 }
