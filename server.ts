@@ -7,6 +7,7 @@ import { createUpstoxRouter } from './src/server/providers/upstox/upstoxRoutes';
 import { createSharedIntegrationsRouter } from './src/server/integrations/sharedRoutes';
 import { createScreenshotRouter } from './src/server/providers/screenshot/screenshotRoutes.js';
 import { createAiCredentialsRouter } from './src/server/user/aiCredentialsRoutes.js';
+import { createSetupStatusRouter } from './src/server/setup/setupStatusRoutes.js';
 
 function getNormalizedTicker(result: unknown) {
   const typed = result as { normalizedTicker?: string; yahooTicker?: string };
@@ -93,14 +94,18 @@ export function createApp() {
   app.use('/api/connections/screenshot', createScreenshotRouter());
   app.use('/api/import', createScreenshotRouter());
   app.use('/api/user/ai-credentials', createAiCredentialsRouter());
+  app.use('/api/setup', createSetupStatusRouter());
 
   return app;
 }
 
 export async function startServer() {
   const env = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), '');
-  if (env.MASSIVE_API_KEY && !process.env.MASSIVE_API_KEY) {
-    process.env.MASSIVE_API_KEY = env.MASSIVE_API_KEY;
+
+  for (const [key, value] of Object.entries(env)) {
+    if (value && !process.env[key]) {
+      process.env[key] = value;
+    }
   }
 
   const app = createApp();

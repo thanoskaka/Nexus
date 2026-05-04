@@ -4,6 +4,18 @@ Nexus Portfolio is a shared wealth tracker for families managing money across Ca
 
 It combines market-linked investments, manual assets, liabilities, and read-only connected broker snapshots in one cloud-backed workspace.
 
+## Product Direction
+
+See [North Star and Strategy](docs/north-star-strategy.md) for the product baseline, hosted vs self-hosted direction, setup principles, docs/service plan, onboarding goals, mobile path, and sibling-app boundary.
+
+## Documentation
+
+- [Docs Index](docs/README.md) -- strategy, setup modes, capability matrix, diagnostics
+- [Setup Modes](docs/setup-modes.md) -- local dev, self-hosted, and hosted env requirements
+- [Capability & Cost Posture](docs/capability-cost-posture.md) -- what each feature needs and costs
+- [Setup Diagnostics Blueprint](docs/setup-diagnostics.md) -- `/api/setup/status` endpoint design
+- [Backend Capabilities Helper](docs/backend-setup-capabilities.md) -- `getSetupCapabilities()` design
+
 ## Connected Accounts (Phase 1)
 
 Nexus now includes a reusable **Connected Accounts** foundation with normalized cloud storage:
