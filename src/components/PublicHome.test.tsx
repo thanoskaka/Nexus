@@ -26,11 +26,13 @@ describe('PublicHome', () => {
     expect(screen.getByText('Documentation')).toBeInTheDocument();
   });
 
-  it('renders launch CTAs', () => {
+  it('renders Google sign-in CTAs', () => {
     render(<PublicHome authError={null} onLaunch={vi.fn()} />);
 
-    const launchButtons = screen.getAllByText('Launch Portfolio');
-    expect(launchButtons.length).toBeGreaterThanOrEqual(2);
+    const signInButtons = screen.getAllByText('Sign in with Google');
+    expect(signInButtons.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Uses Google sign-in for the hosted app')).toBeInTheDocument();
+    expect(screen.getByText('Sign in to hosted app')).toBeInTheDocument();
   });
 
   it('shows auth error when provided', () => {
@@ -57,14 +59,14 @@ describe('PublicHome', () => {
     expect(screen.queryByText(/Signed out/)).not.toBeInTheDocument();
   });
 
-  it('calls onLaunch when a Launch Portfolio button is clicked', async () => {
+  it('calls onLaunch when a Sign in with Google button is clicked', async () => {
     const user = userEvent.setup();
     const onLaunch = vi.fn();
 
     render(<PublicHome authError={null} onLaunch={onLaunch} />);
 
-    const launchButtons = screen.getAllByText('Launch Portfolio');
-    await user.click(launchButtons[0]);
+    const signInButtons = screen.getAllByText('Sign in with Google');
+    await user.click(signInButtons[0]);
 
     expect(onLaunch).toHaveBeenCalledTimes(1);
   });

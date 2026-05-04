@@ -56,7 +56,7 @@ describe('App authentication flow', () => {
     render(<App />);
 
     expect(screen.getByText('Nexus Portfolio')).toBeInTheDocument();
-    expect(screen.getAllByText('Launch Portfolio').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Sign in with Google').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders auth error on public home when auth error is present', () => {
