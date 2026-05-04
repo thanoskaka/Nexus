@@ -15,6 +15,7 @@ import { ConnectedAccountsProvider } from './store/ConnectedAccountsContext';
 import { parseInitialViewFromQuery } from './lib/appNavigation';
 import { PublicHome } from './components/PublicHome';
 import { CenteredState } from './components/CenteredState';
+import { GettingStartedChecklist } from './components/GettingStartedChecklist';
 
 function MainApp() {
   const { user, logout } = useAuth();
@@ -51,7 +52,7 @@ function MainApp() {
   return (
     <div className={`min-h-screen bg-[#F8F9FA] text-slate-900 dark:bg-slate-900 dark:text-slate-50 transition-colors duration-200 font-sans`}>
       <header className="bg-white dark:bg-slate-950 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-800">
-        <div className="container mx-auto px-4 py-4 grid grid-cols-1 gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
+        <div className="container mx-auto px-4 py-2 sm:py-4 grid grid-cols-1 gap-2 lg:gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
           <div className="flex items-center gap-3 cursor-pointer min-w-0 lg:justify-self-start" onClick={() => setCurrentView('dashboard')}>
             <div className="w-10 h-10 bg-[#00875A] rounded-xl flex items-center justify-center shadow-sm">
               <Wallet className="text-white h-5 w-5" />
@@ -65,22 +66,23 @@ function MainApp() {
           <div className="flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-1 rounded-full border border-slate-100 dark:border-slate-800 xl:justify-self-center xl:min-w-0">
             <button
               onClick={() => setCurrentView('dashboard')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${currentView === 'dashboard' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${currentView === 'dashboard' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
             >
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
             </button>
             <button
               onClick={() => setCurrentView('assets')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${currentView === 'assets' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${currentView === 'assets' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
             >
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Assets</span>
             </button>
             <button
+            <button
               data-nav-settings
               onClick={() => setCurrentView('settings')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${currentView === 'settings' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${currentView === 'settings' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
             >
               <SettingsIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Settings</span>
@@ -134,6 +136,13 @@ function MainApp() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {(currentView === 'settings' || (currentView === 'dashboard' && assets.length === 0)) && (
+          <GettingStartedChecklist
+            assetsLength={assets.length}
+            onNavigate={(view) => setCurrentView(view)}
+            onAddAsset={() => setIsAddModalOpen(true)}
+          />
+        )}
         {currentView === 'dashboard' && <Dashboard onAddAsset={() => setIsAddModalOpen(true)} />}
         {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => setIsAddModalOpen(true)} />}
         {currentView === 'settings' && <Settings initialSection={settingsSection} />}

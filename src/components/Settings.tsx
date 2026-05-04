@@ -1129,7 +1129,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="grid gap-2 md:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-5">
             {tabItems.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
