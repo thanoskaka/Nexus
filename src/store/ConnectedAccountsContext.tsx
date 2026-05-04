@@ -78,7 +78,12 @@ export function ConnectedAccountsProvider({ children }: { children: React.ReactN
         getUpstoxHoldings(),
       ]);
 
-      setUpstox(status);
+      setUpstox((current) => {
+        if (current?.status === 'connecting' && status.status === 'disconnected') {
+          return current;
+        }
+        return status;
+      });
       setUpstoxHoldings(holdings);
 
       if (status.lastError && status.status !== 'connected') {
