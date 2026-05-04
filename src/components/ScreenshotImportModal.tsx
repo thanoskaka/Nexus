@@ -15,6 +15,7 @@ type QuantityStrategy = 'replace' | 'add';
 interface ImportCandidate {
   id: string;
   extracted: ExtractedAsset;
+  excluded: boolean;
   matchAction: MatchAction;
   quantityStrategy: QuantityStrategy;
   matchedAsset: Asset | null;
@@ -120,6 +121,7 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
         return {
           id: `candidate-${Date.now()}-${index}`,
           extracted,
+          excluded: false,
           matchAction: match ? 'update' : 'add_new',
           quantityStrategy: 'replace',
           matchedAsset: match?.asset || null,
@@ -139,10 +141,28 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
     setCandidates((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
   }, []);
 
+  const updateExtractedField = useCallback(<K extends keyof ExtractedAsset>(
+    id: string,
+    field: K,
+    value: ExtractedAsset[K],
+  ) => {
+    setCandidates((prev) => prev.map((c) =>
+      c.id === id ? { ...c, extracted: { ...c.extracted, [field]: value } } : c,
+    ));
+  }, []);
+
+  const toggleExcluded = useCallback((id: string) => {
+    setCandidates((prev) => prev.map((c) =>
+      c.id === id ? { ...c, excluded: !c.excluded } : c,
+    ));
+  }, []);
+
   const handleCommit = useCallback(async () => {
     setIsCommitting(true);
     try {
-      const selected = candidates.filter((c) => c.matchAction === 'add_new' || (c.matchAction === 'update' && c.matchedAsset));
+      const selected = candidates.filter(
+        (c) => !c.excluded && (c.matchAction === 'add_new' || (c.matchAction === 'update' && c.matchedAsset)),
+      );
       const newAssets: Asset[] = [];
       const updatedAssets: Asset[] = [...assets];
 
@@ -212,8 +232,11 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
     }
   }, [candidates, assets, importAssets, reset, onOpenChange]);
 
-  const newCount = candidates.filter((c) => c.matchAction === 'add_new').length;
-  const updateCount = candidates.filter((c) => c.matchAction === 'update' && c.matchedAsset).length;
+  const newCount = candidates.filter((c) => !c.excluded && c.matchAction === 'add_new').length;
+  const updateCount = candidates.filter((c) => !c.excluded && c.matchAction === 'update' && c.matchedAsset).length;
+  const excludedCount = candidates.filter((c) => c.excluded).length;
+  const approvedCount = candidates.length - excludedCount;
+  const totalImportable = newCount + updateCount;
 
   return (
     <Dialog open={open} onOpenChange={(value) => { if (!isProcessing && !isCommitting) { onOpenChange(value); if (!value) reset(); } }}>
@@ -263,6 +286,7 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
                   multiple
                   className="hidden"
                   onChange={handleFileSelect}
+                  aria-label="Upload screenshot files"
                 />
                 <Button
                   variant="outline"
@@ -336,6 +360,11 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Found {candidates.length} asset{candidates.length !== 1 ? 's' : ''}
                 </span>
+                {excludedCount > 0 && (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                    {approvedCount} approved
+                  </span>
+                )}
                 {newCount > 0 && (
                   <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
                     {newCount} new
@@ -347,66 +376,151 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
                   </span>
                 )}
               </div>
+              <div className="text-xs text-slate-400">
+                Review each candidate before importing
+              </div>
             </div>
 
             <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-              <div className="max-h-[400px] overflow-y-auto">
+              <div className="max-h-[500px] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-50 dark:bg-slate-900">
-                      <TableHead className="text-xs">Asset</TableHead>
+                      <TableHead className="text-xs w-10">
+                        <span className="sr-only">Include</span>
+                      </TableHead>
+                      <TableHead className="text-xs">Name</TableHead>
                       <TableHead className="text-xs">Ticker</TableHead>
-                      <TableHead className="text-xs text-right">Qty</TableHead>
-                      <TableHead className="text-xs text-right">Price</TableHead>
-                      <TableHead className="text-xs text-right">Value</TableHead>
-                      <TableHead className="text-xs">Match</TableHead>
-                      <TableHead className="text-xs">Action</TableHead>
-                      <TableHead className="text-xs">Strategy</TableHead>
+                      <TableHead className="text-xs text-right w-20">Qty</TableHead>
+                      <TableHead className="text-xs text-right w-20">Price</TableHead>
+                      <TableHead className="text-xs w-20">Currency</TableHead>
+                      <TableHead className="text-xs">Class</TableHead>
+                      <TableHead className="text-xs w-20">Conf.</TableHead>
+                      <TableHead className="text-xs w-24">Match</TableHead>
+                      <TableHead className="text-xs w-28">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {candidates.map((candidate) => {
                       const { extracted } = candidate;
+                      const confidencePct = Math.round(extracted.confidence * 100);
+                      const confColor = confidencePct >= 80
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : confidencePct >= 50
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-rose-600 dark:text-rose-400';
+
+                      const hasWarnings = extracted.warnings.length > 0;
+
                       return (
-                        <TableRow key={candidate.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                        <TableRow
+                          key={candidate.id}
+                          className={`${
+                            candidate.excluded
+                              ? 'opacity-40 bg-slate-50 dark:bg-slate-900/50'
+                              : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/50'
+                          }`}
+                        >
                           <TableCell>
-                            <div className="text-sm font-medium text-slate-900 dark:text-white">{extracted.name}</div>
-                            {extracted.assetClass && (
-                              <div className="text-xs text-slate-500">{extracted.assetClass}</div>
-                            )}
-                            {extracted.currency && (
-                              <div className="text-xs text-slate-400">{extracted.currency}</div>
-                            )}
+                            <input
+                              type="checkbox"
+                              checked={!candidate.excluded}
+                              onChange={() => toggleExcluded(candidate.id)}
+                              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                              aria-label={candidate.excluded ? `Include ${extracted.name}` : `Exclude ${extracted.name}`}
+                            />
                           </TableCell>
-                          <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                            {extracted.ticker || '-'}
+                          <TableCell>
+                            <Input
+                              value={extracted.name}
+                              onChange={(e) => updateExtractedField(candidate.id, 'name', e.target.value)}
+                              className="h-8 text-sm min-w-[120px]"
+                              aria-label={`Name for ${extracted.name}`}
+                            />
                           </TableCell>
-                          <TableCell className="text-sm text-right font-mono text-slate-800 dark:text-slate-200">
-                            {Number.isFinite(extracted.quantity) ? extracted.quantity.toLocaleString() : '-'}
+                          <TableCell>
+                            <Input
+                              value={extracted.ticker || ''}
+                              onChange={(e) => updateExtractedField(candidate.id, 'ticker', e.target.value || undefined)}
+                              className="h-8 text-sm font-mono min-w-[80px]"
+                              placeholder="—"
+                              aria-label={`Ticker for ${extracted.name}`}
+                            />
                           </TableCell>
-                          <TableCell className="text-sm text-right font-mono text-slate-800 dark:text-slate-200">
-                            {Number.isFinite(extracted.price) ? extracted.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="any"
+                              value={Number.isFinite(extracted.quantity) ? extracted.quantity : ''}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                updateExtractedField(candidate.id, 'quantity', Number.isFinite(val) ? val : 0);
+                              }}
+                              className="h-8 text-sm font-mono text-right"
+                              aria-label={`Quantity for ${extracted.name}`}
+                            />
                           </TableCell>
-                          <TableCell className="text-sm text-right font-mono text-slate-800 dark:text-slate-200">
-                            {Number.isFinite(extracted.value) ? extracted.value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="any"
+                              value={Number.isFinite(extracted.price) ? extracted.price : ''}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                                updateExtractedField(candidate.id, 'price', val !== undefined && Number.isFinite(val) ? val : undefined);
+                              }}
+                              className="h-8 text-sm font-mono text-right"
+                              aria-label={`Price for ${extracted.name}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={extracted.currency || 'CAD'}
+                              onChange={(e) => updateExtractedField(candidate.id, 'currency', e.target.value || undefined)}
+                              className="h-8 text-xs"
+                              aria-label={`Currency for ${extracted.name}`}
+                            >
+                              <option value="CAD">CAD</option>
+                              <option value="INR">INR</option>
+                              <option value="USD">USD</option>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={extracted.assetClass || ''}
+                              onChange={(e) => updateExtractedField(candidate.id, 'assetClass', e.target.value || undefined)}
+                              className="h-8 text-sm min-w-[90px]"
+                              placeholder="Other"
+                              aria-label={`Asset class for ${extracted.name}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-xs font-mono font-medium ${confColor}`}>
+                                {confidencePct}%
+                              </span>
+                              {hasWarnings && (
+                                <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" title={extracted.warnings.join('; ')} />
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {candidate.matchConfidence === 'exact' && (
                               <div className="flex items-center gap-1.5">
-                                <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-                                <span className="text-xs text-emerald-700 dark:text-emerald-400">{candidate.matchedAsset?.name || 'Matched'}</span>
+                                <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                <span className="text-xs text-emerald-700 dark:text-emerald-400 truncate max-w-[80px]">{candidate.matchedAsset?.name || 'Matched'}</span>
                               </div>
                             )}
                             {candidate.matchConfidence === 'fuzzy' && (
                               <div className="flex items-center gap-1.5">
-                                <HelpCircle className="h-4 w-4 text-amber-500 shrink-0" />
-                                <span className="text-xs text-amber-700 dark:text-amber-400">{candidate.matchedAsset?.name || 'Fuzzy match'}</span>
+                                <HelpCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                <span className="text-xs text-amber-700 dark:text-amber-400 truncate max-w-[80px]">{candidate.matchedAsset?.name || 'Fuzzy'}</span>
                               </div>
                             )}
                             {candidate.matchConfidence === 'none' && (
                               <div className="flex items-center gap-1.5">
-                                <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
-                                <span className="text-xs text-slate-500">New asset</span>
+                                <AlertCircle className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                <span className="text-xs text-slate-500">New</span>
                               </div>
                             )}
                           </TableCell>
@@ -414,26 +528,24 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
                             <Select
                               value={candidate.matchAction}
                               onChange={(e) => updateCandidate(candidate.id, { matchAction: e.target.value as MatchAction })}
-                              className="text-xs min-w-[110px]"
+                              className="h-8 text-xs min-w-[100px]"
+                              aria-label={`Action for ${extracted.name}`}
                             >
-                              <option value="add_new">Add as new</option>
+                              <option value="add_new">Add new</option>
                               {candidate.matchedAsset && (
-                                <option value="update">Update existing</option>
+                                <option value="update">Update</option>
                               )}
                             </Select>
-                          </TableCell>
-                          <TableCell>
-                            {candidate.matchAction === 'update' && candidate.matchedAsset ? (
+                            {candidate.matchAction === 'update' && candidate.matchedAsset && (
                               <Select
                                 value={candidate.quantityStrategy}
                                 onChange={(e) => updateCandidate(candidate.id, { quantityStrategy: e.target.value as QuantityStrategy })}
-                                className="text-xs min-w-[100px]"
+                                className="h-8 text-xs min-w-[80px] mt-1"
+                                aria-label={`Strategy for ${extracted.name}`}
                               >
                                 <option value="replace">Replace</option>
-                                <option value="add">Add to existing</option>
+                                <option value="add">Add to</option>
                               </Select>
-                            ) : (
-                              <span className="text-xs text-slate-400">—</span>
                             )}
                           </TableCell>
                         </TableRow>
@@ -459,7 +571,14 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
 
             <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800">
               <div className="text-xs text-slate-500">
-                {newCount} asset{newCount !== 1 ? 's' : ''} will be added &bull; {updateCount} existing asset{updateCount !== 1 ? 's' : ''} will be updated
+                {excludedCount > 0
+                  ? `${totalImportable} of ${approvedCount} approved will be imported`
+                  : `${totalImportable} candidate${totalImportable !== 1 ? 's' : ''} will be imported`}
+                {excludedCount > 0 && (
+                  <span className="ml-2 text-slate-400">
+                    ({excludedCount} excluded)
+                  </span>
+                )}
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" className="rounded-full" onClick={reset}>
@@ -467,7 +586,7 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
                 </Button>
                 <Button
                   className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]"
-                  disabled={isCommitting || candidates.length === 0}
+                  disabled={isCommitting || totalImportable === 0}
                   onClick={handleCommit}
                 >
                   {isCommitting ? (
@@ -478,7 +597,7 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
                   ) : (
                     <>
                       <Upload className="mr-2 h-4 w-4" />
-                      Import {candidates.filter((c) => c.matchAction === 'add_new' || (c.matchAction === 'update' && c.matchedAsset)).length} Asset{candidates.length !== 1 ? 's' : ''}
+                      Import {totalImportable} Asset{totalImportable !== 1 ? 's' : ''}
                     </>
                   )}
                 </Button>
