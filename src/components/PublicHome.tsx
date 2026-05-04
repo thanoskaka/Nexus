@@ -37,7 +37,7 @@ const PATHS: PathDef[] = [
     icon: Sparkles,
     title: 'Hosted (cloud)',
     desc: 'Use the hosted version with Google sign-in and auto-synced pricing. No server setup required.',
-    link: { label: 'Sign in to get started', onClick: undefined },
+    link: { label: 'Sign in to hosted app', onClick: undefined },
     accent: 'emerald',
   },
   {
@@ -111,7 +111,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
             </div>
           </div>
           <Button onClick={onLaunch} className="rounded-full bg-[#00875A] px-5 text-white hover:bg-[#007A51]">
-            Launch Portfolio
+            Sign in with Google
           </Button>
         </div>
       </header>
@@ -139,11 +139,11 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
             </p>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Button onClick={onLaunch} className="h-12 rounded-full bg-[#00875A] px-7 text-base text-white hover:bg-[#007A51]">
-                Launch Portfolio
+                Sign in with Google
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <span className="rounded-full border border-slate-200 bg-white/80 px-5 py-2.5 text-sm text-slate-500 shadow-sm">
-                Google sign-in appears after launch
+                Uses Google sign-in for the hosted app
               </span>
             </div>
           </div>
@@ -194,7 +194,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
             </p>
             <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Button onClick={onLaunch} className="h-12 rounded-full bg-[#00875A] px-7 text-base text-white hover:bg-[#007A51]">
-                Launch Portfolio
+                Sign in with Google
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
