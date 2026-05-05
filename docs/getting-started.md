@@ -111,3 +111,28 @@ Use export when you want a local copy or backup:
 - Use Google Drive sync/export when configured.
 
 Nexus direction is user-owned data. Provider connections and AI features should make tracking easier, but the core portfolio should remain understandable and portable.
+
+## 8. Verify your setup
+
+After configuring environment variables, verify each capability works from the **Setup Health** card in **Settings > Integrations**. Each card has a **Test** button for configured items:
+
+1. **Verify All** — runs all capability checks at once.
+2. **Test per capability** — individual check per item.
+3. **Re-test** — re-run after configuration changes.
+
+Verification results show one of:
+
+- **verified** (checkmark) — configuration looks correct.
+- **not-configured** — missing env vars with names listed.
+- **failed** — config is present but has an issue (e.g., missing `ALLOW_EXTERNAL_FALLBACK` for CAS parser).
+
+Each verification result includes:
+- **Last tested** timestamp.
+- **Guidance** with missing env var names.
+- **Fix this** area with specific error messages.
+- **Docs link** to the relevant setup guide.
+
+Backend verification is safe and lightweight:
+- Only checks environment variable presence — no secrets are returned.
+- No paid API calls are made for cost-limited providers (AI, Logo.dev, CAS cloud).
+- Real connection tests (e.g., Upstox OAuth, Splitwise) require user authorization at runtime.
