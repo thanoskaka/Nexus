@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Loader2, CheckCircle, XCircle, AlertCircle, RefreshCw, Server, Activity, ExternalLink, Copy, Settings } from 'lucide-react';
 import { fetchSetupStatus, type SetupStatusResponse } from '../lib/setupStatusApi';
+import { recordEvent } from '../store/setupHistory';
 
 type HealthItemStatus = 'configured' | 'partial' | 'missing';
 type FeatureImportance = 'required' | 'recommended' | 'optional';
@@ -550,12 +551,19 @@ export function SetupHealthCard() {
   const [error, setError] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<HealthItem | null>(null);
 
+  const initialRecordedRef = useRef(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const result = await fetchSetupStatus();
       setData(result);
+      if (!initialRecordedRef.current) {
+        initialRecordedRef.current = true;
+        const configuredCount = buildItems(result).filter((item) => item.status === 'configured').length;
+        recordEvent('setup_verification_run', `Setup health verified (${configuredCount} features configured)`, 'success');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load setup status');
     } finally {

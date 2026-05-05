@@ -10,6 +10,7 @@ import {
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { CheckCircle2, Circle, ChevronRight, ExternalLink, Rocket, XCircle } from 'lucide-react';
+import { recordEvent } from '../store/setupHistory';
 
 const ITEM_LABELS: Record<ChecklistItemId, { title: string; description: string }> = {
   [CHECKLIST_ITEM_IDS.SIGN_IN]: {
@@ -153,6 +154,9 @@ export function GettingStartedChecklist({
       saveManualState(next);
       return next;
     });
+  });
+    const labels = ITEM_LABELS[id];
+    recordEvent('checklist_item_skipped', `Skipped: ${labels.title}`, 'skipped', id);
   }, []);
 
   const handleDone = useCallback((id: ChecklistItemId) => {
@@ -161,6 +165,9 @@ export function GettingStartedChecklist({
       saveManualState(next);
       return next;
     });
+  });
+    const labels = ITEM_LABELS[id];
+    recordEvent('checklist_item_completed', `Completed: ${labels.title}`, 'success', id);
   }, []);
 
   const handleGo = useCallback((id: ChecklistItemId) => {

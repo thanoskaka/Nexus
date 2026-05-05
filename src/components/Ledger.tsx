@@ -16,8 +16,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { TickerRepairModal } from './TickerRepairModal';
+import { useSampleMode } from '../lib/samplePortfolio';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { AlertTriangle, Building2, Check, ChevronDown, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from 'lucide-react';
+import { AlertTriangle, Building2, Check, ChevronDown, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards, FlaskConical } from 'lucide-react';
 import { convertAmount, formatCurrency, formatPercent, getAssetXirr, getCurrentPrice, getCurrentTotal, getGrowthTotal, getInvestmentPrice, getInvestmentTotal, isDebtAssetClass } from '../lib/portfolioMetrics';
 import { getTickerRecommendation } from '../lib/api';
 import { Select } from './ui/select';
@@ -74,7 +75,11 @@ function buildAssetClassFilterValue(country: 'Canada' | 'India', assetClass: str
 
 export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asset) => void; onAddAsset?: () => void }) {
   const { user } = useAuth();
-  const { assets, assetClasses, baseCurrency, rates, priceProviderSettings, removeAsset, duplicateAsset, refreshAsset, refreshPrices, refreshFailedPrices, isRefreshing, refreshQueue, bulkRefreshState } = usePortfolio();
+  const { assets: realAssets, assetClasses: realClasses, baseCurrency, rates: realRates, priceProviderSettings, removeAsset, duplicateAsset, refreshAsset, refreshPrices, refreshFailedPrices, isRefreshing, refreshQueue, bulkRefreshState } = usePortfolio();
+  const { isSampleMode, sampleData } = useSampleMode();
+  const assets = isSampleMode ? sampleData.assets : realAssets;
+  const assetClasses = isSampleMode ? sampleData.assetClasses : realClasses;
+  const rates = isSampleMode ? sampleData.rates : realRates;
   const safeBulkRefreshState = normalizeBulkRefreshState(bulkRefreshState);
   const [sortMode, setSortMode] = useState<LedgerSortMode>('default');
   const [memberFilter, setMemberFilter] = useState('ALL');
@@ -686,8 +691,15 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
     <div className="space-y-6">
       <div className="mb-8 flex justify-between items-start gap-3">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">Assets</h1>
-          <p className="text-lg text-slate-500 dark:text-slate-400">Manage your family's individual holdings</p>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Assets</h1>
+            {isSampleMode && (
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300" title="Not your real portfolio">
+                Sample data
+              </span>
+            )}
+          </div>
+          <p className="text-lg text-slate-500 dark:text-slate-400">{isSampleMode ? 'Exploring sample holdings' : "Manage your family's individual holdings"}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={refreshPrices} disabled={isRefreshing} className="hidden sm:flex items-center gap-2">

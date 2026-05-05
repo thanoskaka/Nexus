@@ -19,6 +19,7 @@ import { GettingStartedChecklist } from './components/GettingStartedChecklist';
 import { NextActionPanel } from './components/NextActionPanel';
 import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
+import { SampleModeProvider, useSampleMode } from './lib/samplePortfolio';
 
 type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
 
@@ -27,6 +28,7 @@ function MainApp() {
   const { assets, refreshPrices, isRefreshing, portfolios, activePortfolioId, setActivePortfolioId } = usePortfolio();
   const { upstox } = useConnectedAccounts();
   const { status: splitwiseStatus } = useSplitwise();
+  const { isSampleMode, disableSampleMode } = useSampleMode();
   const initialView = parseInitialViewFromQuery();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
@@ -192,10 +194,16 @@ function MainApp() {
               onNavigateToDocs={navigateToDocs}
               onAddAsset={() => setIsAddModalOpen(true)}
             />
-            <Dashboard onAddAsset={() => setIsAddModalOpen(true)} />
+            <Dashboard onAddAsset={() => {
+              if (isSampleMode) disableSampleMode();
+              setIsAddModalOpen(true);
+            }} />
           </>
         )}
-        {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => setIsAddModalOpen(true)} />}
+        {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => {
+          if (isSampleMode) disableSampleMode();
+          setIsAddModalOpen(true);
+        }} />}
         {currentView === 'settings' && <Settings initialSection={settingsSection} />}
         {currentView === 'docs' && <Docs onBack={() => setCurrentView('dashboard')} />}
       </main>
