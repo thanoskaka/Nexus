@@ -18,11 +18,17 @@ vi.mock('./store/PortfolioContext', () => ({
 }));
 
 vi.mock('./store/SplitwiseContext', () => ({
+  useSplitwise: () => ({ status: 'disconnected' }),
   SplitwiseProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('./store/ConnectedAccountsContext', () => ({
+  useConnectedAccounts: () => ({ upstox: null }),
   ConnectedAccountsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('./lib/aiCredentialsApi', () => ({
+  getAiCredentials: vi.fn(async () => ({ provider: null })),
 }));
 
 vi.mock('./components/Dashboard', () => ({ Dashboard: () => <div>Dashboard</div> }));
@@ -37,6 +43,17 @@ import App from './App';
 describe('App authentication flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, 'localStorage', {
+      value: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      value: vi.fn(() => ({ matches: false })),
+      configurable: true,
+    });
   });
 
   it('renders public home when user is null and not loading', () => {

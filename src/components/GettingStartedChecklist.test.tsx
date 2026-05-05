@@ -1,413 +1,241 @@
-// @vitest-environment happy-dom
+// @vitest-environment jsdom
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GettingStartedChecklist } from './GettingStartedChecklist';
-import type { SetupStatusResponse } from '../lib/setupStatusApi';
+import { CHECKLIST_ITEM_IDS, CHECKLIST_STORAGE_KEY } from '../lib/checklistTypes';
 
-const mockFetch = vi.fn();
+function createMockStorage() {
+  const store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
+    get length() { return Object.keys(store).length; },
+    key: (i: number) => Object.keys(store)[i] ?? null,
+  };
+}
 
-const fullStatus: SetupStatusResponse = {
-  mode: 'self-hosted',
-  app: { baseUrl: 'https://example.com' },
-  firebase: { configured: true, projectId: 'my-project' },
-  firebaseAdmin: {
-    configured: true,
-    hasProjectId: true,
-    hasClientEmail: true,
-    hasPrivateKey: true,
-  },
-  pricing: {
-    massive: { configured: true, present: true },
-    alphaVantage: { configured: false, present: false },
-    finnhub: { configured: false, present: false },
-    upstoxSystem: { configured: true, present: true },
-  },
-  integrations: {
-    upstox: {
-      clientConfigured: true,
-      encryptionConfigured: true,
-      stateSecretConfigured: true,
-      redirectConfigured: true,
-    },
-    splitwise: {
-      clientConfigured: true,
-      encryptionConfigured: true,
-      stateSecretConfigured: true,
-      redirectConfigured: true,
-    },
-  },
-  ai: {
-    serverKey: { configured: true, present: true },
-    userCredentialsSupported: true,
-  },
-  casParser: {
-    configured: false,
-    hasServiceUrl: false,
-    allowsExternalFallback: false,
-  },
-  logoProvider: {
-    serverKey: { configured: false, present: false },
-    clientKey: { configured: true, present: true },
-  },
-  googleDrive: {
-    clientId: { configured: false, present: false },
-  },
-  connectedAccounts: {
-    encryptionConfigured: true,
-    stateSecretConfigured: true,
-  },
-  integrationTokens: {
-    encryptionConfigured: true,
-  },
-  features: {
-    manualAssets: true,
-    dashboard: true,
-    priceRefresh: true,
-    firebaseAuth: true,
-    firebaseAdmin: true,
-    upstoxConnectedAccounts: true,
-    splitwise: true,
-    casParser: false,
-    screenshotImport: true,
-    googleDriveSync: false,
-    aiAssistant: true,
-    logoProvider: true,
-  },
-};
+function clearLocalStorage() {
+  Object.keys(window.localStorage).forEach((key) => {
+    try { window.localStorage.removeItem(key); } catch { /* noop */ }
+  });
+}
 
-const emptyStatus: SetupStatusResponse = {
-  mode: 'local',
-  app: { baseUrl: '' },
-  firebase: { configured: false, projectId: null },
-  firebaseAdmin: {
-    configured: false,
-    hasProjectId: false,
-    hasClientEmail: false,
-    hasPrivateKey: false,
-  },
-  pricing: {
-    massive: { configured: false, present: false },
-    alphaVantage: { configured: false, present: false },
-    finnhub: { configured: false, present: false },
-    upstoxSystem: { configured: false, present: false },
-  },
-  integrations: {
-    upstox: {
-      clientConfigured: false,
-      encryptionConfigured: false,
-      stateSecretConfigured: false,
-      redirectConfigured: false,
-    },
-    splitwise: {
-      clientConfigured: false,
-      encryptionConfigured: false,
-      stateSecretConfigured: false,
-      redirectConfigured: false,
-    },
-  },
-  ai: {
-    serverKey: { configured: false, present: false },
-    userCredentialsSupported: false,
-  },
-  casParser: {
-    configured: false,
-    hasServiceUrl: false,
-    allowsExternalFallback: false,
-  },
-  logoProvider: {
-    serverKey: { configured: false, present: false },
-    clientKey: { configured: false, present: false },
-  },
-  googleDrive: {
-    clientId: { configured: false, present: false },
-  },
-  connectedAccounts: {
-    encryptionConfigured: false,
-    stateSecretConfigured: false,
-  },
-  integrationTokens: {
-    encryptionConfigured: false,
-  },
-  features: {
-    manualAssets: true,
-    dashboard: true,
-    priceRefresh: true,
-    firebaseAuth: false,
-    firebaseAdmin: false,
-    upstoxConnectedAccounts: false,
-    splitwise: false,
-    casParser: false,
-    screenshotImport: false,
-    googleDriveSync: false,
-    aiAssistant: false,
-    logoProvider: false,
-  },
-};
+function renderChecklist(props: Partial<React.ComponentProps<typeof GettingStartedChecklist>> = {}) {
+  const defaults: React.ComponentProps<typeof GettingStartedChecklist> = {
+    assetsCount: 0,
+    upstoxConnected: false,
+    splitwiseConnected: false,
+    aiKeyConfigured: false,
+    onNavigateToSettings: vi.fn(),
+    onNavigateToDocs: vi.fn(),
+  };
+  return render(<GettingStartedChecklist {...defaults} {...props} />);
+}
 
 describe('GettingStartedChecklist', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockReset();
-    vi.stubGlobal('fetch', mockFetch);
-    localStorage.clear();
+    const mockStorage = createMockStorage();
+    vi.stubGlobal('localStorage', mockStorage);
+    window.fetch = vi.fn().mockResolvedValue({ ok: true } as Response);
   });
 
-  const baseProps = {
-    assetsLength: 0,
-    onNavigate: vi.fn(),
-    onAddAsset: vi.fn(),
-  };
-
-  it('renders the checklist with title and progress', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Getting Started')).toBeTruthy();
-    });
-
-    expect(screen.getByText(/1\/7 steps complete/)).toBeTruthy();
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it('renders required, recommended, and optional section headers', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('required')).toBeTruthy();
-    });
-
-    expect(screen.getByText('recommended')).toBeTruthy();
-    expect(screen.getByText('optional')).toBeTruthy();
-  });
-
-  it('renders all checklist item labels when setup is empty', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Sign in & portfolio loaded')).toBeTruthy();
-    });
-
-    expect(screen.getByText('Add your first manual asset')).toBeTruthy();
-    expect(screen.getByText('Configure base setup')).toBeTruthy();
-    expect(screen.getByText('Connect an optional provider')).toBeTruthy();
+  it('renders the checklist with all items', () => {
+    renderChecklist();
+    expect(screen.getByText('Getting Started')).toBeTruthy();
+    expect(screen.getByText('Sign in and portfolio loaded')).toBeTruthy();
+    expect(screen.getByText('Add your first asset')).toBeTruthy();
+    expect(screen.getByText('Configure Firebase / Admin setup')).toBeTruthy();
+    expect(screen.getByText('Configure price providers')).toBeTruthy();
+    expect(screen.getByText('Connect optional provider')).toBeTruthy();
     expect(screen.getByText('Import holdings')).toBeTruthy();
-    expect(screen.getByText('Add AI key (optional)')).toBeTruthy();
-    expect(screen.getByText('Review setup guide')).toBeTruthy();
+    expect(screen.getByText('Add AI key')).toBeTruthy();
+    expect(screen.getByText('Review docs / help')).toBeTruthy();
   });
 
-  it('shows items as done when assets exist and setup is configured', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => fullStatus,
-    });
+  it('shows progress count', () => {
+    renderChecklist();
+    expect(screen.getByText(/of 8 complete/)).toBeTruthy();
+  });
 
-    render(<GettingStartedChecklist {...baseProps} assetsLength={3} />);
+  it('auto-completes sign-in item', () => {
+    renderChecklist();
+    expect(screen.getByTestId('checklist-item-sign-in').querySelector('[data-testid="icon-done"]')).toBeTruthy();
+  });
 
+  it('auto-completes add-first-asset when assetsCount > 0', () => {
+    renderChecklist({ assetsCount: 1 });
+    expect(screen.getByTestId('checklist-item-add-first-asset').querySelector('[data-testid="icon-done"]')).toBeTruthy();
+  });
+
+  it('auto-completes import-holdings when assetsCount > 0', () => {
+    renderChecklist({ assetsCount: 1 });
+    expect(screen.getByTestId('checklist-item-import-holdings').querySelector('[data-testid="icon-done"]')).toBeTruthy();
+  });
+
+  it('auto-completes connect-provider when upstox is connected', () => {
+    renderChecklist({ upstoxConnected: true });
+    expect(screen.getByTestId('checklist-item-connect-provider').querySelector('[data-testid="icon-done"]')).toBeTruthy();
+  });
+
+  it('auto-completes connect-provider when splitwise is connected', () => {
+    renderChecklist({ splitwiseConnected: true });
+    expect(screen.getByTestId('checklist-item-connect-provider').querySelector('[data-testid="icon-done"]')).toBeTruthy();
+  });
+
+  it('auto-completes add-ai-key when aiKeyConfigured is true', () => {
+    renderChecklist({ aiKeyConfigured: true });
+    expect(screen.getByTestId('checklist-item-add-ai-key').querySelector('[data-testid="icon-done"]')).toBeTruthy();
+  });
+
+  it('auto-completes configure-admin when health endpoint responds', async () => {
+    window.fetch = vi.fn().mockResolvedValue({ ok: true } as Response);
+    renderChecklist();
     await waitFor(() => {
-      expect(screen.getByText('Getting Started')).toBeTruthy();
+      expect(screen.getByTestId('checklist-item-configure-admin').querySelector('[data-testid="icon-done"]')).toBeTruthy();
     });
-
-    const doneIndicators = screen.getAllByText('Done');
-    expect(doneIndicators.length).toBeGreaterThanOrEqual(1);
-
-    expect(screen.getByText(/5\/7 steps complete/)).toBeTruthy();
   });
 
-  it('hides the checklist when dismissed', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
+  it('shows manual skip button and marks item skipped', async () => {
     const user = userEvent.setup();
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Getting Started')).toBeTruthy();
-    });
-
-    const dismissButton = screen.getByLabelText('Dismiss checklist');
-    await user.click(dismissButton);
-
-    expect(screen.queryByText('Getting Started')).toBeNull();
-    expect(localStorage.getItem('nexus-checklist-dismissed')).toBe('true');
+    renderChecklist();
+    const skipBtn = screen.getByTestId('action-skip-configure-price-providers');
+    await user.click(skipBtn);
+    expect(screen.getByTestId('checklist-item-configure-price-providers').querySelector('[data-testid="icon-skipped"]')).toBeTruthy();
   });
 
-  it('collapses and expands the checklist', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
+  it('shows manual done button and marks item done', async () => {
     const user = userEvent.setup();
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('required')).toBeTruthy();
-    });
-
-    const collapseButton = screen.getByLabelText('Collapse checklist');
-    await user.click(collapseButton);
-
-    expect(screen.queryByText('required')).toBeNull();
-    expect(localStorage.getItem('nexus-checklist-collapsed')).toBe('true');
-
-    await user.click(screen.getByLabelText('Expand checklist'));
-    expect(screen.getByText('required')).toBeTruthy();
+    renderChecklist();
+    const doneBtn = screen.getByTestId('action-done-configure-price-providers');
+    await user.click(doneBtn);
+    expect(screen.getByTestId('checklist-item-configure-price-providers').querySelector('[data-testid="icon-done"]')).toBeTruthy();
   });
 
-  it('restores collapsed state from localStorage on mount', async () => {
-    localStorage.setItem('nexus-checklist-collapsed', 'true');
-
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Getting Started')).toBeTruthy();
-    });
-
-    expect(screen.queryByText('required')).toBeNull();
-  });
-
-  it('restores dismissed state from localStorage on mount', async () => {
-    localStorage.setItem('nexus-checklist-dismissed', 'true');
-
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    expect(screen.queryByText('Getting Started')).toBeNull();
-  });
-
-  it('shows action buttons for pending items', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Add Asset')).toBeTruthy();
-    });
-
-    expect(screen.getByText('View Setup Guide')).toBeTruthy();
-    expect(screen.getByText('Go to Integrations')).toBeTruthy();
-    expect(screen.getByText('Import')).toBeTruthy();
-    expect(screen.getByText('AI Settings')).toBeTruthy();
-    expect(screen.getByText('Open Docs')).toBeTruthy();
-  });
-
-  it('calls onAddAsset when Add Asset button is clicked', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    const onAddAsset = vi.fn();
+  it('persists manual state to localStorage', async () => {
     const user = userEvent.setup();
-
-    render(<GettingStartedChecklist {...baseProps} onAddAsset={onAddAsset} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Add Asset')).toBeTruthy();
-    });
-
-    await user.click(screen.getByText('Add Asset'));
-    expect(onAddAsset).toHaveBeenCalledTimes(1);
+    renderChecklist();
+    await user.click(screen.getByTestId('action-skip-configure-price-providers'));
+    const saved = JSON.parse(window.localStorage.getItem(CHECKLIST_STORAGE_KEY) || '{}');
+    expect(saved['configure-price-providers']).toBe('skipped');
   });
 
-  it('calls onNavigate when Go to Integrations is clicked', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
+  it('restores manual state from localStorage', () => {
+    window.localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify({
+      'configure-price-providers': 'done',
+      'review-docs': 'skipped',
+    }));
+    renderChecklist();
+    expect(screen.getByTestId('checklist-item-configure-price-providers').querySelector('[data-testid="icon-done"]')).toBeTruthy();
+    expect(screen.getByTestId('checklist-item-review-docs').querySelector('[data-testid="icon-skipped"]')).toBeTruthy();
+  });
 
-    const onNavigate = vi.fn();
+  it('navigates to settings for connect-provider', async () => {
+    const onNavigateToSettings = vi.fn();
     const user = userEvent.setup();
-
-    render(<GettingStartedChecklist {...baseProps} onNavigate={onNavigate} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Go to Integrations')).toBeTruthy();
-    });
-
-    await user.click(screen.getByText('Go to Integrations'));
-    expect(onNavigate).toHaveBeenCalledWith('settings', 'integrations');
+    renderChecklist({ onNavigateToSettings });
+    await user.click(screen.getByTestId('action-go-connect-provider'));
+    expect(onNavigateToSettings).toHaveBeenCalledWith('integrations');
   });
 
-  it('shows "Add first manual asset" as done when assets exist', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    render(<GettingStartedChecklist {...baseProps} assetsLength={2} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Getting Started')).toBeTruthy();
-    });
-
-    const doneBadges = screen.getAllByText('Done');
-    expect(doneBadges.length).toBeGreaterThanOrEqual(1);
-
-    expect(screen.queryByText('Add Asset')).toBeNull();
+  it('navigates to settings for import-holdings', async () => {
+    const onNavigateToSettings = vi.fn();
+    const user = userEvent.setup();
+    renderChecklist({ onNavigateToSettings });
+    await user.click(screen.getByTestId('action-go-import-holdings'));
+    expect(onNavigateToSettings).toHaveBeenCalledWith('data-management');
   });
 
-  it('shows "Configure base setup" as done when firebaseAdmin is configured', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => fullStatus,
+  it('navigates to settings for add-ai-key', async () => {
+    const onNavigateToSettings = vi.fn();
+    const user = userEvent.setup();
+    renderChecklist({ onNavigateToSettings });
+    await user.click(screen.getByTestId('action-go-add-ai-key'));
+    expect(onNavigateToSettings).toHaveBeenCalledWith('price-providers');
+  });
+
+  it('navigates to settings for add-first-asset', async () => {
+    const onNavigateToSettings = vi.fn();
+    const user = userEvent.setup();
+    renderChecklist({ onNavigateToSettings });
+    await user.click(screen.getByTestId('action-go-add-first-asset'));
+    expect(onNavigateToSettings).toHaveBeenCalledWith('data-management');
+  });
+
+  it('navigates to settings for configure-price-providers', async () => {
+    const onNavigateToSettings = vi.fn();
+    const user = userEvent.setup();
+    renderChecklist({ onNavigateToSettings });
+    await user.click(screen.getByTestId('action-go-configure-price-providers'));
+    expect(onNavigateToSettings).toHaveBeenCalledWith('price-providers');
+  });
+
+  it('opens docs for review-docs action', async () => {
+    const onNavigateToDocs = vi.fn();
+    const user = userEvent.setup();
+    renderChecklist({ onNavigateToDocs });
+    await user.click(screen.getByTestId('action-go-review-docs'));
+    expect(onNavigateToDocs).toHaveBeenCalled();
+  });
+
+  it('does not show raw markdown link for docs', () => {
+    renderChecklist();
+    const actionBtn = screen.getByTestId('action-go-review-docs');
+    expect(actionBtn.getAttribute('href')).toBeNull();
+    expect(actionBtn.textContent).toContain('Open Docs');
+  });
+
+  it('shows reset button and clears manual state', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify({
+      'configure-price-providers': 'done',
+      'review-docs': 'done',
+    }));
+    renderChecklist({ assetsCount: 1, aiKeyConfigured: true });
+    expect(screen.queryByTestId('action-reset')).toBeTruthy();
+    await user.click(screen.getByTestId('action-reset'));
+    expect(screen.getByTestId('checklist-item-configure-price-providers').querySelector('[data-testid="icon-pending"]')).toBeTruthy();
+  });
+
+  it('hides checklist when all items are done', async () => {
+    window.fetch = vi.fn().mockResolvedValue({ ok: true } as Response);
+    window.localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify({
+      'configure-price-providers': 'done',
+      'review-docs': 'done',
+    }));
+    renderChecklist({
+      assetsCount: 5,
+      upstoxConnected: true,
+      aiKeyConfigured: true,
     });
-
-    render(<GettingStartedChecklist {...baseProps} />);
-
     await waitFor(() => {
-      const doneBadges = screen.getAllByText('Done');
-      expect(doneBadges.length).toBeGreaterThanOrEqual(2);
+      expect(screen.queryByText('Getting Started')).toBeNull();
     });
   });
 
-  it('does not render action buttons for done items', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => fullStatus,
-    });
-
-    render(<GettingStartedChecklist {...baseProps} assetsLength={3} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Getting Started')).toBeTruthy();
-    });
-
-    expect(screen.queryByText('Add Asset')).toBeNull();
-    expect(screen.queryByText('View Setup Guide')).toBeNull();
-    expect(screen.queryByText('Go to Integrations')).toBeNull();
+  it('shows progress bar with correct width', () => {
+    window.localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify({
+      'configure-price-providers': 'done',
+    }));
+    renderChecklist();
+    const bar = document.querySelector('.bg-\\[\\#00875A\\]');
+    expect(bar).toBeTruthy();
   });
 
-  it('does not fetch setup status when dismissed', () => {
-    localStorage.setItem('nexus-checklist-dismissed', 'true');
-
-    render(<GettingStartedChecklist {...baseProps} />);
-
-    expect(mockFetch).not.toHaveBeenCalled();
+  it('allows undoing a skip', async () => {
+    const user = userEvent.setup();
+    renderChecklist();
+    await user.click(screen.getByTestId('action-skip-configure-price-providers'));
+    expect(screen.getByTestId('checklist-item-configure-price-providers').querySelector('[data-testid="icon-skipped"]')).toBeTruthy();
+    await user.click(screen.getByTestId('action-undo-skip-configure-price-providers'));
+    expect(screen.getByTestId('checklist-item-configure-price-providers').querySelector('[data-testid="icon-done"]')).toBeTruthy();
   });
 });

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 6868 --strictPort",
+    "dev:mock": "VITE_MOCK_MODE=mock vite --host 0.0.0.0 --port 6868 --strictPort",
     "start": "PORT=6868 node server.ts",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 6868 --strictPort",

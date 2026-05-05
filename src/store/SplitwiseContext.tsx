@@ -23,7 +23,7 @@ export type SplitwiseContextType = {
   disconnect: () => Promise<void>;
 };
 
-const SplitwiseContext = createContext<SplitwiseContextType | undefined>(undefined);
+export const SplitwiseContext = createContext<SplitwiseContextType | undefined>(undefined);
 
 export function SplitwiseProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();

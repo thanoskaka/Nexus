@@ -51,7 +51,7 @@ const PATHS: PathDef[] = [
     icon: BookOpen,
     title: 'Documentation',
     desc: 'Deployment guide, API reference, environment setup, and integration docs.',
-    link: { label: `${REPO_URL}#readme`, href: `${REPO_URL}#readme`, external: true as const },
+    link: { label: 'Read product docs', href: '/docs' },
     accent: 'violet',
   },
 ];
@@ -80,8 +80,8 @@ function PathCard({ path, onLaunch }: { path: PathDef; onLaunch: () => void }) {
       ) : (
         <a
           href={path.link.href}
-          target="_blank"
-          rel="noopener noreferrer"
+          target={path.link.external ? '_blank' : undefined}
+          rel={path.link.external ? 'noopener noreferrer' : undefined}
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 break-all"
         >
           {path.link.label}
@@ -213,7 +213,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
               <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="hover:text-slate-700">
                 GitHub
               </a>
-              <a href={`${REPO_URL}#readme`} target="_blank" rel="noopener noreferrer" className="hover:text-slate-700">
+              <a href="/docs" className="hover:text-slate-700">
                 Docs
               </a>
               <span className="text-slate-300">|</span>
