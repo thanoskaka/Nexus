@@ -36,6 +36,8 @@ import { useAuth } from '../store/AuthContext';
 import { SetupHealthCard } from './SetupHealthCard';
 import { ProviderCapabilityMatrix } from './ProviderCapabilityMatrix';
 import { getWorkspaceOwnership, resetWorkspaceOwnership, type WorkspaceMode } from '../store/workspaceOwnership';
+import { SetupHistoryPanel } from './SetupHistoryPanel';
+import { recordEvent, getSetupHistory, clearSetupHistory } from '../store/setupHistory';
 
 export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
 type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'credentials' | 'workspace';
@@ -535,6 +537,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
       csv,
       targetCountry === 'India' ? 'india_holdings_export.csv' : 'canada_holdings_export.csv',
     );
+    recordEvent('csv_export_run', `Exported ${countryAssets.length} ${targetCountry} holdings as CSV`, 'success');
+    refreshSetupHistory();
   };
 
   const downloadCSV = (csv: string, filename: string) => {
@@ -912,6 +916,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           if (targetCountry === 'India' && indiaFileRef.current) indiaFileRef.current.value = '';
           if (targetCountry === 'Canada' && canadaFileRef.current) canadaFileRef.current.value = '';
           setAlertDialog({ open: true, title: 'Import Successful', description: `Successfully imported ${newAssets.length} ${targetCountry} holdings! Prices can be refreshed afterwards.` });
+          recordEvent('csv_import_run', `Imported ${newAssets.length} ${targetCountry} holdings from CSV`, 'success');
+          refreshSetupHistory();
         } catch (error) {
           setImportProgress({ visible: false, current: 0, total: 0, message: '' });
           setAlertDialog({
@@ -962,6 +968,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           setImportProgress({ visible: false, current: 0, total: 0, message: '' });
           if (classesFileRef.current) classesFileRef.current.value = '';
           setAlertDialog({ open: true, title: 'Import Successful', description: `Successfully imported ${newClasses.length} asset classes!` });
+          recordEvent('csv_import_run', `Imported ${newClasses.length} asset classes from CSV`, 'success');
+          refreshSetupHistory();
         } catch (error) {
           setImportProgress({ visible: false, current: 0, total: 0, message: '' });
           setAlertDialog({
@@ -1000,21 +1008,29 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const saveSharedProviderPreferences = async () => {
     await updatePriceProviderSettings(sharedProviderForm);
     setAlertDialog({ open: true, title: 'Saved', description: 'Shared provider defaults have been updated.' });
+    recordEvent('provider_preference_changed', 'Shared price providers saved', 'info', `Primary: ${sharedProviderForm.primaryProvider}, Secondary: ${sharedProviderForm.secondaryProvider}`);
+    refreshSetupHistory();
   };
 
   const savePersonalProviderOverrides = async () => {
     await updateUserProviderOverrides({ ...overrideForm, enabled: true });
     setAlertDialog({ open: true, title: 'Saved', description: 'Your personal provider overrides are stored on this device.' });
+    recordEvent('provider_preference_changed', 'Personal provider overrides saved', 'info', `Primary: ${overrideForm.primaryProviderOverride}, Secondary: ${overrideForm.secondaryProviderOverride}`);
+    refreshSetupHistory();
   };
 
   const saveSystemProvidedPricing = async () => {
     await updateUserProviderOverrides({ ...overrideForm, enabled: false });
     setAlertDialog({ open: true, title: 'Using System Pricing', description: 'This device will use the shared app pricing setup.' });
+    recordEvent('provider_preference_changed', 'Reverted to system pricing', 'info');
+    refreshSetupHistory();
   };
 
   const saveBrokerConnections = async () => {
     await updateUserBrokerConnections(brokerForm);
     setAlertDialog({ open: true, title: 'Saved', description: 'Broker connection details are stored on this device.' });
+    recordEvent('key_saved', 'Broker credentials saved', 'info');
+    refreshSetupHistory();
   };
 
   const saveCurrencyPreferences = async () => {
@@ -2894,6 +2910,11 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
               ) : null}
             </CardContent>
           </Card>
+
+          <SetupHistoryPanel
+            events={setupEvents}
+            onClear={() => { clearSetupHistory(); refreshSetupHistory(); }}
+          />
         </div>
       )}
 
