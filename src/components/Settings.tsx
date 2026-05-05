@@ -3,7 +3,17 @@ import Papa from 'papaparse';
 import { usePortfolio } from '../store/PortfolioContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera } from 'lucide-react';
+import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson } from 'lucide-react';
+import {
+  buildExportPayload,
+  computeImportResult,
+  downloadExportFile,
+  getImportPreview,
+  validateImportPayload,
+  type ImportMode,
+  type ImportPreview,
+  type NexusExportData,
+} from '../lib/dataPortability';
 import { GoogleDriveSync } from './GoogleDriveSync';
 import { SyncHistoryPanel } from './SyncHistoryPanel';
 import { Asset, AssetClassDef, getAllAssetClasses, getAllAssets, getSetting } from '../store/db';
@@ -12,6 +22,7 @@ import { DEFAULT_PRICE_PROVIDER_SETTINGS, PriceProvider, PriceProviderSettings, 
 import { AddAssetClassModal } from './AddAssetClassModal';
 import { ScreenshotImportModal } from './ScreenshotImportModal';
 import { AiSettingsCard } from './AiSettingsCard';
+import { ProviderCredentialsSection } from './ProviderCredentialsSection';
 import { AssetClassLogo } from '../lib/assetClassBranding';
 import { SYSTEM_ASSET_CLASSES } from '../lib/systemAssetClasses';
 import { Input } from './ui/input';
@@ -23,9 +34,10 @@ import { useConnectedAccounts } from '../store/ConnectedAccountsContext';
 import type { CurrencyAmount } from '../lib/splitwiseTypes';
 import { useAuth } from '../store/AuthContext';
 import { SetupHealthCard } from './SetupHealthCard';
+import { getWorkspaceOwnership, resetWorkspaceOwnership, type WorkspaceMode } from '../store/workspaceOwnership';
 
 export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations';
-type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations';
+type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'credentials';
 
 function getTabForSection(section?: SettingsSection): SettingsTab {
   switch (section) {
@@ -104,6 +116,12 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const indiaFileRef = useRef<HTMLInputElement>(null);
   const canadaFileRef = useRef<HTMLInputElement>(null);
   const classesFileRef = useRef<HTMLInputElement>(null);
+  const importJsonFileRef = useRef<HTMLInputElement>(null);
+
+  // Data portability state
+  const [importPreview, setImportPreview] = React.useState<ImportPreview | null>(null);
+  const [importMode, setImportMode] = React.useState<ImportMode>('merge');
+  const [importPayloadData, setImportPayloadData] = React.useState<NexusExportData | null>(null);
 
   const [confirmDialog, setConfirmDialog] = React.useState<{ open: boolean, title: string, description: string, onConfirm: () => void }>({ open: false, title: '', description: '', onConfirm: () => {} });
   const [alertDialog, setAlertDialog] = React.useState<{ open: boolean, title: string, description: string }>({ open: false, title: '', description: '' });
@@ -146,6 +164,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const lastIntegrationAutoRefreshRef = React.useRef<number>(0);
   const [teamIntegrationBusyKey, setTeamIntegrationBusyKey] = React.useState<string | null>(null);
   const [selectedIntegrationMemberKey, setSelectedIntegrationMemberKey] = React.useState<string>('mine');
+  const [workspaceMode, setWorkspaceMode] = React.useState<WorkspaceMode | null>(null);
+  const [workspaceResetBusy, setWorkspaceResetBusy] = React.useState(false);
   const canEditCurrencies = currentUserRole === 'owner';
 
   const formatCurrencyAmount = React.useCallback((entry: CurrencyAmount) => {
@@ -265,6 +285,27 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     if (!initialSection) return;
     setActiveTab(getTabForSection(initialSection));
   }, [initialSection]);
+
+  React.useEffect(() => {
+    const ownership = getWorkspaceOwnership(user?.uid);
+    setWorkspaceMode(ownership?.mode || null);
+  }, [user?.uid]);
+
+  const handleResetWorkspace = () => {
+    setConfirmDialog({
+      open: true,
+      title: 'Reset Workspace Ownership',
+      description: 'This will clear your workspace ownership choice. On your next visit, you will be asked to choose between Nexus Hosted and self-owned Firebase again. Your existing portfolio data is not affected — this only controls how Nexus connects to Firebase.',
+      onConfirm: () => {
+        setWorkspaceResetBusy(true);
+        resetWorkspaceOwnership(user?.uid);
+        setWorkspaceMode(null);
+        setWorkspaceResetBusy(false);
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        setAlertDialog({ open: true, title: 'Workspace Reset', description: 'Your workspace ownership preference has been cleared. You will be asked to choose again on your next visit.' });
+      },
+    });
+  };
 
   React.useEffect(() => {
     if (activeTab !== 'integrations') return;
@@ -1069,6 +1110,114 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     }
   };
 
+  // ── Data portability handlers ────────────────────────────────
+
+  const handleExportData = () => {
+    try {
+      const payload = buildExportPayload({
+        assets,
+        assetClasses,
+        baseCurrency,
+        primaryCurrency,
+        secondaryCurrency,
+        connectedAccounts: {
+          upstox: upstox ? {
+            status: upstox.status,
+            connectedAt: upstox.connectedAt,
+            lastSyncAt: upstox.lastSyncAt,
+            accountCount: upstox.accounts.length,
+            holdingsCount: upstox.holdingsSummary.totalHoldingsCount,
+            positionsCount: upstox.holdingsSummary.totalPositionsCount,
+          } : null,
+        },
+      });
+      downloadExportFile(payload);
+    } catch (error) {
+      setAlertDialog({
+        open: true,
+        title: 'Export Failed',
+        description: error instanceof Error ? error.message : 'Could not generate export file.',
+      });
+    }
+  };
+
+  const handleImportJsonFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(reader.result as string);
+        const validation = validateImportPayload(raw);
+
+        if (!validation.valid) {
+          setAlertDialog({
+            open: true,
+            title: 'Invalid Import File',
+            description: validation.errors.join(' '),
+          });
+          return;
+        }
+
+        const preview = getImportPreview(validation.data!);
+        setImportPayloadData(validation.data!);
+        setImportPreview(preview);
+        setImportMode('merge');
+      } catch {
+        setAlertDialog({
+          open: true,
+          title: 'Invalid File',
+          description: 'The selected file is not valid JSON. Please check the file and try again.',
+        });
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset file input so the same file can be re-selected
+    if (importJsonFileRef.current) importJsonFileRef.current.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importPayloadData) return;
+
+    try {
+      const result = computeImportResult(importPayloadData, importMode, assets, assetClasses);
+
+      await replaceCloudPortfolio({
+        assets: result.assets,
+        assetClasses: result.assetClasses,
+        baseCurrency: result.baseCurrency,
+        primaryCurrency: result.primaryCurrency,
+        secondaryCurrency: result.secondaryCurrency,
+      });
+
+      // Restore checklist preferences if present
+      if (importPayloadData.preferences?.checklist) {
+        try {
+          window.localStorage.setItem(
+            'nexus-checklist-state',
+            JSON.stringify(importPayloadData.preferences.checklist),
+          );
+        } catch { /* silently skip */ }
+      }
+
+      setImportPreview(null);
+      setImportPayloadData(null);
+      setAlertDialog({
+        open: true,
+        title: 'Import Successful',
+        description: `Successfully imported ${result.assets.length} assets and ${result.assetClasses.length} asset classes using ${importMode === 'replace' ? 'replace' : 'merge'} mode.`,
+      });
+    } catch (error) {
+      setAlertDialog({
+        open: true,
+        title: 'Import Failed',
+        description: error instanceof Error ? error.message : 'Could not import portfolio data.',
+      });
+    }
+  };
+
   const updateBrokerConfig = (
     broker: keyof UserBrokerConnections,
     field: keyof BrokerConnectionConfig,
@@ -1095,6 +1244,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     { id: 'structure', label: 'Structure', description: 'Classes and organization' },
     { id: 'data', label: 'Data', description: 'Imports, sync, migration' },
     { id: 'integrations', label: 'Integrations', description: 'Connected accounts' },
+    { id: 'credentials', label: 'Credentials', description: 'Provider API keys' },
   ];
 
   return (
@@ -1129,8 +1279,45 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           </div>
         </div>
 
+        {workspaceMode && (
+          <Card className="border-none shadow-sm rounded-2xl mb-4">
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 ${
+                    workspaceMode === 'hosted'
+                      ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400'
+                  }`}>
+                    {workspaceMode === 'hosted' ? <Globe2 className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                      Workspace Mode: {workspaceMode === 'hosted' ? 'Nexus Hosted' : 'Self-Owned Firebase'}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {workspaceMode === 'hosted'
+                        ? 'Your portfolio data is stored in Nexus-hosted infrastructure.'
+                        : 'You are using your own Firebase project. Server-side Admin credentials are configured separately in Integrations.'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleResetWorkspace}
+                  disabled={workspaceResetBusy}
+                  className="shrink-0 rounded-full"
+                >
+                  <RotateCw className="h-4 w-4 mr-1.5" />
+                  Reset / Change Mode
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-6">
             {tabItems.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -1948,6 +2135,130 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
               <Trash2 className="mr-2 h-4 w-4" />
               Erase All Classes
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-none shadow-sm rounded-2xl">
+        <CardHeader>
+          <CardTitle>Data Portability</CardTitle>
+          <CardDescription>Export your portfolio data as a portable JSON file, or restore from a previous export.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handleExportData}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Data (JSON)
+            </Button>
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              ref={importJsonFileRef}
+              onChange={handleImportJsonFile}
+            />
+            <Button variant="outline" onClick={() => importJsonFileRef.current?.click()}>
+              <FileJson className="mr-2 h-4 w-4" />
+              Import Data (JSON)
+            </Button>
+          </div>
+
+          {importPreview && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4 dark:border-slate-800 dark:bg-slate-900">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Import Preview</h4>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Portfolios</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.portfolioCount}</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Assets</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.assets}</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Asset Classes</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.assetClasses}</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Connected Accounts</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.connectedAccounts}</div>
+                  </div>
+                </div>
+                {importPreview.hasChecklist && (
+                  <p className="text-xs text-slate-500 mt-2">Includes onboarding checklist preferences.</p>
+                )}
+                {importPreview.warnings.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                    {importPreview.warnings.map((warning, i) => (
+                      <p key={i}>{warning}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Import Mode</h4>
+                <div className="flex gap-2">
+                  <Button
+                    variant={importMode === 'merge' ? 'default' : 'outline'}
+                    className={`rounded-full ${importMode === 'merge' ? 'bg-[#00875A] text-white hover:bg-[#007A51]' : ''}`}
+                    onClick={() => setImportMode('merge')}
+                  >
+                    Merge
+                  </Button>
+                  <Button
+                    variant={importMode === 'replace' ? 'default' : 'outline'}
+                    className={`rounded-full ${importMode === 'replace' ? 'bg-[#00875A] text-white hover:bg-[#007A51]' : ''}`}
+                    onClick={() => setImportMode('replace')}
+                  >
+                    Replace
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {importMode === 'merge'
+                    ? 'Merge adds imported assets and classes alongside your existing portfolio data.'
+                    : 'Replace clears your current portfolio and loads only the imported data.'}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
+                Your export may contain financial holdings data. Store it safely.
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]"
+                  onClick={() => {
+                    setConfirmDialog({
+                      open: true,
+                      title: `${importMode === 'replace' ? 'Replace' : 'Merge'} Portfolio Data`,
+                      description: `This will ${importMode === 'replace' ? 'replace your current portfolio' : 'merge into your current portfolio'} with ${importPreview.assets} assets and ${importPreview.assetClasses} asset classes. Continue?`,
+                      onConfirm: () => {
+                        setConfirmDialog(prev => ({ ...prev, open: false }));
+                        handleConfirmImport();
+                      },
+                    });
+                  }}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Apply Import
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setImportPreview(null);
+                    setImportPayloadData(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+            Your export may contain financial holdings data. Store it safely.
           </div>
         </CardContent>
       </Card>

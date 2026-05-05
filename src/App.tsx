@@ -18,6 +18,9 @@ import { CenteredState } from './components/CenteredState';
 import { GettingStartedChecklist } from './components/GettingStartedChecklist';
 import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
+import { WorkspaceOwnershipSetup } from './components/WorkspaceOwnershipSetup';
+import { getWorkspaceOwnership, saveWorkspaceOwnership } from './store/workspaceOwnership';
+import type { FirebaseClientConfig, WorkspaceMode } from './store/workspaceOwnership';
 
 type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
 
@@ -209,12 +212,29 @@ function AuthenticatedApp() {
   const prevUserRef = useRef(user);
   const [signedOut, setSignedOut] = useState(false);
 
+  const [ownershipChoice, setOwnershipChoice] = useState<WorkspaceMode | null>(null);
+  const [ownershipChecked, setOwnershipChecked] = useState(false);
+
   useEffect(() => {
     if (prevUserRef.current && !user) {
       setSignedOut(true);
     }
     prevUserRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const existing = getWorkspaceOwnership(user.uid);
+    if (existing) {
+      setOwnershipChoice(existing.mode);
+    }
+    setOwnershipChecked(true);
+  }, [user]);
+
+  const handleOwnershipChoice = (mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
+    saveWorkspaceOwnership(mode, firebaseConfig, user?.uid);
+    setOwnershipChoice(mode);
+  };
 
   if (loading || (user && isPortfolioLoading)) {
     return <CenteredState title="Loading portfolio" description="Connecting to Firebase and syncing your shared portfolio..." />;
@@ -236,6 +256,14 @@ function AuthenticatedApp() {
         )}
       />
     );
+  }
+
+  if (ownershipChecked && !ownershipChoice) {
+    return <WorkspaceOwnershipSetup onChooseMode={handleOwnershipChoice} />;
+  }
+
+  if (!ownershipChecked) {
+    return null;
   }
 
   return <MainApp />;

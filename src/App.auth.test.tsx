@@ -149,8 +149,9 @@ describe('App authentication flow', () => {
   });
 
   it('renders main app when user has access', () => {
+    const uid = 'test-uid';
     mockUseAuth.mockReturnValue({
-      user: { uid: 'test-uid', email: 'test@example.com' },
+      user: { uid, email: 'test@example.com' },
       loading: false,
       authError: null,
       signInWithGoogle: vi.fn(),
@@ -166,6 +167,19 @@ describe('App authentication flow', () => {
       activePortfolioId: null,
       setActivePortfolioId: vi.fn(),
       assets: [],
+    });
+
+    Object.defineProperty(window, 'localStorage', {
+      value: {
+        getItem: vi.fn((key: string) => {
+          if (key === `nexus.workspaceOwnership.v1:${uid}`) {
+            return JSON.stringify({ mode: 'hosted', savedAt: Date.now() });
+          }
+          return null;
+        }),
+        setItem: vi.fn(),
+      },
+      configurable: true,
     });
 
     render(<App />);
