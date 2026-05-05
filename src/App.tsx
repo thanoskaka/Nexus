@@ -9,23 +9,30 @@ import { Settings, type SettingsSection } from './components/Settings';
 import { ImportProgressOverlay } from './components/ImportProgressOverlay';
 import { Button } from './components/ui/button';
 import { Select } from './components/ui/select';
-import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut } from 'lucide-react';
-import { SplitwiseProvider } from './store/SplitwiseContext';
-import { ConnectedAccountsProvider } from './store/ConnectedAccountsContext';
+import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut, BookOpen } from 'lucide-react';
+import { SplitwiseProvider, useSplitwise } from './store/SplitwiseContext';
+import { ConnectedAccountsProvider, useConnectedAccounts } from './store/ConnectedAccountsContext';
 import { parseInitialViewFromQuery } from './lib/appNavigation';
 import { PublicHome } from './components/PublicHome';
 import { CenteredState } from './components/CenteredState';
 import { GettingStartedChecklist } from './components/GettingStartedChecklist';
+import { getAiCredentials } from './lib/aiCredentialsApi';
+import { Docs } from './components/Docs';
+
+type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
 
 function MainApp() {
   const { user, logout } = useAuth();
   const { assets, refreshPrices, isRefreshing, portfolios, activePortfolioId, setActivePortfolioId } = usePortfolio();
+  const { upstox } = useConnectedAccounts();
+  const { status: splitwiseStatus } = useSplitwise();
   const initialView = parseInitialViewFromQuery();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'assets' | 'settings'>(initialView.view);
-  const [settingsSection] = useState<SettingsSection | undefined>(initialView.settingsSection);
+  const [currentView, setCurrentView] = useState<AppView>(initialView.view);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | undefined>(initialView.settingsSection);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [aiKeyConfigured, setAiKeyConfigured] = useState(false);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem('nexus-theme');
@@ -33,6 +40,12 @@ function MainApp() {
     const shouldUseDark = storedTheme ? storedTheme === 'dark' : prefersDark;
     setIsDarkMode(shouldUseDark);
     document.documentElement.classList.toggle('dark', shouldUseDark);
+  }, []);
+
+  useEffect(() => {
+    getAiCredentials()
+      .then((creds) => setAiKeyConfigured(Boolean(creds.provider)))
+      .catch(() => setAiKeyConfigured(false));
   }, []);
 
   const toggleDarkMode = () => {
@@ -44,13 +57,26 @@ function MainApp() {
     });
   };
 
+  const navigateToSettings = React.useCallback((section: string) => {
+    setSettingsSection(section as SettingsSection);
+    setCurrentView('settings');
+  }, []);
+
+  const navigateToDocs = React.useCallback(() => {
+    window.history.pushState({}, '', '/docs');
+    setCurrentView('docs');
+  }, []);
+
   const handleEditAsset = React.useCallback((asset: Asset) => {
     setEditingAsset(asset);
     setIsAddModalOpen(true);
   }, []);
 
+  const upstoxConnected = upstox?.status === 'connected';
+  const splitwiseConnected = splitwiseStatus === 'connected';
+
   return (
-    <div className={`min-h-screen bg-[#F8F9FA] text-slate-900 dark:bg-slate-900 dark:text-slate-50 transition-colors duration-200 font-sans`}>
+    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 dark:bg-slate-900 dark:text-slate-50 transition-colors duration-200 font-sans">
       <header className="bg-white dark:bg-slate-950 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-800">
         <div className="container mx-auto px-4 py-2 sm:py-4 grid grid-cols-1 gap-2 lg:gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
           <div className="flex items-center gap-3 cursor-pointer min-w-0 lg:justify-self-start" onClick={() => setCurrentView('dashboard')}>
@@ -106,9 +132,20 @@ function MainApp() {
               </div>
             )}
 
-              <Button variant="outline" size="icon" onClick={refreshPrices} disabled={isRefreshing} className="h-11 w-11 rounded-lg border-slate-200 dark:border-slate-800 shrink-0">
-                <RefreshCw className={`h-4 w-4 text-slate-600 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </Button>
+            <Button variant="outline" size="icon" onClick={refreshPrices} disabled={isRefreshing} className="h-11 w-11 rounded-lg border-slate-200 dark:border-slate-800 shrink-0">
+              <RefreshCw className={`h-4 w-4 text-slate-600 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={navigateToDocs}
+              className="h-11 w-11 rounded-lg border-slate-200 dark:border-slate-800 shrink-0"
+              title="Documentation"
+              aria-label="Open documentation"
+            >
+              <BookOpen className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            </Button>
 
             <Button
               variant="outline"
@@ -129,22 +166,27 @@ function MainApp() {
                 </button>
               </div>
             )}
-
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {(currentView === 'settings' || (currentView === 'dashboard' && assets.length === 0)) && (
-          <GettingStartedChecklist
-            assetsLength={assets.length}
-            onNavigate={(view) => setCurrentView(view)}
-            onAddAsset={() => setIsAddModalOpen(true)}
-          />
+        {currentView === 'dashboard' && (
+          <>
+            <GettingStartedChecklist
+              assetsCount={assets.length}
+              upstoxConnected={upstoxConnected}
+              splitwiseConnected={splitwiseConnected}
+              aiKeyConfigured={aiKeyConfigured}
+              onNavigateToSettings={navigateToSettings}
+              onNavigateToDocs={navigateToDocs}
+            />
+            <Dashboard onAddAsset={() => setIsAddModalOpen(true)} />
+          </>
         )}
-        {currentView === 'dashboard' && <Dashboard onAddAsset={() => setIsAddModalOpen(true)} />}
         {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => setIsAddModalOpen(true)} />}
         {currentView === 'settings' && <Settings initialSection={settingsSection} />}
+        {currentView === 'docs' && <Docs onBack={() => setCurrentView('dashboard')} />}
       </main>
 
       <AddAssetModal
@@ -199,7 +241,40 @@ function AuthenticatedApp() {
   return <MainApp />;
 }
 
+export { AuthenticatedApp };
+
+function getDocSectionFromPath(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const match = window.location.pathname.match(/^\/docs\/(.+)/);
+  return match?.[1] || undefined;
+}
+
 export default function App() {
+  const [docRoute, setDocRoute] = useState<{ active: boolean; section?: string }>(() => ({
+    active: typeof window !== 'undefined' && window.location.pathname.startsWith('/docs'),
+    section: getDocSectionFromPath(),
+  }));
+
+  useEffect(() => {
+    const handlePop = () => {
+      setDocRoute({
+        active: window.location.pathname.startsWith('/docs'),
+        section: getDocSectionFromPath(),
+      });
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, []);
+
+  const closeDocs = () => {
+    window.history.pushState({}, '', '/');
+    setDocRoute({ active: false, section: undefined });
+  };
+
+  if (docRoute.active) {
+    return <Docs initialSection={docRoute.section as any} onBack={closeDocs} />;
+  }
+
   return (
     <AuthProvider>
       <ConnectedAccountsProvider>

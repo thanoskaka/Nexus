@@ -32,7 +32,7 @@ export type ConnectedAccountsContextType = {
   ) => Promise<void>;
 };
 
-const ConnectedAccountsContext = createContext<ConnectedAccountsContextType | undefined>(undefined);
+export const ConnectedAccountsContext = createContext<ConnectedAccountsContextType | undefined>(undefined);
 
 function parseUpstoxCallbackResult() {
   const url = new URL(window.location.href);

@@ -64,7 +64,7 @@ export interface ImportProgress {
   message: string;
 }
 
-interface PortfolioContextType {
+export interface PortfolioContextType {
   assets: Asset[];
   assetClasses: AssetClassDef[];
   members: PortfolioMember[];
@@ -175,7 +175,7 @@ export interface BulkRefreshRunState {
   note?: string;
 }
 
-const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
+export const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
 
 const EMPTY_PROGRESS: ImportProgress = { visible: false, current: 0, total: 0, message: '' };
 const MASSIVE_REFRESH_BATCH_SIZE = 5;

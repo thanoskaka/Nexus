@@ -18,5 +18,6 @@ export default defineConfig({
     pool: 'threads',
     restoreMocks: true,
     clearMocks: true,
+    setupFiles: ['./src/test/setup.ts'],
   },
 });

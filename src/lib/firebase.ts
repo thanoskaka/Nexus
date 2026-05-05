@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { enableIndexedDbPersistence, getFirestore } from 'firebase/firestore';
+import { isMockMode, resolveFirebaseDataNamespace } from './env';
 
 const firebaseConfig = {
   apiKey: import.meta.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,11 +12,15 @@ const firebaseConfig = {
   appId: import.meta.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Firebase SDK does not validate config at initializeApp time.
+// Validation happens lazily on actual Firebase operations (sign-in, Firestore R/W).
+// In mock mode, these exports exist but MockApp never accesses them.
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
+export const firebaseDataNamespace = resolveFirebaseDataNamespace();
 
 if (typeof window !== 'undefined') {
   void enableIndexedDbPersistence(db).catch((err: unknown) => {

@@ -1,295 +1,318 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Button } from './ui/button';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CheckCircle2,
-  Circle,
-  ChevronDown,
-  ChevronRight,
-  X,
-  ListTodo,
-  Plus,
-  Link2,
-  Settings,
-  FileText,
-  BookOpen,
-  Sparkles,
-} from 'lucide-react';
-import { fetchSetupStatus, type SetupStatusResponse } from '../lib/setupStatusApi';
+  CHECKLIST_ITEM_IDS,
+  CHECKLIST_ITEMS,
+  CHECKLIST_STORAGE_KEY,
+  type ChecklistItemId,
+  type ChecklistItemState,
+  type ChecklistState,
+} from '../lib/checklistTypes';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { CheckCircle2, Circle, ChevronRight, ExternalLink, Rocket, XCircle } from 'lucide-react';
 
-type ChecklistCategory = 'required' | 'recommended' | 'optional';
-type ChecklistItemStatus = 'done' | 'pending';
+const ITEM_LABELS: Record<ChecklistItemId, { title: string; description: string }> = {
+  [CHECKLIST_ITEM_IDS.SIGN_IN]: {
+    title: 'Sign in and portfolio loaded',
+    description: 'Authenticate with Google and access your shared portfolio.',
+  },
+  [CHECKLIST_ITEM_IDS.ADD_FIRST_ASSET]: {
+    title: 'Add your first asset',
+    description: 'Track any holding manually — stocks, mutual funds, gold, and more.',
+  },
+  [CHECKLIST_ITEM_IDS.CONFIGURE_ADMIN]: {
+    title: 'Configure Firebase / Admin setup',
+    description: 'Set server-side credentials for connected accounts and AI features.',
+  },
+  [CHECKLIST_ITEM_IDS.CONFIGURE_PRICE_PROVIDERS]: {
+    title: 'Configure price providers',
+    description: 'Set up API keys for live market-data pricing.',
+  },
+  [CHECKLIST_ITEM_IDS.CONNECT_PROVIDER]: {
+    title: 'Connect optional provider',
+    description: 'Link Upstox or Splitwise for cloud-synced holdings and expenses.',
+  },
+  [CHECKLIST_ITEM_IDS.IMPORT_HOLDINGS]: {
+    title: 'Import holdings',
+    description: 'Bulk-import via CAS file, CSV, or screenshot with AI extraction.',
+  },
+  [CHECKLIST_ITEM_IDS.ADD_AI_KEY]: {
+    title: 'Add AI key',
+    description: 'Enable AI features: portfolio Q&A and screenshot OCR.',
+  },
+  [CHECKLIST_ITEM_IDS.REVIEW_DOCS]: {
+    title: 'Review docs / help',
+    description: 'Learn about workflows, providers, and configuration options.',
+  },
+};
 
-interface ChecklistItemDef {
-  key: string;
-  label: string;
-  description: string;
-  category: ChecklistCategory;
-  status: ChecklistItemStatus;
-  actionLabel: string;
-  onAction: () => void;
-  actionIcon?: React.ReactNode;
+const ITEM_ACTIONS: Record<ChecklistItemId, { label: string; target: 'settings' | 'docs' | null; section?: string } | null> = {
+  [CHECKLIST_ITEM_IDS.SIGN_IN]: null,
+  [CHECKLIST_ITEM_IDS.ADD_FIRST_ASSET]: { label: 'Go', target: 'settings', section: 'data-management' },
+  [CHECKLIST_ITEM_IDS.CONFIGURE_ADMIN]: { label: 'Go', target: 'docs', section: undefined },
+  [CHECKLIST_ITEM_IDS.CONFIGURE_PRICE_PROVIDERS]: { label: 'Go', target: 'settings', section: 'price-providers' },
+  [CHECKLIST_ITEM_IDS.CONNECT_PROVIDER]: { label: 'Go', target: 'settings', section: 'integrations' },
+  [CHECKLIST_ITEM_IDS.IMPORT_HOLDINGS]: { label: 'Go', target: 'settings', section: 'data-management' },
+  [CHECKLIST_ITEM_IDS.ADD_AI_KEY]: { label: 'Go', target: 'settings', section: 'price-providers' },
+  [CHECKLIST_ITEM_IDS.REVIEW_DOCS]: { label: 'Open Docs', target: 'docs', section: undefined },
+};
+
+function loadManualState(): ChecklistState {
+  try {
+    const raw = window.localStorage.getItem(CHECKLIST_STORAGE_KEY);
+    if (!raw) return {} as ChecklistState;
+    return JSON.parse(raw) as ChecklistState;
+  } catch {
+    return {} as ChecklistState;
+  }
 }
 
-const DISMISS_STORAGE_KEY = 'nexus-checklist-dismissed';
-const COLLAPSE_STORAGE_KEY = 'nexus-checklist-collapsed';
-
-function getStored(key: string, fallback: boolean): boolean {
-  if (typeof window === 'undefined') return fallback;
-  const val = localStorage.getItem(key);
-  if (val === null) return fallback;
-  return val === 'true';
+function saveManualState(state: ChecklistState) {
+  try {
+    window.localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+  }
 }
 
-function setStored(key: string, value: boolean) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(key, String(value));
+export interface GettingStartedChecklistProps {
+  assetsCount: number;
+  upstoxConnected: boolean;
+  splitwiseConnected: boolean;
+  aiKeyConfigured: boolean;
+  onNavigateToSettings?: (section: string) => void;
+  onNavigateToDocs?: () => void;
 }
 
 export function GettingStartedChecklist({
-  assetsLength,
-  onNavigate,
-  onAddAsset,
-}: {
-  assetsLength: number;
-  onNavigate: (view: 'dashboard' | 'assets' | 'settings', tab?: string) => void;
-  onAddAsset: () => void;
-}) {
-  const [collapsed, setCollapsed] = useState(() => getStored(COLLAPSE_STORAGE_KEY, false));
-  const [dismissed, setDismissed] = useState(() => getStored(DISMISS_STORAGE_KEY, false));
-  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  assetsCount,
+  upstoxConnected,
+  splitwiseConnected,
+  aiKeyConfigured,
+  onNavigateToSettings,
+  onNavigateToDocs,
+}: GettingStartedChecklistProps) {
+  const [manualState, setManualState] = useState<ChecklistState>(loadManualState);
+  const [adminHealthChecked, setAdminHealthChecked] = useState(false);
+  const [adminHealthy, setAdminHealthy] = useState(false);
 
   useEffect(() => {
-    setStored(COLLAPSE_STORAGE_KEY, collapsed);
-  }, [collapsed]);
-
-  useEffect(() => {
-    setStored(DISMISS_STORAGE_KEY, dismissed);
-  }, [dismissed]);
-
-  useEffect(() => {
-    if (dismissed) return;
-    fetchSetupStatus()
-      .then(setSetupStatus)
-      .catch(() => setSetupStatus(null));
-  }, [dismissed]);
-
-  const handleDismiss = useCallback(() => setDismissed(true), []);
-  const handleToggleCollapse = useCallback(() => setCollapsed((p) => !p), []);
-  const handleReset = useCallback(() => {
-    setDismissed(false);
-    setCollapsed(false);
+    let cancelled = false;
+    fetch('/api/health')
+      .then((res) => {
+        if (!cancelled) {
+          setAdminHealthy(res.ok);
+          setAdminHealthChecked(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAdminHealthy(false);
+          setAdminHealthChecked(true);
+        }
+      });
+    return () => { cancelled = true; };
   }, []);
 
-  if (dismissed) return null;
+  const autoComplete: Record<ChecklistItemId, boolean> = useMemo(() => ({
+    [CHECKLIST_ITEM_IDS.SIGN_IN]: true,
+    [CHECKLIST_ITEM_IDS.ADD_FIRST_ASSET]: assetsCount > 0,
+    [CHECKLIST_ITEM_IDS.CONFIGURE_ADMIN]: adminHealthy,
+    [CHECKLIST_ITEM_IDS.CONFIGURE_PRICE_PROVIDERS]: false,
+    [CHECKLIST_ITEM_IDS.CONNECT_PROVIDER]: upstoxConnected || splitwiseConnected,
+    [CHECKLIST_ITEM_IDS.IMPORT_HOLDINGS]: assetsCount > 0,
+    [CHECKLIST_ITEM_IDS.ADD_AI_KEY]: aiKeyConfigured,
+    [CHECKLIST_ITEM_IDS.REVIEW_DOCS]: false,
+  }), [assetsCount, upstoxConnected, splitwiseConnected, aiKeyConfigured, adminHealthy]);
 
-  const hasAssets = assetsLength > 0;
+  const derivedState: Record<ChecklistItemId, ChecklistItemState> = useMemo(() => {
+    const state: Record<string, ChecklistItemState> = {};
+    for (const id of CHECKLIST_ITEMS) {
+      const manual = manualState[id];
+      if (manual === 'done') {
+        state[id] = 'done';
+      } else if (manual === 'skipped') {
+        state[id] = 'skipped';
+      } else if (autoComplete[id]) {
+        state[id] = 'done';
+      } else {
+        state[id] = 'pending';
+      }
+    }
+    return state as Record<ChecklistItemId, ChecklistItemState>;
+  }, [manualState, autoComplete]);
 
-  const items: ChecklistItemDef[] = [
-    {
-      key: 'signed-in',
-      label: 'Sign in & portfolio loaded',
-      description: 'You are signed in and your portfolio workspace is ready.',
-      category: 'required',
-      status: 'done',
-      actionLabel: '',
-      onAction: () => {},
-    },
-    {
-      key: 'add-asset',
-      label: 'Add your first manual asset',
-      description: 'Enter a holding manually to start populating your portfolio.',
-      category: 'required',
-      status: hasAssets ? 'done' : 'pending',
-      actionLabel: 'Add Asset',
-      onAction: onAddAsset,
-      actionIcon: <Plus className="h-3 w-3 mr-1" />,
-    },
-    {
-      key: 'firebase-setup',
-      label: 'Configure base setup',
-      description: setupStatus?.features.firebaseAdmin
-        ? 'Firebase Admin SDK is configured.'
-        : 'Set up Firebase Admin for server-side features (required for providers, AI).',
-      category: 'required',
-      status: setupStatus?.features.firebaseAdmin ? 'done' : 'pending',
-      actionLabel: 'View Setup Guide',
-      onAction: () => onNavigate('settings'),
-    },
-    {
-      key: 'connect-provider',
-      label: 'Connect an optional provider',
-      description: 'Sync Upstox holdings or Splitwise shared expenses.',
-      category: 'recommended',
-      status:
-        setupStatus?.features.upstoxConnectedAccounts || setupStatus?.features.splitwise
-          ? 'done'
-          : 'pending',
-      actionLabel: 'Go to Integrations',
-      onAction: () => onNavigate('settings', 'integrations'),
-      actionIcon: <Link2 className="h-3 w-3 mr-1" />,
-    },
-    {
-      key: 'import-holdings',
-      label: 'Import holdings',
-      description: 'Upload a CAS statement PDF or a screenshot for AI-powered import.',
-      category: 'recommended',
-      status: 'pending',
-      actionLabel: 'Import',
-      onAction: () => onNavigate('settings', 'data'),
-      actionIcon: <FileText className="h-3 w-3 mr-1" />,
-    },
-    {
-      key: 'ai-key',
-      label: 'Add AI key (optional)',
-      description: 'Connect Gemini or DeepSeek for the AI assistant and screenshot OCR.',
-      category: 'optional',
-      status: setupStatus?.features.aiAssistant ? 'done' : 'pending',
-      actionLabel: 'AI Settings',
-      onAction: () => onNavigate('settings'),
-      actionIcon: <Sparkles className="h-3 w-3 mr-1" />,
-    },
-    {
-      key: 'review-docs',
-      label: 'Review setup guide',
-      description: 'Read about deployment modes, pricing, and all features.',
-      category: 'optional',
-      status: 'pending',
-      actionLabel: 'Open Docs',
-      onAction: () => window.open('/docs/setup-modes.md', '_blank'),
-      actionIcon: <BookOpen className="h-3 w-3 mr-1" />,
-    },
-  ];
+  const doneCount = useMemo(
+    () => CHECKLIST_ITEMS.filter((id) => derivedState[id] === 'done').length,
+    [derivedState],
+  );
+  const allDone = doneCount === CHECKLIST_ITEMS.length;
 
-  const doneCount = items.filter((i) => i.status === 'done').length;
-  const totalCount = items.length;
-  const allDone = doneCount === totalCount;
+  const handleSkip = useCallback((id: ChecklistItemId) => {
+    setManualState((prev) => {
+      const next = { ...prev, [id]: 'skipped' as ChecklistItemState };
+      saveManualState(next);
+      return next;
+    });
+  }, []);
 
-  const categoryOrder: ChecklistCategory[] = ['required', 'recommended', 'optional'];
-  const grouped = categoryOrder.map((cat) => ({
-    category: cat,
-    items: items.filter((i) => i.category === cat),
-  }));
+  const handleDone = useCallback((id: ChecklistItemId) => {
+    setManualState((prev) => {
+      const next = { ...prev, [id]: 'done' as ChecklistItemState };
+      saveManualState(next);
+      return next;
+    });
+  }, []);
+
+  const handleGo = useCallback((id: ChecklistItemId) => {
+    const action = ITEM_ACTIONS[id];
+    if (!action) return;
+    if (action.target === 'docs') {
+      onNavigateToDocs?.();
+    } else if (action.target === 'settings' && action.section) {
+      onNavigateToSettings?.(action.section);
+    }
+  }, [onNavigateToSettings, onNavigateToDocs]);
+
+  const handleReset = useCallback(() => {
+    setManualState({} as ChecklistState);
+    saveManualState({} as ChecklistState);
+  }, []);
+
+  if (allDone) return null;
 
   return (
-    <Card className="border-none shadow-sm rounded-2xl mb-6 bg-white dark:bg-slate-950">
-      <CardHeader className="pb-3">
+    <Card className="border-none shadow-sm rounded-2xl mb-6">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00875A] shrink-0">
-              <ListTodo className="h-4 w-4 text-white" />
-            </div>
-            <div className="min-w-0">
-              <CardTitle className="text-base">Getting Started</CardTitle>
-              <CardDescription className="text-xs">
-                {allDone
-                  ? 'All steps complete! Dismiss this card.'
-                  : `${doneCount}/${totalCount} steps complete`}
-              </CardDescription>
-            </div>
+          <div className="flex items-center gap-2">
+            <Rocket className="h-5 w-5 text-[#00875A]" />
+            <CardTitle>Getting Started</CardTitle>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={handleToggleCollapse}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-              aria-label={collapsed ? 'Expand checklist' : 'Collapse checklist'}
-            >
-              {collapsed ? (
-                <ChevronRight className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleDismiss}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-              aria-label="Dismiss checklist"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            {doneCount} of {CHECKLIST_ITEMS.length} complete
+          </span>
+        </div>
+        <div className="mt-3 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800">
+          <div
+            className="h-2 rounded-full bg-[#00875A] transition-all duration-500"
+            style={{ width: `${(doneCount / CHECKLIST_ITEMS.length) * 100}%` }}
+          />
         </div>
       </CardHeader>
-      {!collapsed && (
-        <CardContent>
-          <div className="space-y-4">
-            {grouped.map(
-              (group) =>
-                group.items.length > 0 && (
-                  <div key={group.category}>
-                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      {group.category}
-                    </h4>
-                    <div className="space-y-2">
-                      {group.items.map((item) => (
-                        <div
-                          key={item.key}
-                          className={`flex items-start gap-3 rounded-xl border p-3 transition-colors ${
-                            item.status === 'done'
-                              ? 'border-emerald-100 bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-emerald-950/20'
-                              : 'border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-950'
-                          }`}
-                        >
-                          {item.status === 'done' ? (
-                            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-                          ) : (
-                            <Circle className="mt-0.5 h-5 w-5 shrink-0 text-slate-300 dark:text-slate-600" />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`text-sm font-medium ${
-                                  item.status === 'done'
-                                    ? 'text-emerald-700 line-through dark:text-emerald-300'
-                                    : 'text-slate-900 dark:text-white'
-                                }`}
-                              >
-                                {item.label}
-                              </span>
-                              {item.status === 'done' && item.category === 'required' && (
-                                <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                                  Done
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                              {item.description}
-                            </p>
-                          </div>
-                          {item.status !== 'done' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex h-7 shrink-0 items-center gap-0.5 rounded-full text-xs"
-                              onClick={item.onAction}
-                            >
-                              {item.actionIcon}
-                              {item.actionLabel}
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ),
-            )}
-            {allDone && (
-              <div className="flex items-center justify-center pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-slate-400"
-                  onClick={handleReset}
-                >
-                  Reset checklist
-                </Button>
+      <CardContent className="space-y-2">
+        {CHECKLIST_ITEMS.map((id) => {
+          const state = derivedState[id];
+          const action = ITEM_ACTIONS[id];
+          const labels = ITEM_LABELS[id];
+
+          return (
+            <div
+              key={id}
+              data-testid={`checklist-item-${id}`}
+              className={`flex items-start gap-3 rounded-xl border p-3 transition-colors ${
+                state === 'done'
+                  ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/10'
+                  : state === 'skipped'
+                    ? 'border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/30'
+                    : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950'
+              }`}
+            >
+              <div className="mt-0.5 shrink-0">
+                {state === 'done' ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" data-testid="icon-done" />
+                ) : state === 'skipped' ? (
+                  <XCircle className="h-5 w-5 text-slate-400" data-testid="icon-skipped" />
+                ) : (
+                  <Circle className="h-5 w-5 text-slate-300 dark:text-slate-600" data-testid="icon-pending" />
+                )}
               </div>
-            )}
+              <div className="min-w-0 flex-1">
+                <div className={`text-sm font-semibold ${
+                  state === 'done'
+                    ? 'text-emerald-800 dark:text-emerald-200'
+                    : state === 'skipped'
+                      ? 'text-slate-400 dark:text-slate-500'
+                      : 'text-slate-900 dark:text-white'
+                }`}>
+                  {labels.title}
+                </div>
+                <div className={`text-xs ${
+                  state === 'skipped'
+                    ? 'text-slate-400 dark:text-slate-500'
+                    : 'text-slate-500 dark:text-slate-400'
+                }`}>
+                  {labels.description}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {state === 'pending' && action && (
+                  <Button
+                    size="sm"
+                    className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51] h-8 px-3 text-xs"
+                    onClick={() => handleGo(id)}
+                    data-testid={`action-go-${id}`}
+                  >
+                    {action.label}
+                    {action.target === 'docs' ? (
+                      <ExternalLink className="ml-1 h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="ml-1 h-3 w-3" />
+                    )}
+                  </Button>
+                )}
+                {state === 'pending' && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      onClick={() => handleSkip(id)}
+                      data-testid={`action-skip-${id}`}
+                    >
+                      Skip
+                    </Button>
+                    {!autoComplete[id] && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-slate-500 hover:text-emerald-700 dark:text-slate-400 dark:hover:text-emerald-200"
+                        onClick={() => handleDone(id)}
+                        data-testid={`action-done-${id}`}
+                      >
+                        Done
+                      </Button>
+                    )}
+                  </>
+                )}
+                {state === 'skipped' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs text-slate-500 dark:text-slate-400"
+                    onClick={() => handleDone(id)}
+                    data-testid={`action-undo-skip-${id}`}
+                  >
+                    Undo
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {doneCount > 0 && doneCount < CHECKLIST_ITEMS.length && (
+          <div className="pt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-slate-500 dark:text-slate-400"
+              onClick={handleReset}
+              data-testid="action-reset"
+            >
+              Reset checklist
+            </Button>
           </div>
-        </CardContent>
-      )}
+        )}
+      </CardContent>
     </Card>
   );
 }

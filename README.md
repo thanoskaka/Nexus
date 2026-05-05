@@ -69,6 +69,19 @@ Manual assets still work and are not auto-overwritten or auto-merged.
 
 ## Local Development
 
+### Option A — Mock Mode (no Firebase required)
+
+Quick-start with realistic demo data. No Firebase account needed.
+
+```bash
+npm install
+npm run dev:mock
+```
+
+Open `http://localhost:6868` — pre-authenticated with a demo portfolio.
+
+### Option B — Real Firebase
+
 1. Install dependencies:
 
 ```bash
@@ -81,7 +94,7 @@ npm install
 cp .env.example .env.local
 ```
 
-3. Fill in `.env.local` values.
+3. Fill in `.env.local` values (see [docs/setup.md](docs/setup.md)).
 
 4. Start app + API server:
 
@@ -136,7 +149,8 @@ Nexus pricing routes remain provider-aware for manual/market-linked assets:
 ## Useful Scripts
 
 ```bash
-npm run dev
+npm run dev          # Development with Firebase
+npm run dev:mock     # Development with mock data (no Firebase)
 npm run build
 npm run lint
 npm run test:run
