@@ -97,6 +97,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     disconnectMemberIntegration,
     refreshMemberIntegration,
     setImportProgress,
+    workspacePreferences,
+    updateWorkspacePreferences,
   } = usePortfolio();
   const { user } = useAuth();
   const {
@@ -1040,6 +1042,24 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
       groww: { ...brokerForm.groww, enabled: false },
     });
     setAlertDialog({ open: true, title: 'Using System Routing', description: 'This device will keep using the shared/default India stock routing.' });
+  };
+
+  const saveWorkspacePreferences = async () => {
+    await updateWorkspacePreferences(workspaceForm);
+    setAlertDialog({ open: true, title: 'Workspace Saved', description: 'Your workspace preferences have been updated.' });
+  };
+
+  const resetWorkspacePreferences = () => {
+    setConfirmDialog({
+      open: true,
+      title: 'Reset Workspace Settings',
+      description: 'This will reset workspace name, currency, region, label and market preference to their defaults. Your portfolio data is not affected.',
+      onConfirm: () => {
+        setWorkspaceForm(DEFAULT_WORKSPACE_PREFERENCES);
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        setAlertDialog({ open: true, title: 'Workspace Reset', description: 'Workspace settings have been reset to defaults. Save to persist these changes.' });
+      },
+    });
   };
 
   const handleInvite = async () => {

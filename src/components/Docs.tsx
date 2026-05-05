@@ -9,6 +9,7 @@ type DocSection =
   | 'api-keys'
   | 'integrations'
   | 'user-guide'
+  | 'data-portability'
   | 'troubleshooting';
 
 interface DocNavItem {
@@ -24,6 +25,7 @@ const NAV_ITEMS: DocNavItem[] = [
   { id: 'api-keys', label: 'API Keys & Providers' },
   { id: 'integrations', label: 'Integrations' },
   { id: 'user-guide', label: 'User Guide' },
+  { id: 'data-portability', label: 'Data Portability' },
   { id: 'troubleshooting', label: 'Troubleshooting' },
 ];
 
@@ -778,6 +780,107 @@ npm run test:run # Run tests once`}</CodeBlock>
             Member access is controlled via Firestore. When a user signs in with Google for the first time,
             a personal portfolio is created. Owners can invite additional members in Settings {'>'} Access.
           </Tip>
+        </div>
+      </div>
+    ),
+  },
+
+  'data-portability': {
+    title: 'Data Portability',
+    content: (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Data Portability</h2>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+            Nexus supports data portability so you always own your financial data. You can export your
+            full portfolio as a machine-readable JSON file and restore it later &mdash; or move it to another
+            Nexus instance.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Exporting Your Data</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Navigate to <strong>Settings &gt; Data &gt; Data Portability</strong> and click
+            <strong> Export Data (JSON)</strong>. The export file includes:
+          </p>
+          <Checklist items={[
+            <>All portfolio holdings (assets with tickers, quantities, cost bases, and metadata)</>,
+            <>All custom asset class definitions</>,
+            <>Currency settings (primary/secondary/base)</>,
+            <>Connected account metadata (provider status, account counts) &mdash; <em>never OAuth tokens or secrets</em></>,
+            <>Onboarding checklist preferences (if locally stored)</>,
+          ]} />
+          <Tip>The export file never includes API keys, OAuth tokens, client secrets, passwords, or any other authentication credentials.</Tip>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Importing Your Data</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Navigate to <strong>Settings &gt; Data &gt; Data Portability</strong>, click
+            <strong> Import Data (JSON)</strong>, and select your <Code>.json</Code> export file.
+          </p>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Before the import is applied, Nexus validates the file and shows a preview with counts of
+            assets, asset classes, portfolios, and connected accounts. You can then choose between two
+            import modes:
+          </p>
+          <ul className="list-disc list-inside space-y-1.5 text-sm text-slate-600 dark:text-slate-400 mb-3">
+            <li><strong>Merge</strong> &mdash; adds imported assets and classes alongside your existing data. Duplicate assets (by ID) and classes (by name) are skipped.</li>
+            <li><strong>Replace</strong> &mdash; clears your current portfolio and loads only the imported data. Use with caution.</li>
+          </ul>
+          <Warning>
+            <strong>Replace</strong> mode will overwrite your current portfolio. Make sure you have a
+            recent export before using this mode.
+          </Warning>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Schema</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            The export format is versioned to ensure compatibility. Each export file contains:
+          </p>
+          <CodeBlock>{`{
+  "nexusExportVersion": 1,
+  "app": "nexus-portfolio",
+  "exportedAt": "2026-01-01T00:00:00.000Z",
+  "portfolios": [
+    {
+      "assets": [ ... ],
+      "assetClasses": [ ... ],
+      "baseCurrency": "CAD",
+      "primaryCurrency": "CAD",
+      "secondaryCurrency": "USD"
+    }
+  ],
+  "connectedAccounts": [
+    {
+      "provider": "upstox",
+      "status": "connected",
+      "accountCount": 1,
+      "holdingsCount": 5,
+      "positionsCount": 2
+    }
+  ],
+  "preferences": {
+    "checklist": { "sign-in": "done" }
+  }
+}`}</CodeBlock>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mt-3">
+            Nexus validates the <Code>nexusExportVersion</Code> and <Code>app</Code> fields on import
+            and rejects files with unknown versions or identifiers. This prevents accidental data
+            corruption from incompatible files.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Security Notes</h3>
+          <Checklist items={[
+            <>The export never includes OAuth tokens, API keys, client secrets, or passwords.</>,
+            <>Connected account metadata includes only provider name, status, and counts &mdash; no credentials.</>,
+            <>Store your export files securely. They contain financial holdings data.</>,
+            <>Re-importing does not restore OAuth connections. You must reconnect providers after import.</>,
+          ]} />
         </div>
       </div>
     ),
