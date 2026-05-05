@@ -26,8 +26,8 @@ import { SetupHealthCard } from './SetupHealthCard';
 import { SetupHistoryPanel } from './SetupHistoryPanel';
 import { recordEvent, getSetupHistory, clearSetupHistory } from '../store/setupHistory';
 
-export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations';
-type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations';
+export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
+type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'workspace';
 
 function getTabForSection(section?: SettingsSection): SettingsTab {
   switch (section) {
