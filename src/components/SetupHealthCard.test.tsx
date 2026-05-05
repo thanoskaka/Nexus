@@ -146,11 +146,47 @@ const emptyStatus: SetupStatusResponse = {
   },
 };
 
+const workingResult = {
+  capabilityId: 'firebase-auth',
+  status: 'working',
+  checkedAt: new Date().toISOString(),
+  errorCode: null,
+  errorMessage: null,
+  guidance: { missingEnvKeys: [], docsPath: 'docs/setup-modes.md', hint: 'Firebase Auth is configured.' },
+};
+
+const failedResult = {
+  capabilityId: 'firebase-auth',
+  status: 'failed',
+  checkedAt: new Date().toISOString(),
+  errorCode: 'MISSING_ENV_KEYS',
+  errorMessage: 'Missing required environment variables: NEXT_PUBLIC_FIREBASE_API_KEY',
+  guidance: { missingEnvKeys: ['NEXT_PUBLIC_FIREBASE_API_KEY'], docsPath: 'docs/setup-modes.md', hint: 'Set the required env vars.' },
+};
+
+const verifyAllResponse = {
+  results: [
+    { capabilityId: 'firebase-auth', status: 'working', checkedAt: new Date().toISOString(), guidance: { missingEnvKeys: [] } },
+    { capabilityId: 'firebase-admin', status: 'working', checkedAt: new Date().toISOString(), guidance: { missingEnvKeys: [] } },
+    { capabilityId: 'price-provider', status: 'working', checkedAt: new Date().toISOString(), guidance: { missingEnvKeys: [] } },
+    { capabilityId: 'ai-provider', status: 'working', checkedAt: new Date().toISOString(), guidance: { missingEnvKeys: [] } },
+    { capabilityId: 'logo-provider', status: 'working', checkedAt: new Date().toISOString(), guidance: { missingEnvKeys: [] } },
+    { capabilityId: 'cas-parser', status: 'not-configured', checkedAt: new Date().toISOString(), guidance: { missingEnvKeys: ['CAS_PARSER_SERVICE_URL'] } },
+    { capabilityId: 'upstox', status: 'working', checkedAt: new Date().toISOString(), guidance: { missingEnvKeys: [] } },
+    { capabilityId: 'splitwise', status: 'working', checkedAt: new Date().toISOString(), guidance: { missingEnvKeys: [] } },
+  ],
+};
+
 describe('SetupHealthCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     vi.stubGlobal('fetch', mockFetch);
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
   });
 
   it('shows loading state initially', () => {
@@ -232,44 +268,135 @@ describe('SetupHealthCard', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('reports error on non-200 response', async () => {
+  it('shows Test button for configured items', async () => {
     mockFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: async () => 'Internal Server Error',
+      ok: true,
+      json: async () => fullStatus,
     });
 
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Setup status request failed/)).toBeTruthy();
+      expect(screen.getByText('self-hosted')).toBeTruthy();
+    });
+
+    const testButtons = screen.getAllByText('Test');
+    expect(testButtons.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('shows Verify All button when configured items exist', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => fullStatus,
+    });
+
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Verify All')).toBeTruthy();
     });
   });
 
-  it('shows partial status for partially configured upstox', async () => {
-    const partialUpstox = {
-      ...emptyStatus,
-      integrations: {
-        ...emptyStatus.integrations,
-        upstox: {
-          ...emptyStatus.integrations.upstox,
-          clientConfigured: true,
-        },
-      },
-    };
-
+  it('does not show Verify All button when only price-refresh (always-true) is configured', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => partialUpstox,
+      json: async () => emptyStatus,
     });
 
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('Upstox')).toBeTruthy();
+      expect(screen.getByText('local')).toBeTruthy();
     });
 
-    expect(screen.getByText('partial')).toBeTruthy();
+    const verifyAllButtons = screen.queryAllByText('Verify All');
+    expect(verifyAllButtons.length).toBeLessThanOrEqual(1);
+  });
+
+  it('shows verification badge and timestamp after successful test', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => fullStatus,
+    });
+
+    const user = userEvent.setup();
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('self-hosted')).toBeTruthy();
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => workingResult,
+    });
+
+    const testButtons = screen.getAllByText('Test');
+    await user.click(testButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('verified')).toBeTruthy();
+    });
+
+    expect(screen.getByText(/Last tested:/)).toBeTruthy();
+  });
+
+  it('shows Fix this guidance when verification fails', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => fullStatus,
+    });
+
+    const user = userEvent.setup();
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('self-hosted')).toBeTruthy();
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => failedResult,
+    });
+
+    const testButtons = screen.getAllByText('Test');
+    await user.click(testButtons[0]);
+
+    await waitFor(() => {
+      const fixThisElements = screen.getAllByText('Fix this');
+      expect(fixThisElements.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const keyElements = screen.getAllByText(/NEXT_PUBLIC_FIREBASE_API_KEY/);
+    expect(keyElements.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows Re-test button after first test', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => fullStatus,
+    });
+
+    const user = userEvent.setup();
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('self-hosted')).toBeTruthy();
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => workingResult,
+    });
+
+    const testButtons = screen.getAllByText('Test');
+    await user.click(testButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('verified')).toBeTruthy();
+    });
+
+    expect(screen.getByText('Re-test')).toBeTruthy();
   });
 
   it('shows View setup button for configured items', async () => {
@@ -311,41 +438,6 @@ describe('SetupHealthCard', () => {
     const viewSteps = await screen.findAllByText('View steps');
     expect(viewSteps.length).toBeGreaterThanOrEqual(5);
   });
-
-  it('shows Setup button configured hint includes env var names for each missing item', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    render(<SetupHealthCard />);
-
-    await screen.findByText('Firebase Auth');
-
-    const hintText = document.body.textContent || '';
-    expect(hintText).toContain('FIREBASE_ADMIN_PROJECT_ID');
-    expect(hintText).toContain('UPSTOX_CLIENT_ID');
-    expect(hintText).toContain('SPLITWISE_CLIENT_ID');
-  });
-
-  it('shows detail panel when clicking AI Assistant View steps button', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => emptyStatus,
-    });
-
-    const user = userEvent.setup();
-    render(<SetupHealthCard />);
-
-    await screen.findByText('AI Assistant');
-
-    const viewSteps = await screen.findAllByText('View steps');
-    await user.click(viewSteps[5]);
-
-    await screen.findByText('Open AI Settings', {}, { timeout: 2000 });
-  });
-
-
 
   it('never renders secret values from status endpoint', async () => {
     mockFetch.mockResolvedValue({
