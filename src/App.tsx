@@ -16,6 +16,7 @@ import { parseInitialViewFromQuery } from './lib/appNavigation';
 import { PublicHome } from './components/PublicHome';
 import { CenteredState } from './components/CenteredState';
 import { GettingStartedChecklist } from './components/GettingStartedChecklist';
+import { NextActionPanel } from './components/NextActionPanel';
 import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
 import { WorkspaceOwnershipSetup } from './components/WorkspaceOwnershipSetup';
@@ -184,6 +185,16 @@ function MainApp() {
               onNavigateToSettings={navigateToSettings}
               onNavigateToDocs={navigateToDocs}
             />
+            <NextActionPanel
+              assetsCount={assets.length}
+              upstoxConnected={upstoxConnected}
+              splitwiseConnected={splitwiseConnected}
+              aiKeyConfigured={aiKeyConfigured}
+              userUid={user?.uid}
+              onNavigateToSettings={navigateToSettings}
+              onNavigateToDocs={navigateToDocs}
+              onAddAsset={() => setIsAddModalOpen(true)}
+            />
             <Dashboard onAddAsset={() => setIsAddModalOpen(true)} />
           </>
         )}
@@ -308,7 +319,9 @@ export default function App() {
       <ConnectedAccountsProvider>
         <SplitwiseProvider>
           <PortfolioProvider>
-            <AuthenticatedApp />
+            <SampleModeProvider>
+              <AuthenticatedApp />
+            </SampleModeProvider>
           </PortfolioProvider>
         </SplitwiseProvider>
       </ConnectedAccountsProvider>
