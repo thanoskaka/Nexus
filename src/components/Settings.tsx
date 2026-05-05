@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { usePortfolio } from '../store/PortfolioContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson, FlaskConical } from 'lucide-react';
+import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson, FlaskConical, Wand2 } from 'lucide-react';
 import {
   buildExportPayload,
   computeImportResult,
@@ -15,6 +15,7 @@ import {
   type NexusExportData,
 } from '../lib/dataPortability';
 import { GoogleDriveSync } from './GoogleDriveSync';
+import { useSampleMode } from '../lib/samplePortfolio';
 import { SyncHistoryPanel } from './SyncHistoryPanel';
 import { Asset, AssetClassDef, getAllAssetClasses, getAllAssets, getSetting } from '../store/db';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -984,7 +985,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
 
   const owners = Array.from(new Set(assets.map(a => a.owner).filter(Boolean))).map(String);
   
-  const allAssetClasses = [...SYSTEM_ASSET_CLASSES, ...assetClasses];
+  const allAssetClasses = [...SYSTEM_ASSET_CLASSES, ...displayAssetClasses];
 
   // Group asset classes by country
   const assetClassesByCountry = allAssetClasses.reduce((acc, cls) => {
@@ -1317,17 +1318,24 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
       <div className="mb-8 space-y-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">Settings</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Settings</h1>
+            {isSampleMode && (
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300" title="Not your real portfolio">
+                Sample data
+              </span>
+            )}
+          </div>
             <p className="text-lg text-slate-500 dark:text-slate-400">Configure your portfolio tracker without digging through one long page.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="text-slate-500 dark:text-slate-400">Members</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{members.length}</div>
+              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{displayMembers.length}</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="text-slate-500 dark:text-slate-400">Assets</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{assets.length}</div>
+              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{displayAssets.length}</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="text-slate-500 dark:text-slate-400">Classes</div>
@@ -2390,6 +2398,41 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           </Button>
         </CardContent>
       </Card>
+
+      {isSampleMode && (
+        <Card className="border-none shadow-sm rounded-2xl border-amber-200 dark:border-amber-900/60">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <CardTitle>Sample Portfolio</CardTitle>
+            </div>
+            <CardDescription>
+              You are currently viewing a sample portfolio for demonstration.
+              <span className="block mt-1 font-medium text-amber-700 dark:text-amber-300">This is not your real financial data.</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+              onClick={() => {
+                setConfirmDialog({
+                  open: true,
+                  title: 'Clear Sample Data',
+                  description: 'Remove all sample holdings, asset classes, and exit demo mode. Your real portfolio (if any) will remain unchanged.',
+                  onConfirm: () => {
+                    disableSampleMode();
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                  },
+                });
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear Sample Data
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       </div>
       )}
 
@@ -2916,6 +2959,10 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
             onClear={() => { clearSetupHistory(); refreshSetupHistory(); }}
           />
         </div>
+      )}
+
+      {activeTab === 'credentials' && (
+        <ProviderCredentialsSection />
       )}
 
       <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>

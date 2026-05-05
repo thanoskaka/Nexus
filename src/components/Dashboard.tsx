@@ -41,6 +41,7 @@ import {
 } from '../lib/portfolioMetrics';
 import { Asset } from '../store/db';
 import { fetchHistoricalExchangeRate } from '../lib/api';
+import { useSampleMode } from '../lib/samplePortfolio';
 
 const COLORS = ['#00875A', '#00B8D9', '#FFAB00', '#FF5630', '#6554C0', '#36B37E', '#FF8B00', '#4C9AFF'];
 const WATERFALL_COLORS = {
@@ -86,7 +87,10 @@ type ChartAnalytics = {
 };
 
 export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
-  const { assets, rates, refreshPrices, isRefreshing, refreshQueue } = usePortfolio();
+  const { assets: realAssets, rates, refreshPrices, isRefreshing, refreshQueue } = usePortfolio();
+  const { isSampleMode, sampleData, enableSampleMode } = useSampleMode();
+  const assets = isSampleMode ? sampleData.assets : realAssets;
+  const showEmptyState = !isSampleMode && realAssets.length === 0;
   const visibleAssets = useMemo(() => assets.filter((asset) => !asset.hiddenFromDashboard), [assets]);
   const [scope, setScope] = useState<DashboardScope>('ALL');
   const [memberFilter, setMemberFilter] = useState('ALL');
@@ -663,8 +667,15 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
     <div className="space-y-6">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="mb-2 text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Dashboard</h1>
-          <p className="text-lg text-slate-500 dark:text-slate-400">Your family's wealth at a glance</p>
+          <div className="mb-2 flex items-center gap-3">
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Dashboard</h1>
+            {isSampleMode && (
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300" title="Not your real portfolio">
+                Sample data
+              </span>
+            )}
+          </div>
+          <p className="text-lg text-slate-500 dark:text-slate-400">{isSampleMode ? 'Exploring a sample portfolio' : "Your family's wealth at a glance"}</p>
         </div>
         <Button variant="outline" onClick={refreshPrices} disabled={isRefreshing} className="w-full sm:w-auto">
           <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -680,7 +691,7 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         </div>
       ) : null}
 
-      {assets.length === 0 ? (
+      {showEmptyState ? (
         <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00875A]">
             <WalletCards className="h-8 w-8 text-white" />
@@ -715,7 +726,19 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
               Go to Integrations
             </Button>
           </div>
-          <p className="mt-6 text-sm text-slate-400 dark:text-slate-500">
+          <div className="mt-6">
+            <Button
+              onClick={enableSampleMode}
+              className="rounded-lg border-2 border-dashed border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
+            >
+              <WalletCards className="mr-2 h-4 w-4" />
+              Explore sample portfolio
+            </Button>
+          </div>
+          <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+            Sample data shown is for demonstration only. Not your real financial information.
+          </p>
+          <p className="mt-3 text-sm text-slate-400 dark:text-slate-500">
             Supported formats: CSV, screenshot, and CAS statements.
           </p>
         </div>
