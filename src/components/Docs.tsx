@@ -913,9 +913,10 @@ npm run test:run # Run tests once`}</CodeBlock>
 interface DocsProps {
   initialSection?: DocSection;
   onBack?: () => void;
+  onStartSetupWizard?: () => void;
 }
 
-export function Docs({ initialSection, onBack }: DocsProps) {
+export function Docs({ initialSection, onBack, onStartSetupWizard }: DocsProps) {
   const [activeSection, setActiveSection] = useState<DocSection>(initialSection || 'getting-started');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -964,6 +965,27 @@ export function Docs({ initialSection, onBack }: DocsProps) {
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-950">
               {section.content}
+
+              {activeSection === 'getting-started' && onStartSetupWizard && (
+                <div className="mt-8 rounded-2xl border border-[#00875A]/20 bg-[#00875A]/5 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Try the Guided Setup Wizard</h3>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Step-by-step walkthrough to configure all your providers, API keys, and integrations.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onStartSetupWizard}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#00875A] px-4 py-2 text-sm font-medium text-white hover:bg-[#007A51] transition-colors shrink-0"
+                    >
+                      <Wand2 className="h-4 w-4" />
+                      Launch Setup Wizard
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-8 flex items-center justify-between text-sm text-slate-400 dark:text-slate-500">

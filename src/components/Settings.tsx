@@ -13,6 +13,7 @@ import { DEFAULT_PRICE_PROVIDER_SETTINGS, PriceProvider, PriceProviderSettings, 
 import { AddAssetClassModal } from './AddAssetClassModal';
 import { ScreenshotImportModal } from './ScreenshotImportModal';
 import { AiSettingsCard } from './AiSettingsCard';
+import { ProviderCredentialsSection } from './ProviderCredentialsSection';
 import { AssetClassLogo } from '../lib/assetClassBranding';
 import { SYSTEM_ASSET_CLASSES } from '../lib/systemAssetClasses';
 import { Input } from './ui/input';
@@ -28,7 +29,7 @@ import { SetupHistoryPanel } from './SetupHistoryPanel';
 import { recordEvent, getSetupHistory, clearSetupHistory } from '../store/setupHistory';
 
 export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
-type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'workspace';
+type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'workspace' | 'credentials';
 
 function getTabForSection(section?: SettingsSection): SettingsTab {
   switch (section) {
@@ -1117,6 +1118,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     { id: 'structure', label: 'Structure', description: 'Classes and organization' },
     { id: 'data', label: 'Data', description: 'Imports, sync, migration' },
     { id: 'integrations', label: 'Integrations', description: 'Connected accounts' },
+    { id: 'workspace', label: 'Workspace', description: 'Ownership setup' },
+    { id: 'credentials', label: 'Credentials', description: 'Provider API keys' },
   ];
 
   return (
@@ -1159,7 +1162,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-7">
             {tabItems.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
