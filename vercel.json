@@ -3,6 +3,14 @@
     {
       "source": "/api/integrations/splitwise/(.*)",
       "destination": "/api/splitwise/$1"
+    },
+    {
+      "source": "/docs",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/docs/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
