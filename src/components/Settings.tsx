@@ -1310,6 +1310,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     { id: 'structure', label: 'Structure', description: 'Classes and organization' },
     { id: 'data', label: 'Data', description: 'Imports, sync, migration' },
     { id: 'integrations', label: 'Integrations', description: 'Connected accounts' },
+    { id: 'workspace', label: 'Workspace', description: 'Ownership setup' },
     { id: 'credentials', label: 'Credentials', description: 'Provider API keys' },
   ];
 
@@ -1390,7 +1391,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         )}
 
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-6">
+          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-7">
             {tabItems.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
