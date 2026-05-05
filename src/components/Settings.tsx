@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { usePortfolio } from '../store/PortfolioContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson } from 'lucide-react';
+import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson, FlaskConical } from 'lucide-react';
 import {
   buildExportPayload,
   computeImportResult,
@@ -28,16 +28,17 @@ import { SYSTEM_ASSET_CLASSES } from '../lib/systemAssetClasses';
 import { Input } from './ui/input';
 import { Select } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES, type BrokerConnectionConfig, type UserBrokerConnections, type UserProviderOverrides } from '../store/userPreferences';
+import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES, DEFAULT_WORKSPACE_PREFERENCES, type BrokerConnectionConfig, type UserBrokerConnections, type UserProviderOverrides, type WorkspacePreferences } from '../store/userPreferences';
 import { useSplitwise } from '../store/SplitwiseContext';
 import { useConnectedAccounts } from '../store/ConnectedAccountsContext';
 import type { CurrencyAmount } from '../lib/splitwiseTypes';
 import { useAuth } from '../store/AuthContext';
 import { SetupHealthCard } from './SetupHealthCard';
+import { ProviderCapabilityMatrix } from './ProviderCapabilityMatrix';
 import { getWorkspaceOwnership, resetWorkspaceOwnership, type WorkspaceMode } from '../store/workspaceOwnership';
 
-export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations';
-type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'credentials';
+export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
+type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'credentials' | 'workspace';
 
 function getTabForSection(section?: SettingsSection): SettingsTab {
   switch (section) {
@@ -51,6 +52,8 @@ function getTabForSection(section?: SettingsSection): SettingsTab {
     case 'data-management':
     case 'cloud-sync':
       return 'data';
+    case 'workspace':
+      return 'workspace';
     case 'integrations':
       return 'integrations';
     default:
@@ -113,6 +116,11 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     refreshUpstox,
     disconnectUpstox,
   } = useConnectedAccounts();
+  const { isSampleMode, sampleData, disableSampleMode } = useSampleMode();
+  const displayAssets = isSampleMode ? sampleData.assets : assets;
+  const displayAssetClasses = isSampleMode ? sampleData.assetClasses : assetClasses;
+  const displayMembers = isSampleMode ? sampleData.members : members;
+
   const indiaFileRef = useRef<HTMLInputElement>(null);
   const canadaFileRef = useRef<HTMLInputElement>(null);
   const classesFileRef = useRef<HTMLInputElement>(null);
@@ -131,6 +139,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const [sharedProviderForm, setSharedProviderForm] = React.useState<PriceProviderSettings>(DEFAULT_PRICE_PROVIDER_SETTINGS);
   const [overrideForm, setOverrideForm] = React.useState<UserProviderOverrides>(DEFAULT_USER_PROVIDER_OVERRIDES);
   const [brokerForm, setBrokerForm] = React.useState<UserBrokerConnections>(DEFAULT_BROKER_CONNECTIONS);
+  const [workspaceForm, setWorkspaceForm] = React.useState<WorkspacePreferences>(DEFAULT_WORKSPACE_PREFERENCES);
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [inviteRole, setInviteRole] = React.useState<'owner' | 'partner'>('partner');
   const [migrationPreview, setMigrationPreview] = React.useState<{
@@ -261,6 +270,10 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   React.useEffect(() => {
     setBrokerForm(userBrokerConnections);
   }, [userBrokerConnections]);
+
+  React.useEffect(() => {
+    setWorkspaceForm(workspacePreferences);
+  }, [workspacePreferences]);
 
   React.useEffect(() => {
     setPersonalPricingMode(userProviderOverrides.enabled ? 'override' : 'system');
@@ -1113,31 +1126,47 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   // ── Data portability handlers ────────────────────────────────
 
   const handleExportData = () => {
-    try {
-      const payload = buildExportPayload({
-        assets,
-        assetClasses,
-        baseCurrency,
-        primaryCurrency,
-        secondaryCurrency,
-        connectedAccounts: {
-          upstox: upstox ? {
-            status: upstox.status,
-            connectedAt: upstox.connectedAt,
-            lastSyncAt: upstox.lastSyncAt,
-            accountCount: upstox.accounts.length,
-            holdingsCount: upstox.holdingsSummary.totalHoldingsCount,
-            positionsCount: upstox.holdingsSummary.totalPositionsCount,
-          } : null,
+    const confirmExport = () => {
+      try {
+        const payload = buildExportPayload({
+          assets: displayAssets,
+          assetClasses: displayAssetClasses,
+          baseCurrency,
+          primaryCurrency,
+          secondaryCurrency,
+          connectedAccounts: {
+            upstox: upstox ? {
+              status: upstox.status,
+              connectedAt: upstox.connectedAt,
+              lastSyncAt: upstox.lastSyncAt,
+              accountCount: upstox.accounts.length,
+              holdingsCount: upstox.holdingsSummary.totalHoldingsCount,
+              positionsCount: upstox.holdingsSummary.totalPositionsCount,
+            } : null,
+          },
+        });
+        downloadExportFile(payload);
+      } catch (error) {
+        setAlertDialog({
+          open: true,
+          title: 'Export Failed',
+          description: error instanceof Error ? error.message : 'Could not generate export file.',
+        });
+      }
+    };
+
+    if (isSampleMode) {
+      setConfirmDialog({
+        open: true,
+        title: 'Export Sample Data?',
+        description: 'Your portfolio is currently showing sample data. The export will include these sample holdings. They are not your real financial data. Continue?',
+        onConfirm: () => {
+          setConfirmDialog(prev => ({ ...prev, open: false }));
+          confirmExport();
         },
       });
-      downloadExportFile(payload);
-    } catch (error) {
-      setAlertDialog({
-        open: true,
-        title: 'Export Failed',
-        description: error instanceof Error ? error.message : 'Could not generate export file.',
-      });
+    } else {
+      confirmExport();
     }
   };
 
@@ -2139,6 +2168,46 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         </CardContent>
       </Card>
 
+      {isSampleMode && (
+        <Card className="border-none shadow-sm rounded-2xl border-amber-200 dark:border-amber-900/60">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <CardTitle>Sample Portfolio</CardTitle>
+            </div>
+            <CardDescription>
+              You are currently viewing a sample portfolio for demonstration.
+              <span className="block mt-1 font-medium text-amber-700 dark:text-amber-300">This is not your real financial data.</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+              onClick={() => {
+                setConfirmDialog({
+                  open: true,
+                  title: 'Clear Sample Data',
+                  description: 'Remove all sample holdings, asset classes, and exit demo mode. Your real portfolio (if any) will remain unchanged.',
+                  onConfirm: () => {
+                    disableSampleMode();
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                    setAlertDialog({
+                      open: true,
+                      title: 'Sample Data Cleared',
+                      description: 'Sample portfolio has been removed. You can now add your real financial data.',
+                    });
+                  },
+                });
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear Sample Data
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-none shadow-sm rounded-2xl">
         <CardHeader>
           <CardTitle>Data Portability</CardTitle>
@@ -2296,6 +2365,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           </div>
 
           <SetupHealthCard />
+
+          <ProviderCapabilityMatrix />
 
           <Card className="border-none shadow-sm rounded-2xl">
             <CardHeader>
