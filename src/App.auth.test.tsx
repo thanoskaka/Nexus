@@ -41,6 +41,21 @@ vi.mock('./components/GettingStartedChecklist', () => ({ GettingStartedChecklist
 import App from './App';
 
 describe('App authentication flow', () => {
+  function mockSavedOwnership(uid = 'test-uid') {
+    Object.defineProperty(window, 'localStorage', {
+      value: {
+        getItem: vi.fn((key: string) => {
+          if (key === `nexus.workspaceOwnership.v1:${uid}`) {
+            return JSON.stringify({ mode: 'hosted', savedAt: Date.now() });
+          }
+          return null;
+        }),
+        setItem: vi.fn(),
+      },
+      configurable: true,
+    });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(window, 'localStorage', {
@@ -111,6 +126,7 @@ describe('App authentication flow', () => {
   });
 
   it('renders loading state when user exists but portfolio is loading', () => {
+    mockSavedOwnership();
     mockUseAuth.mockReturnValue({
       user: { uid: 'test-uid', email: 'test@example.com' },
       loading: false,
@@ -130,6 +146,7 @@ describe('App authentication flow', () => {
   });
 
   it('renders preparing portfolio when user exists but no access', () => {
+    mockSavedOwnership();
     mockUseAuth.mockReturnValue({
       user: { uid: 'test-uid', email: 'test@example.com' },
       loading: false,
@@ -169,21 +186,31 @@ describe('App authentication flow', () => {
       assets: [],
     });
 
-    Object.defineProperty(window, 'localStorage', {
-      value: {
-        getItem: vi.fn((key: string) => {
-          if (key === `nexus.workspaceOwnership.v1:${uid}`) {
-            return JSON.stringify({ mode: 'hosted', savedAt: Date.now() });
-          }
-          return null;
-        }),
-        setItem: vi.fn(),
-      },
-      configurable: true,
-    });
+    mockSavedOwnership(uid);
 
     render(<App />);
 
     expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders ownership setup before portfolio for a signed-in user without saved mode', () => {
+    mockUseAuth.mockReturnValue({
+      user: { uid: 'new-user', email: 'new@example.com' },
+      loading: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+    mockUsePortfolio.mockReturnValue({
+      isPortfolioLoading: true,
+      hasAccess: false,
+      accessError: null,
+    });
+
+    render(<App />);
+
+    expect(screen.getByText('Welcome to Nexus Portfolio')).toBeInTheDocument();
+    expect(screen.getAllByText('Use Nexus Hosted').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Use My Own Firebase').length).toBeGreaterThanOrEqual(1);
   });
 });

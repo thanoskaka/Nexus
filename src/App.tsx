@@ -19,6 +19,7 @@ import { GettingStartedChecklist } from './components/GettingStartedChecklist';
 import { NextActionPanel } from './components/NextActionPanel';
 import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
+import { SetupWizard } from './components/SetupWizard';
 import { WorkspaceOwnershipSetup } from './components/WorkspaceOwnershipSetup';
 import { getWorkspaceOwnership, saveWorkspaceOwnership } from './store/workspaceOwnership';
 import type { FirebaseClientConfig, WorkspaceMode } from './store/workspaceOwnership';
@@ -236,9 +237,33 @@ function MainApp() {
   );
 }
 
-function AuthenticatedApp() {
-  const { user, loading, authError, signInWithGoogle, logout } = useAuth();
+function PortfolioApp() {
+  const { logout } = useAuth();
   const { hasAccess, accessError, isPortfolioLoading } = usePortfolio();
+
+  if (isPortfolioLoading) {
+    return <CenteredState title="Loading portfolio" description="Connecting to Firebase and syncing your shared portfolio..." />;
+  }
+
+  if (!hasAccess) {
+    return (
+      <CenteredState
+        title="Preparing your portfolio"
+        description={accessError || 'We are creating or syncing the portfolios available to your Google account. Please refresh in a moment if this screen persists.'}
+        action={(
+          <Button variant="outline" onClick={() => void logout()}>
+            Sign out
+          </Button>
+        )}
+      />
+    );
+  }
+
+  return <MainApp />;
+}
+
+function AuthenticatedApp() {
+  const { user, loading, authError, signInWithGoogle } = useAuth();
 
   const prevUserRef = useRef(user);
   const [signedOut, setSignedOut] = useState(false);
@@ -267,26 +292,12 @@ function AuthenticatedApp() {
     setOwnershipChoice(mode);
   };
 
-  if (loading || (user && isPortfolioLoading)) {
-    return <CenteredState title="Loading portfolio" description="Connecting to Firebase and syncing your shared portfolio..." />;
+  if (loading) {
+    return <CenteredState title="Loading portfolio" description="Checking your sign-in session..." />;
   }
 
   if (!user) {
     return <PublicHome authError={authError} onLaunch={() => void signInWithGoogle()} signedOut={signedOut} />;
-  }
-
-  if (!hasAccess) {
-    return (
-      <CenteredState
-        title="Preparing your portfolio"
-        description={accessError || 'We are creating or syncing the portfolios available to your Google account. Please refresh in a moment if this screen persists.'}
-        action={(
-          <Button variant="outline" onClick={() => void logout()}>
-            Sign out
-          </Button>
-        )}
-      />
-    );
   }
 
   if (ownershipChecked && !ownershipChoice) {
@@ -297,7 +308,17 @@ function AuthenticatedApp() {
     return null;
   }
 
-  return <MainApp />;
+  return (
+    <ConnectedAccountsProvider>
+      <SplitwiseProvider>
+        <PortfolioProvider>
+          <SampleModeProvider>
+            <PortfolioApp />
+          </SampleModeProvider>
+        </PortfolioProvider>
+      </SplitwiseProvider>
+    </ConnectedAccountsProvider>
+  );
 }
 
 export { AuthenticatedApp };
@@ -351,17 +372,7 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <ConnectedAccountsProvider>
-        <SplitwiseProvider>
-          <PortfolioProvider>
-            <SampleModeProvider>
-              <SampleModeProvider>
-              <AuthenticatedApp />
-            </SampleModeProvider>
-            </SampleModeProvider>
-          </PortfolioProvider>
-        </SplitwiseProvider>
-      </ConnectedAccountsProvider>
+      <AuthenticatedApp />
     </AuthProvider>
   );
 }
