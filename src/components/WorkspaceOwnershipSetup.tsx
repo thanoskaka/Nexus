@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wallet, Globe2, Shield, ArrowRight, ArrowLeft, Key, ExternalLink, Check } from 'lucide-react';
+import { Wallet, Globe2, Shield, ArrowRight, ArrowLeft, Key, ExternalLink, Check, Copy, MousePointerClick } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Input } from './ui/input';
@@ -10,20 +10,29 @@ interface WorkspaceOwnershipSetupProps {
   onChooseMode: (mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => void;
 }
 
-const FIREBASE_CONFIG_FIELDS: { key: keyof FirebaseClientConfig; label: string; placeholder: string }[] = [
-  { key: 'apiKey', label: 'API Key', placeholder: 'AIza...' },
-  { key: 'authDomain', label: 'Auth Domain', placeholder: 'project.firebaseapp.com' },
-  { key: 'projectId', label: 'Project ID', placeholder: 'my-project-id' },
-  { key: 'storageBucket', label: 'Storage Bucket', placeholder: 'project.appspot.com' },
-  { key: 'messagingSenderId', label: 'Messaging Sender ID', placeholder: '123456789' },
-  { key: 'appId', label: 'App ID', placeholder: '1:123:web:abc' },
+const FIREBASE_CONFIG_FIELDS: { key: keyof FirebaseClientConfig; label: string; placeholder: string; hint: string }[] = [
+  { key: 'apiKey', label: 'API Key', placeholder: 'AIza...', hint: 'apiKey' },
+  { key: 'authDomain', label: 'Auth Domain', placeholder: 'project.firebaseapp.com', hint: 'authDomain' },
+  { key: 'projectId', label: 'Project ID', placeholder: 'my-project-id', hint: 'projectId' },
+  { key: 'storageBucket', label: 'Storage Bucket', placeholder: 'project.firebasestorage.app', hint: 'storageBucket' },
+  { key: 'messagingSenderId', label: 'Messaging Sender ID', placeholder: '123456789', hint: 'messagingSenderId' },
+  { key: 'appId', label: 'App ID', placeholder: '1:123:web:abc', hint: 'appId' },
 ];
+
+export function parseFirebaseConfigText(input: string): Partial<FirebaseClientConfig> {
+  return FIREBASE_CONFIG_FIELDS.reduce<Partial<FirebaseClientConfig>>((parsed, field) => {
+    const match = input.match(new RegExp(`${field.key}\\s*:\\s*["']([^"']+)["']`));
+    if (match?.[1]) parsed[field.key] = match[1].trim();
+    return parsed;
+  }, {});
+}
 
 export function WorkspaceOwnershipSetup({ onChooseMode }: WorkspaceOwnershipSetupProps) {
   const [step, setStep] = useState<'choose' | 'selfOwned'>('choose');
   const [form, setForm] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [pasteValue, setPasteValue] = useState('');
 
   const handleFieldChange = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -45,6 +54,17 @@ export function WorkspaceOwnershipSetup({ onChooseMode }: WorkspaceOwnershipSetu
     setStep('choose');
   };
 
+  const handlePasteConfig = (value: string) => {
+    setPasteValue(value);
+    const parsed = parseFirebaseConfigText(value);
+    if (Object.keys(parsed).length === 0) return;
+    const nextForm = { ...form, ...parsed };
+    setForm(nextForm);
+    if (submitted) {
+      setErrors(validateFirebaseConfigFields(nextForm as FirebaseClientConfig));
+    }
+  };
+
   const handleSubmit = () => {
     setSubmitted(true);
     const validationErrors = validateFirebaseConfigFields(form as FirebaseClientConfig);
@@ -62,16 +82,43 @@ export function WorkspaceOwnershipSetup({ onChooseMode }: WorkspaceOwnershipSetu
           </div>
           <h1 className="text-center text-2xl font-bold text-slate-900 dark:text-white mb-2">Configure Your Firebase</h1>
           <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-8">
-            Enter your Firebase project client configuration from the Firebase Console (Project Settings &gt; General &gt; Your apps &gt; Web app).
-            These are public client-side values. You still sign into Nexus with Google &mdash; your portfolio data will connect to your Firebase project.
+            In Firebase Console, click <strong>Add app</strong>, choose <strong>Web</strong>, register the app, then copy the firebaseConfig block.
+            Paste it here and Nexus will fill the fields.
           </p>
 
           <Card className="shadow-sm">
             <CardContent className="pt-6 space-y-4">
+              <div className="rounded-lg border border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950 p-4">
+                <div className="flex items-start gap-3">
+                  <MousePointerClick className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Where to find this in Firebase</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                      Project Overview &rarr; <strong>Add app</strong> &rarr; Web icon <strong>&lt;/&gt;</strong> &rarr; App nickname <strong>Nexus</strong> &rarr; Register app &rarr; copy <strong>firebaseConfig</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="firebase-config-paste" className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <Copy className="h-4 w-4 text-slate-400" />
+                  Paste firebaseConfig
+                </label>
+                <textarea
+                  id="firebase-config-paste"
+                  value={pasteValue}
+                  onChange={(e) => handlePasteConfig(e.target.value)}
+                  placeholder={'const firebaseConfig = {\n  apiKey: "...",\n  authDomain: "...",\n  projectId: "...",\n  storageBucket: "...",\n  messagingSenderId: "...",\n  appId: "..."\n};'}
+                  className="min-h-32 w-full rounded-md border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-900"
+                />
+              </div>
+
               {FIREBASE_CONFIG_FIELDS.map((field) => (
                 <div key={field.key}>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                    {field.label}
+                  <label className="mb-1.5 flex items-center justify-between gap-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+                    <span>{field.label}</span>
+                    <span className="font-mono text-xs font-normal text-slate-400">{field.hint}</span>
                   </label>
                   <Input
                     value={form[field.key] || ''}

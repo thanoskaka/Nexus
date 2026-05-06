@@ -1,12 +1,32 @@
 // @vitest-environment happy-dom
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { WorkspaceOwnershipSetup } from './WorkspaceOwnershipSetup';
+import { parseFirebaseConfigText, WorkspaceOwnershipSetup } from './WorkspaceOwnershipSetup';
 
 describe('WorkspaceOwnershipSetup', () => {
+  it('parses a pasted Firebase config object', () => {
+    expect(parseFirebaseConfigText(`
+      const firebaseConfig = {
+        apiKey: "AIza-test",
+        authDomain: "budget.firebaseapp.com",
+        projectId: "budget",
+        storageBucket: "budget.firebasestorage.app",
+        messagingSenderId: "123456789",
+        appId: "1:123456789:web:abc123"
+      };
+    `)).toEqual({
+      apiKey: 'AIza-test',
+      authDomain: 'budget.firebaseapp.com',
+      projectId: 'budget',
+      storageBucket: 'budget.firebasestorage.app',
+      messagingSenderId: '123456789',
+      appId: '1:123456789:web:abc123',
+    });
+  });
+
   it('renders the mode selection screen with both options', () => {
     render(<WorkspaceOwnershipSetup onChooseMode={vi.fn()} />);
 
@@ -53,6 +73,9 @@ describe('WorkspaceOwnershipSetup', () => {
     await user.click(screen.getByText('Configure My Firebase'));
 
     expect(screen.getByText('Configure Your Firebase')).toBeInTheDocument();
+    expect(screen.getByText(/Where to find this in Firebase/)).toBeInTheDocument();
+    expect(screen.getByText(/Project Overview/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Paste firebaseConfig')).toBeInTheDocument();
     expect(screen.getByText('API Key')).toBeInTheDocument();
     expect(screen.getByText('Auth Domain')).toBeInTheDocument();
     expect(screen.getByText('Project ID')).toBeInTheDocument();
@@ -97,20 +120,18 @@ describe('WorkspaceOwnershipSetup', () => {
     await user.click(screen.getByText('Configure My Firebase'));
 
     const fields = [
-      { label: 'API Key', value: 'my-api-key' },
-      { label: 'Auth Domain', value: 'my-project.firebaseapp.com' },
-      { label: 'Project ID', value: 'my-project-id' },
-      { label: 'Storage Bucket', value: 'my-project.appspot.com' },
-      { label: 'Messaging Sender ID', value: '123456789' },
-      { label: 'App ID', value: '1:123:web:abc' },
+      { placeholder: 'AIza...', value: 'my-api-key' },
+      { placeholder: 'project.firebaseapp.com', value: 'my-project.firebaseapp.com' },
+      { placeholder: 'my-project-id', value: 'my-project-id' },
+      { placeholder: 'project.firebasestorage.app', value: 'my-project.appspot.com' },
+      { placeholder: '123456789', value: '123456789' },
+      { placeholder: '1:123:web:abc', value: '1:123:web:abc' },
     ];
 
     for (const field of fields) {
-      const label = screen.getByText(field.label);
-      const input = label.parentElement?.querySelector('input');
-      expect(input).not.toBeNull();
-      await user.clear(input!);
-      await user.type(input!, field.value);
+      const input = screen.getByPlaceholderText(field.placeholder);
+      await user.clear(input);
+      await user.type(input, field.value);
     }
 
     await user.click(screen.getByText('Save & Continue'));
@@ -123,6 +144,33 @@ describe('WorkspaceOwnershipSetup', () => {
       storageBucket: 'my-project.appspot.com',
       messagingSenderId: '123456789',
       appId: '1:123:web:abc',
+    });
+  });
+
+  it('fills firebase fields from pasted config', async () => {
+    const user = userEvent.setup();
+    const onChooseMode = vi.fn();
+
+    render(<WorkspaceOwnershipSetup onChooseMode={onChooseMode} />);
+
+    await user.click(screen.getByText('Configure My Firebase'));
+    fireEvent.change(screen.getByLabelText('Paste firebaseConfig'), { target: { value: `const firebaseConfig = {
+      apiKey: "AIza-pasted",
+      authDomain: "budget.firebaseapp.com",
+      projectId: "budget",
+      storageBucket: "budget.firebasestorage.app",
+      messagingSenderId: "987654321",
+      appId: "1:987654321:web:def456"
+    };` } });
+    await user.click(screen.getByText('Save & Continue'));
+
+    expect(onChooseMode).toHaveBeenCalledWith('selfOwned', {
+      apiKey: 'AIza-pasted',
+      authDomain: 'budget.firebaseapp.com',
+      projectId: 'budget',
+      storageBucket: 'budget.firebasestorage.app',
+      messagingSenderId: '987654321',
+      appId: '1:987654321:web:def456',
     });
   });
 
