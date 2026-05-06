@@ -26,13 +26,12 @@ describe('PublicHome', () => {
     expect(screen.getByText('Documentation')).toBeInTheDocument();
   });
 
-  it('renders Google sign-in CTAs', () => {
+  it('renders Get Started CTAs', () => {
     render(<PublicHome authError={null} onLaunch={vi.fn()} />);
 
-    const signInButtons = screen.getAllByText('Sign in with Google');
-    expect(signInButtons.length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('Uses Google sign-in for the hosted app')).toBeInTheDocument();
-    expect(screen.getByText('Sign in to hosted app')).toBeInTheDocument();
+    const ctaButtons = screen.getAllByText('Get Started');
+    expect(ctaButtons.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Create a Nexus account, then choose hosted or self-owned setup')).toBeInTheDocument();
   });
 
   it('shows auth error when provided', () => {
@@ -59,14 +58,14 @@ describe('PublicHome', () => {
     expect(screen.queryByText(/Signed out/)).not.toBeInTheDocument();
   });
 
-  it('calls onLaunch when a Sign in with Google button is clicked', async () => {
+  it('calls onLaunch when a Get Started button is clicked', async () => {
     const user = userEvent.setup();
     const onLaunch = vi.fn();
 
     render(<PublicHome authError={null} onLaunch={onLaunch} />);
 
-    const signInButtons = screen.getAllByText('Sign in with Google');
-    await user.click(signInButtons[0]);
+    const ctaButtons = screen.getAllByText('Get Started');
+    await user.click(ctaButtons[0]);
 
     expect(onLaunch).toHaveBeenCalledTimes(1);
   });

@@ -1372,7 +1372,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       {workspaceMode === 'hosted'
                         ? 'Your portfolio data is stored in Nexus-hosted infrastructure.'
-                        : 'You are using your own Firebase project. Server-side Admin credentials are configured separately in Integrations.'}
+                        : 'Signed into Nexus. Portfolio data source: your Firebase project. Self-owned data routing requires additional configuration.'}
                     </p>
                   </div>
                 </div>

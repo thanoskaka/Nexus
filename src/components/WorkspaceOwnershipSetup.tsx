@@ -63,7 +63,7 @@ export function WorkspaceOwnershipSetup({ onChooseMode }: WorkspaceOwnershipSetu
           <h1 className="text-center text-2xl font-bold text-slate-900 dark:text-white mb-2">Configure Your Firebase</h1>
           <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-8">
             Enter your Firebase project client configuration from the Firebase Console (Project Settings &gt; General &gt; Your apps &gt; Web app).
-            These are public client-side values.
+            These are public client-side values. You still sign into Nexus with Google &mdash; your portfolio data will connect to your Firebase project.
           </p>
 
           <Card className="shadow-sm">
@@ -128,7 +128,7 @@ export function WorkspaceOwnershipSetup({ onChooseMode }: WorkspaceOwnershipSetu
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-3">Welcome to Nexus Portfolio</h1>
           <p className="text-lg text-slate-500 dark:text-slate-400">
-            Let&apos;s set up your workspace. Choose how you want Nexus to store your portfolio data.
+            You still sign into Nexus. Choose how your portfolio data is stored.
           </p>
         </div>
 
@@ -168,15 +168,15 @@ export function WorkspaceOwnershipSetup({ onChooseMode }: WorkspaceOwnershipSetu
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400">
                 <Shield className="h-5 w-5" />
               </div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Use My Own Firebase</h2>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Bring Your Own Firebase</h2>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Configure your own Firebase project so portfolio data and assets live under your full control.
+                You still sign into Nexus. Your portfolio data connects to your Firebase project under your control.
               </p>
               <ul className="mt-4 space-y-2">
                 {[
                   'Full data ownership and privacy',
-                  'Use your own Firebase free tier',
-                  'No Nexus dependency for storage',
+                  'Use your own Firebase project',
+                  'Still use Nexus app and login',
                 ].map((text) => (
                   <li key={text} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
                     <Check className="h-4 w-4 mt-0.5 text-sky-500 shrink-0" />

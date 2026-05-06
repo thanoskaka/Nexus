@@ -12,7 +12,7 @@ describe('WorkspaceOwnershipSetup', () => {
 
     expect(screen.getByText('Welcome to Nexus Portfolio')).toBeInTheDocument();
     expect(screen.getAllByText('Use Nexus Hosted').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Use My Own Firebase').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Bring Your Own Firebase').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders value propositions for hosted mode', () => {
@@ -27,8 +27,8 @@ describe('WorkspaceOwnershipSetup', () => {
     render(<WorkspaceOwnershipSetup onChooseMode={vi.fn()} />);
 
     expect(screen.getByText('Full data ownership and privacy')).toBeInTheDocument();
-    expect(screen.getByText('Use your own Firebase free tier')).toBeInTheDocument();
-    expect(screen.getByText('No Nexus dependency for storage')).toBeInTheDocument();
+    expect(screen.getByText('Use your own Firebase project')).toBeInTheDocument();
+    expect(screen.getByText('Still use Nexus app and login')).toBeInTheDocument();
   });
 
   it('calls onChooseMode with hosted when hosted button is clicked', async () => {
