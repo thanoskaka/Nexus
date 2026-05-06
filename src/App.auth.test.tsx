@@ -27,6 +27,17 @@ vi.mock('./store/ConnectedAccountsContext', () => ({
   ConnectedAccountsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('./lib/firebaseRuntime', () => ({
+  getHostedRuntime: () => ({ auth: {}, db: {}, googleProvider: {} }),
+  createSelfOwnedRuntime: () => ({ auth: {}, db: {}, googleProvider: {} }),
+  destroySelfOwnedRuntime: () => {},
+}));
+
+vi.mock('./lib/WorkspaceContext', () => ({
+  WorkspaceProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  WorkspaceContext: null,
+}));
+
 vi.mock('./lib/aiCredentialsApi', () => ({
   getAiCredentials: vi.fn(async () => ({ provider: null })),
 }));

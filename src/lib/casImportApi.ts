@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { assertHostedMode } from './workspaceGuard';
 
 export type CasMutualFundHolding = {
   folioNumber: string;
@@ -20,6 +21,7 @@ export type CasImportResponse = {
 };
 
 async function requireAuthToken() {
+  assertHostedMode('CAS Import');
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('You must be signed in to import a CAS PDF.');

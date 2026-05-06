@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { assertHostedMode } from './workspaceGuard';
 import type { ConnectedHolding, UpstoxConnectionSummary } from './connectedAccountsApi';
 import type { SplitwiseStatusResponse, SplitwiseSummaryResponse } from './splitwiseTypes';
 
@@ -27,6 +28,7 @@ export type SharedIntegrationsResponse = {
 };
 
 async function requireAuthHeaders() {
+  assertHostedMode('Shared Integrations');
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('You must be signed in to use shared integrations.');

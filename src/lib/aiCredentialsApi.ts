@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { assertHostedMode } from './workspaceGuard';
 
 export type AiProvider = 'gemini' | 'deepseek';
 
@@ -17,6 +18,7 @@ export type AiTestResult = {
 };
 
 async function requireAuthHeaders() {
+  assertHostedMode('AI Credentials');
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error('You must be signed in.');
   const token = await currentUser.getIdToken();

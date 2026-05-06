@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { assertHostedMode } from './workspaceGuard';
 
 export type AiChatRole = 'system' | 'user' | 'assistant';
 
@@ -28,6 +29,7 @@ export type AiChatResponse = {
 };
 
 async function requireAuthHeaders() {
+  assertHostedMode('AI Chat');
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('You must be signed in to ask Nexus AI.');

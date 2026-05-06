@@ -21,8 +21,9 @@ import {
   isIndianStockAsset,
   isMassiveCandidateTicker,
 } from '../lib/api';
-import { db } from '../lib/firebase';
+import { db as hostedDb } from '../lib/firebase';
 import { useAuth } from './AuthContext';
+import { WorkspaceContext } from '../lib/WorkspaceContext';
 import { applyPriceFormula } from '../lib/priceFormula';
 import {
   buildPortfolioName,
@@ -236,6 +237,8 @@ interface PortfolioCachePayload {
 
 export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const workspace = React.useContext(WorkspaceContext);
+  const db = workspace?.db ?? hostedDb;
   const { upstox, saveUpstoxOverride, refreshUpstox } = useConnectedAccounts();
   const { status: splitwiseStatus, summary: splitwiseSummary, refresh: refreshSplitwise } = useSplitwise();
   const [portfolio, setPortfolio] = useState<PortfolioDocument>(EMPTY_PORTFOLIO);
@@ -384,7 +387,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       setAccessError(null);
       setIsPortfolioLoading(false);
     }
-    void ensurePersonalPortfolio(personalPortfolioRef, user.email, user.uid);
+    void ensurePersonalPortfolio(personalPortfolioRef, user.email, user.uid, db);
 
     const portfoliosQuery = query(
       collection(db, 'portfolios'),
@@ -419,6 +422,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
           void hydratePersonalPortfolioFromLegacy(
             doc(db, 'portfolios', personalPortfolioId),
             legacySelfPortfolioCandidate.document,
+            db,
           );
         }
         const visiblePortfolios = removeLegacySelfPortfolioDuplicates(availablePortfolios, user.email);
@@ -450,7 +454,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
           const bindingKey = `${activePortfolio.id}:${user.uid}`;
           if (!memberUidBindingRef.current.has(bindingKey)) {
             memberUidBindingRef.current.add(bindingKey);
-            void bindMemberUidToPortfolio(activePortfolio.id, user.uid, normalizedEmail)
+            void bindMemberUidToPortfolio(activePortfolio.id, user.uid, normalizedEmail, db)
               .finally(() => {
                 memberUidBindingRef.current.delete(bindingKey);
               });
@@ -459,7 +463,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
         if (activePortfolio.document.currencySettingsVersion !== 1 && !migrationInFlightRef.current.has(activePortfolio.id)) {
           migrationInFlightRef.current.add(activePortfolio.id);
-          void migratePortfolioCurrencySettings(doc(db, 'portfolios', activePortfolio.id))
+          void migratePortfolioCurrencySettings(doc(db, 'portfolios', activePortfolio.id), db)
             .finally(() => {
               migrationInFlightRef.current.delete(activePortfolio.id);
             });
@@ -1172,9 +1176,9 @@ export function usePortfolio() {
   return context;
 }
 
-async function bindMemberUidToPortfolio(portfolioId: string, uid: string, email: string) {
-  const portfolioRef = doc(db, 'portfolios', portfolioId);
-  await runTransaction(db, async (transaction) => {
+async function bindMemberUidToPortfolio(portfolioId: string, uid: string, email: string, db_: typeof hostedDb = hostedDb) {
+  const portfolioRef = doc(db_, 'portfolios', portfolioId);
+  await runTransaction(db_, async (transaction) => {
     const snapshot = await transaction.get(portfolioRef);
     if (!snapshot.exists()) return;
     const current = normalizePortfolio(snapshot.data() as Partial<PortfolioDocument>);
@@ -1971,8 +1975,8 @@ function writePortfolioCache(uid: string, payload: PortfolioCachePayload) {
   }
 }
 
-async function migratePortfolioCurrencySettings(portfolioRef: ReturnType<typeof doc>) {
-  await runTransaction(db, async (transaction) => {
+async function migratePortfolioCurrencySettings(portfolioRef: ReturnType<typeof doc>, db_: typeof hostedDb = hostedDb) {
+  await runTransaction(db_, async (transaction) => {
     const snapshot = await transaction.get(portfolioRef);
     if (!snapshot.exists()) return;
     const current = normalizePortfolio(snapshot.data() as Partial<PortfolioDocument>);
@@ -1991,8 +1995,8 @@ async function migratePortfolioCurrencySettings(portfolioRef: ReturnType<typeof 
   });
 }
 
-async function ensurePersonalPortfolio(portfolioRef: ReturnType<typeof doc>, email: string, uid: string) {
-  await runTransaction(db, async (transaction) => {
+async function ensurePersonalPortfolio(portfolioRef: ReturnType<typeof doc>, email: string, uid: string, db_: typeof hostedDb = hostedDb) {
+  await runTransaction(db_, async (transaction) => {
     const snapshot = await transaction.get(portfolioRef);
     if (snapshot.exists()) return;
     transaction.set(portfolioRef, {
@@ -2005,8 +2009,9 @@ async function ensurePersonalPortfolio(portfolioRef: ReturnType<typeof doc>, ema
 async function hydratePersonalPortfolioFromLegacy(
   personalPortfolioRef: ReturnType<typeof doc>,
   legacyPortfolio: PortfolioDocument,
+  db_: typeof hostedDb = hostedDb,
 ) {
-  await runTransaction(db, async (transaction) => {
+  await runTransaction(db_, async (transaction) => {
     const snapshot = await transaction.get(personalPortfolioRef);
     const currentPersonal = snapshot.exists()
       ? normalizePortfolio(snapshot.data() as Partial<PortfolioDocument>)

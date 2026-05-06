@@ -1,7 +1,9 @@
 import { auth } from './firebase';
+import { assertHostedMode } from './workspaceGuard';
 import type { SplitwiseStatusResponse, SplitwiseSummaryResponse } from './splitwiseTypes';
 
 async function requireCurrentUserToken() {
+  assertHostedMode('Splitwise');
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('You must be signed in to use Splitwise integration.');
