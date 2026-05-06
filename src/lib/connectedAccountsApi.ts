@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { assertHostedMode } from './workspaceGuard';
 
 export type ConnectedProviderStatus =
   | 'disconnected'
@@ -69,9 +70,10 @@ export type ConnectedHolding = {
 };
 
 async function requireAuthHeaders() {
+  assertHostedMode('Connected Accounts');
   const currentUser = auth.currentUser;
   if (!currentUser) {
-    throw new Error('You must be signed in to use connected accounts.');
+    throw new Error('You must be signed in to manage connected accounts.');
   }
 
   const token = await currentUser.getIdToken();

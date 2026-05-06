@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import type { User } from 'firebase/auth';
-import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
+import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth as hostedAuth, googleProvider as hostedGoogleProvider } from '../lib/firebase';
 import { WorkspaceContext } from '../lib/WorkspaceContext';
 
@@ -66,7 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     logout: async () => {
       setAuthError(null);
-      await signOut(auth);
+      await firebaseSignOut(auth);
+      if (auth !== hostedAuth) {
+        await firebaseSignOut(hostedAuth);
+      }
     },
   }), [user, loading, authError, auth, googleProvider]);
 

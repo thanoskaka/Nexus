@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { assertHostedMode } from './workspaceGuard';
 import type { ExtractedAsset } from '../server/providers/screenshot/screenshotRoutes.js';
 
 export type { ExtractedAsset };
@@ -21,6 +22,7 @@ type ScreenshotImportCandidate = ExtractedAsset & {
 };
 
 async function requireAuthToken(): Promise<string> {
+  assertHostedMode('Screenshot Import');
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('You must be signed in to import screenshots.');

@@ -27,6 +27,7 @@ import { SampleModeProvider, useSampleMode } from './lib/samplePortfolio';
 import { WorkspaceProvider } from './lib/WorkspaceContext';
 import { createSelfOwnedRuntime, destroySelfOwnedRuntime, getHostedRuntime } from './lib/firebaseRuntime';
 import type { FirebaseRuntime } from './lib/firebaseRuntime';
+import { setWorkspaceMode } from './lib/workspaceGuard';
 
 type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
 
@@ -291,14 +292,22 @@ function WorkspaceGate({ children, selfOwnedConfig }: {
   }, [selfOwnedConfig]);
 
   useEffect(() => {
+    setWorkspaceMode(selfOwnedConfig ? 'selfOwned' : 'hosted');
     return () => {
+      setWorkspaceMode('hosted');
       if (selfOwnedConfig) {
         destroySelfOwnedRuntime();
       }
     };
   }, [selfOwnedConfig]);
 
-  return <WorkspaceProvider runtime={runtime}>{children}</WorkspaceProvider>;
+  return (
+    <WorkspaceProvider runtime={runtime}>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </WorkspaceProvider>
+  );
 }
 
 function SelfOwnedSignInGate({ onSignedIn }: { onSignedIn: () => void }) {
