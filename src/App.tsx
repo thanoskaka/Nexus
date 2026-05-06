@@ -21,7 +21,8 @@ import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
 import { SetupWizard } from './components/SetupWizard';
 import { WorkspaceOwnershipSetup } from './components/WorkspaceOwnershipSetup';
-import { getWorkspaceOwnership, saveWorkspaceOwnership } from './store/workspaceOwnership';
+import { SelfOwnedPlaceholder } from './components/SelfOwnedPlaceholder';
+import { getWorkspaceOwnership, saveWorkspaceOwnership, resetWorkspaceOwnership } from './store/workspaceOwnership';
 import type { FirebaseClientConfig, WorkspaceMode } from './store/workspaceOwnership';
 import { SampleModeProvider, useSampleMode } from './lib/samplePortfolio';
 
@@ -270,6 +271,7 @@ function AuthenticatedApp() {
 
   const [ownershipChoice, setOwnershipChoice] = useState<WorkspaceMode | null>(null);
   const [ownershipChecked, setOwnershipChecked] = useState(false);
+  const [selfOwnedConfig, setSelfOwnedConfig] = useState<FirebaseClientConfig | undefined>(undefined);
 
   useEffect(() => {
     if (prevUserRef.current && !user) {
@@ -283,6 +285,7 @@ function AuthenticatedApp() {
     const existing = getWorkspaceOwnership(user.uid);
     if (existing) {
       setOwnershipChoice(existing.mode);
+      setSelfOwnedConfig(existing.mode === 'selfOwned' ? existing.firebaseConfig : undefined);
     }
     setOwnershipChecked(true);
   }, [user]);
@@ -290,6 +293,13 @@ function AuthenticatedApp() {
   const handleOwnershipChoice = (mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
     saveWorkspaceOwnership(mode, firebaseConfig, user?.uid);
     setOwnershipChoice(mode);
+    setSelfOwnedConfig(mode === 'selfOwned' ? firebaseConfig : undefined);
+  };
+
+  const handleSwitchToHosted = () => {
+    resetWorkspaceOwnership(user?.uid);
+    setOwnershipChoice(null);
+    setSelfOwnedConfig(undefined);
   };
 
   if (loading) {
@@ -302,6 +312,10 @@ function AuthenticatedApp() {
 
   if (ownershipChecked && !ownershipChoice) {
     return <WorkspaceOwnershipSetup onChooseMode={handleOwnershipChoice} />;
+  }
+
+  if (ownershipChecked && ownershipChoice === 'selfOwned') {
+    return <SelfOwnedPlaceholder firebaseConfig={selfOwnedConfig} onSwitchToHosted={handleSwitchToHosted} />;
   }
 
   if (!ownershipChecked) {

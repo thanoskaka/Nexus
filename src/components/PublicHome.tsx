@@ -37,7 +37,7 @@ const PATHS: PathDef[] = [
     icon: Sparkles,
     title: 'Hosted (cloud)',
     desc: 'Use the hosted version with Google sign-in and auto-synced pricing. No server setup required.',
-    link: { label: 'Sign in to hosted app', onClick: undefined },
+    link: { label: 'Get Started', onClick: undefined },
     accent: 'emerald',
   },
   {
@@ -111,7 +111,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
             </div>
           </div>
           <Button onClick={onLaunch} className="rounded-full bg-[#00875A] px-5 text-white hover:bg-[#007A51]">
-            Sign in with Google
+            Get Started
           </Button>
         </div>
       </header>
@@ -139,11 +139,11 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
             </p>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Button onClick={onLaunch} className="h-12 rounded-full bg-[#00875A] px-7 text-base text-white hover:bg-[#007A51]">
-                Sign in with Google
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <span className="rounded-full border border-slate-200 bg-white/80 px-5 py-2.5 text-sm text-slate-500 shadow-sm">
-                Uses Google sign-in for the hosted app
+                Create a Nexus account, then choose hosted or self-owned setup
               </span>
             </div>
           </div>
@@ -190,11 +190,11 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-2xl font-bold text-slate-900">Ready to get started?</h2>
             <p className="mt-3 text-base text-slate-600">
-              No credit card required. Just a Google account and your portfolio data stays yours.
+              Create a Nexus account, then choose hosted or self-owned setup. No credit card required.
             </p>
             <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Button onClick={onLaunch} className="h-12 rounded-full bg-[#00875A] px-7 text-base text-white hover:bg-[#007A51]">
-                Sign in with Google
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
