@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { PortfolioProvider, usePortfolio } from './store/PortfolioContext';
 import { AuthProvider, useAuth } from './store/AuthContext';
 import { Asset } from './store/db';
@@ -21,10 +21,12 @@ import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
 import { SetupWizard } from './components/SetupWizard';
 import { WorkspaceOwnershipSetup } from './components/WorkspaceOwnershipSetup';
-import { SelfOwnedPlaceholder } from './components/SelfOwnedPlaceholder';
 import { getWorkspaceOwnership, saveWorkspaceOwnership, resetWorkspaceOwnership } from './store/workspaceOwnership';
 import type { FirebaseClientConfig, WorkspaceMode } from './store/workspaceOwnership';
 import { SampleModeProvider, useSampleMode } from './lib/samplePortfolio';
+import { WorkspaceProvider } from './lib/WorkspaceContext';
+import { createSelfOwnedRuntime, destroySelfOwnedRuntime, getHostedRuntime } from './lib/firebaseRuntime';
+import type { FirebaseRuntime } from './lib/firebaseRuntime';
 
 type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
 
@@ -43,7 +45,7 @@ function MainApp() {
   const [aiKeyConfigured, setAiKeyConfigured] = useState(false);
   const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false);
 
-  const handleStartSetupWizard = React.useCallback(() => {
+  const handleStartSetupWizard = useCallback(() => {
     setIsSetupWizardOpen(true);
   }, []);
 
@@ -70,17 +72,17 @@ function MainApp() {
     });
   };
 
-  const navigateToSettings = React.useCallback((section: string) => {
+  const navigateToSettings = useCallback((section: string) => {
     setSettingsSection(section as SettingsSection);
     setCurrentView('settings');
   }, []);
 
-  const navigateToDocs = React.useCallback(() => {
+  const navigateToDocs = useCallback(() => {
     window.history.pushState({}, '', '/docs');
     setCurrentView('docs');
   }, []);
 
-  const handleEditAsset = React.useCallback((asset: Asset) => {
+  const handleEditAsset = useCallback((asset: Asset) => {
     setEditingAsset(asset);
     setIsAddModalOpen(true);
   }, []);
@@ -263,6 +265,76 @@ function PortfolioApp() {
   return <MainApp />;
 }
 
+function AppContent() {
+  return (
+    <ConnectedAccountsProvider>
+      <SplitwiseProvider>
+        <PortfolioProvider>
+          <SampleModeProvider>
+            <PortfolioApp />
+          </SampleModeProvider>
+        </PortfolioProvider>
+      </SplitwiseProvider>
+    </ConnectedAccountsProvider>
+  );
+}
+
+function WorkspaceGate({ children, selfOwnedConfig }: {
+  children: React.ReactNode;
+  selfOwnedConfig?: FirebaseClientConfig;
+}) {
+  const runtime = useMemo<FirebaseRuntime>(() => {
+    if (selfOwnedConfig) {
+      return createSelfOwnedRuntime(selfOwnedConfig);
+    }
+    return getHostedRuntime();
+  }, [selfOwnedConfig]);
+
+  useEffect(() => {
+    return () => {
+      if (selfOwnedConfig) {
+        destroySelfOwnedRuntime();
+      }
+    };
+  }, [selfOwnedConfig]);
+
+  return <WorkspaceProvider runtime={runtime}>{children}</WorkspaceProvider>;
+}
+
+function SelfOwnedSignInGate({ onSignedIn }: { onSignedIn: () => void }) {
+  const { user, loading, authError, signInWithGoogle } = useAuth();
+
+  const initialCheckDone = useRef(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (user && !initialCheckDone.current) {
+      initialCheckDone.current = true;
+      onSignedIn();
+    }
+  }, [user, loading, onSignedIn]);
+
+  if (loading) {
+    return <CenteredState title="Connecting to your Firebase" description="Initializing connection to your Firebase project..." />;
+  }
+
+  if (!user) {
+    return (
+      <CenteredState
+        title="Sign in to your Firebase"
+        description={authError || 'Sign in with Google to authenticate against your own Firebase project. Your portfolio data will be stored there.'}
+        action={(
+          <Button onClick={() => void signInWithGoogle()} className="bg-[#00875A] hover:bg-emerald-700 text-white">
+            Sign in with Google
+          </Button>
+        )}
+      />
+    );
+  }
+
+  return null;
+}
+
 function AuthenticatedApp() {
   const { user, loading, authError, signInWithGoogle } = useAuth();
 
@@ -272,6 +344,7 @@ function AuthenticatedApp() {
   const [ownershipChoice, setOwnershipChoice] = useState<WorkspaceMode | null>(null);
   const [ownershipChecked, setOwnershipChecked] = useState(false);
   const [selfOwnedConfig, setSelfOwnedConfig] = useState<FirebaseClientConfig | undefined>(undefined);
+  const [selfOwnedSignInDone, setSelfOwnedSignInDone] = useState(false);
 
   useEffect(() => {
     if (prevUserRef.current && !user) {
@@ -290,17 +363,22 @@ function AuthenticatedApp() {
     setOwnershipChecked(true);
   }, [user]);
 
-  const handleOwnershipChoice = (mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
+  const handleOwnershipChoice = useCallback((mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
     saveWorkspaceOwnership(mode, firebaseConfig, user?.uid);
     setOwnershipChoice(mode);
     setSelfOwnedConfig(mode === 'selfOwned' ? firebaseConfig : undefined);
-  };
+  }, [user?.uid]);
 
-  const handleSwitchToHosted = () => {
+  const handleSwitchToHosted = useCallback(() => {
     resetWorkspaceOwnership(user?.uid);
     setOwnershipChoice(null);
     setSelfOwnedConfig(undefined);
-  };
+    setSelfOwnedSignInDone(false);
+  }, [user?.uid]);
+
+  const handleSelfOwnedSignInDone = useCallback(() => {
+    setSelfOwnedSignInDone(true);
+  }, []);
 
   if (loading) {
     return <CenteredState title="Loading portfolio" description="Checking your sign-in session..." />;
@@ -314,24 +392,32 @@ function AuthenticatedApp() {
     return <WorkspaceOwnershipSetup onChooseMode={handleOwnershipChoice} />;
   }
 
-  if (ownershipChecked && ownershipChoice === 'selfOwned') {
-    return <SelfOwnedPlaceholder firebaseConfig={selfOwnedConfig} onSwitchToHosted={handleSwitchToHosted} />;
+  if (ownershipChecked && ownershipChoice === 'selfOwned' && selfOwnedConfig && !selfOwnedSignInDone) {
+    return (
+      <WorkspaceGate selfOwnedConfig={selfOwnedConfig}>
+        <SelfOwnedSignInGate onSignedIn={handleSelfOwnedSignInDone} />
+      </WorkspaceGate>
+    );
   }
 
   if (!ownershipChecked) {
     return null;
   }
 
+  const shouldUseSelfOwned = ownershipChoice === 'selfOwned' && selfOwnedConfig && selfOwnedSignInDone;
+
+  if (shouldUseSelfOwned) {
+    return (
+      <WorkspaceGate selfOwnedConfig={selfOwnedConfig}>
+        <AppContent />
+      </WorkspaceGate>
+    );
+  }
+
   return (
-    <ConnectedAccountsProvider>
-      <SplitwiseProvider>
-        <PortfolioProvider>
-          <SampleModeProvider>
-            <PortfolioApp />
-          </SampleModeProvider>
-        </PortfolioProvider>
-      </SplitwiseProvider>
-    </ConnectedAccountsProvider>
+    <WorkspaceGate>
+      <AppContent />
+    </WorkspaceGate>
   );
 }
 

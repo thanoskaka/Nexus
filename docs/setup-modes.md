@@ -87,6 +87,70 @@ npm start          # standalone Express server
 npx vercel --prod
 ```
 
+## Bring Your Own Firebase (Self-Owned Mode)
+
+When you choose "Bring Your Own Firebase" in the ownership setup, Nexus uses your Firebase project for authentication and Firestore portfolio data instead of the hosted infrastructure.
+
+### What Self-Owned Mode Activates
+
+- Google sign-in authenticates against **your** Firebase Auth project
+- All portfolio data (assets, settings, members) reads/writes to **your** Firestore database
+- No portfolio data touches the hosted Firestore
+- Your Firebase client config is stored in localStorage (keyed by your hosted user uid)
+
+### Required Setup in Your Firebase Console
+
+1. **Enable Authentication > Google provider**
+   - Go to Firebase Console > Authentication > Sign-in method
+   - Enable the Google provider
+   - Add your app domain to **Authorized domains** (e.g., `localhost`, `nexus-phi-inky.vercel.app`)
+
+2. **Create Firestore database**
+   - Go to Firebase Console > Firestore Database > Create database
+   - Choose a location and start in test mode (or locked mode if you want to configure rules first)
+
+3. **Firestore security rules** (recommended for production):
+   ```firestore
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /portfolios/{portfolioId} {
+         allow read, write: if request.auth != null
+           && request.auth.uid in resource.data.memberEmails
+           || request.auth.token.email in resource.data.memberEmails;
+         allow create: if request.auth != null;
+       }
+     }
+   }
+   ```
+
+### Client Config vs Admin Credentials
+
+| Credential Type | Where Used | Security Model |
+|----------------|------------|----------------|
+| `FirebaseClientConfig` (apiKey, authDomain, etc.) | Client-side browser | Public by design; safe to store in localStorage |
+| `FIREBASE_ADMIN_*` (private key, client email) | Server-side only | **Never expose to browser** |
+
+The Firebase client config values are public and safe in localStorage — they identify your Firebase project but do not authorize write access. Server Admin private keys must **never** be stored in the browser.
+
+### Server-Side Limitations for Self-Owned Mode
+
+Self-owned mode is currently **client-side only**. The following server integrations cannot use your self-owned Firebase Admin credentials:
+
+| Feature | Behavior in Self-Owned Mode |
+|---------|---------------------------|
+| AI Chat (`/api/ai/chat`) | Token verification and Firestore reads use hosted Firebase Admin. Not compatible with self-owned. Returns 401. |
+| Upstox connected accounts | Uses hosted Firebase Admin for token verification. Returns 401 for self-owned tokens. |
+| Splitwise integration | Uses hosted Firebase Admin for token verification. Returns 401 for self-owned tokens. |
+| AI credentials storage | Uses hosted Firebase Admin. Returns 401 for self-owned tokens. |
+| CAS import | Uses hosted Firebase Admin. Returns 401 for self-owned tokens. |
+| Screenshot import | Uses hosted Firebase Admin. Returns 401 for self-owned tokens. |
+| Shared integrations | Uses hosted Firestore. Self-owned users should not use shared integrations until supported. |
+
+**Workaround:** You can self-host the full Nexus backend with your Firebase Admin credentials. This provides server-side support for all integrations. See [Self-Hosted](#self-hosted).
+
+**Future**: Once Nexus supports per-request Firebase Admin resolution (via the user's ID token tenant), these routes may become self-owned compatible.
+
 ## Hosted
 
 The official managed Nexus deployment (`nexus-phi-inky.vercel.app`).

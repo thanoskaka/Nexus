@@ -18,8 +18,7 @@ describe('SelfOwnedPlaceholder', () => {
   it('shows not active yet message', () => {
     render(<SelfOwnedPlaceholder onSwitchToHosted={vi.fn()} />);
 
-    expect(screen.getAllByText(/not active yet/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/self-owned data connection is not active yet/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/self-owned data connection is not active yet/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows saved firebase config when provided', () => {

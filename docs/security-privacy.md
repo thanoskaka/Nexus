@@ -30,6 +30,23 @@ Examples:
 - Upstox connected accounts
 - Splitwise integration
 
+## Self-Owned Firebase Security Model
+
+When using "Bring Your Own Firebase" mode:
+
+- **FirebaseClientConfig is public by design.** The apiKey, authDomain, projectId, storageBucket, messagingSenderId, and appId values are browser-visible in any Firebase web app. They identify your Firebase project but do not authorize access — Firestore security rules gate reads/writes based on authenticated user identity.
+
+- **The config is stored in localStorage** keyed by your hosted Nexus user uid. This is the same pattern as Firebase SDK persistence. The config is not sent to any server.
+
+- **Google sign-in happens against your Firebase project.** The ID token is issued by your project's Firebase Auth, and Firestore security rules use this token to authorize requests.
+
+- **Server-side Admin credentials are separate.** The server's `FIREBASE_ADMIN_*` env vars are never exposed to the client. Self-owned mode does not use the server's Firebase Admin — all data operations happen client-side via the Firebase Web SDK.
+
+### What Self-Owned Does NOT Protect Against
+
+- The app (Nexus hosted deployment) still serves the JavaScript that reads/writes your Firestore. If you do not trust the hosted deployment, self-host Nexus instead.
+- The workspace ownership choice (hosted vs self-owned) is stored in your browser's localStorage. Clearing localStorage or using a different device will reset this choice.
+
 ## Diagnostics Safety
 
 Setup diagnostics should be public-safe:
