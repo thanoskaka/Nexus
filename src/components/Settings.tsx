@@ -19,7 +19,7 @@ import { SYSTEM_ASSET_CLASSES } from '../lib/systemAssetClasses';
 import { Input } from './ui/input';
 import { Select } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES, type BrokerConnectionConfig, type UserBrokerConnections, type UserProviderOverrides } from '../store/userPreferences';
+import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES, DEFAULT_WORKSPACE_PREFERENCES, type BrokerConnectionConfig, type UserBrokerConnections, type UserProviderOverrides, type WorkspacePreferences } from '../store/userPreferences';
 import { useSplitwise } from '../store/SplitwiseContext';
 import { useConnectedAccounts } from '../store/ConnectedAccountsContext';
 import type { CurrencyAmount } from '../lib/splitwiseTypes';
@@ -50,7 +50,7 @@ function getTabForSection(section?: SettingsSection): SettingsTab {
   }
 }
 
-export function Settings({ initialSection }: { initialSection?: SettingsSection } = {}) {
+export function Settings({ initialSection, onStartSetupWizard }: { initialSection?: SettingsSection; onStartSetupWizard?: () => void } = {}) {
   const showDeveloperMigrationTools =
     typeof window !== 'undefined' &&
     (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
@@ -86,6 +86,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     disconnectMemberIntegration,
     refreshMemberIntegration,
     setImportProgress,
+    workspacePreferences,
+    updateWorkspacePreferences,
   } = usePortfolio();
   const { user } = useAuth();
   const {
@@ -122,6 +124,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const [sharedProviderForm, setSharedProviderForm] = React.useState<PriceProviderSettings>(DEFAULT_PRICE_PROVIDER_SETTINGS);
   const [overrideForm, setOverrideForm] = React.useState<UserProviderOverrides>(DEFAULT_USER_PROVIDER_OVERRIDES);
   const [brokerForm, setBrokerForm] = React.useState<UserBrokerConnections>(DEFAULT_BROKER_CONNECTIONS);
+  const [workspaceForm, setWorkspaceForm] = React.useState<WorkspacePreferences>(DEFAULT_WORKSPACE_PREFERENCES);
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [inviteRole, setInviteRole] = React.useState<'owner' | 'partner'>('partner');
   const [migrationPreview, setMigrationPreview] = React.useState<{
@@ -1011,6 +1014,24 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     setAlertDialog({ open: true, title: 'Using System Routing', description: 'This device will keep using the shared/default India stock routing.' });
   };
 
+  const saveWorkspacePreferences = async () => {
+    await updateWorkspacePreferences(workspaceForm);
+    setAlertDialog({ open: true, title: 'Workspace Saved', description: 'Your workspace preferences have been updated.' });
+  };
+
+  const resetWorkspacePreferences = () => {
+    setConfirmDialog({
+      open: true,
+      title: 'Reset Workspace Settings',
+      description: 'This will reset workspace name, currency, region, label and market preference to their defaults. Your portfolio data is not affected.',
+      onConfirm: () => {
+        setWorkspaceForm(DEFAULT_WORKSPACE_PREFERENCES);
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        setAlertDialog({ open: true, title: 'Workspace Reset', description: 'Workspace settings have been reset to defaults. Save to persist these changes.' });
+      },
+    });
+  };
+
   const handleInvite = async () => {
     const normalizedEmail = inviteEmail.trim().toLowerCase();
     if (!normalizedEmail) return;
@@ -1118,7 +1139,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     { id: 'structure', label: 'Structure', description: 'Classes and organization' },
     { id: 'data', label: 'Data', description: 'Imports, sync, migration' },
     { id: 'integrations', label: 'Integrations', description: 'Connected accounts' },
-    { id: 'workspace', label: 'Workspace', description: 'Ownership setup' },
+    { id: 'workspace', label: 'Workspace', description: 'Portfolio identity and region' },
     { id: 'credentials', label: 'Credentials', description: 'Provider API keys' },
   ];
 
@@ -2044,11 +2065,104 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
       </div>
       )}
 
+      {activeTab === 'workspace' && (
+        <Card id="workspace" className="border-none shadow-sm rounded-2xl mb-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Globe2 className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+              <CardTitle>Workspace Settings</CardTitle>
+            </div>
+            <CardDescription>Configure how your portfolio identifies itself and what defaults to use across the app.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Workspace / Portfolio Name</label>
+                <Input
+                  value={workspaceForm.workspaceName}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, workspaceName: event.target.value }))}
+                  placeholder="e.g. Family Wealth Tracker"
+                />
+                <p className="text-xs text-slate-500">Shown in the header and portfolio selector when set.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Base Currency</label>
+                <Select
+                  value={workspaceForm.baseCurrency}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, baseCurrency: event.target.value as 'CAD' | 'INR' | 'USD' }))}
+                >
+                  <option value="CAD">CAD</option>
+                  <option value="INR">INR</option>
+                  <option value="USD">USD</option>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Primary Country / Region</label>
+                <Select
+                  value={workspaceForm.primaryRegion}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, primaryRegion: event.target.value }))}
+                >
+                  <option value="Canada">Canada</option>
+                  <option value="India">India</option>
+                  <option value="US">United States</option>
+                  <option value="Global">Global</option>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Household / Family Label</label>
+                <Input
+                  value={workspaceForm.householdLabel}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, householdLabel: event.target.value }))}
+                  placeholder="e.g. The Smith Family"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Default Market Preference</label>
+                <Select
+                  value={workspaceForm.defaultMarketPreference}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, defaultMarketPreference: event.target.value as 'India' | 'Canada' | 'US' | 'Global' }))}
+                >
+                  <option value="Canada">Canada</option>
+                  <option value="India">India</option>
+                  <option value="US">United States</option>
+                  <option value="Global">Global</option>
+                </Select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <Button onClick={() => void saveWorkspacePreferences()} className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]">
+                Save Workspace Settings
+              </Button>
+              <Button variant="outline" onClick={resetWorkspacePreferences} className="rounded-full">
+                <RotateCw className="h-4 w-4 mr-1.5" />
+                Reset to Defaults
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {activeTab === 'integrations' && (
         <div id="integrations" className="space-y-6">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Integrations</h2>
-            <p className="text-slate-500 dark:text-slate-400">Connect cloud accounts to enrich Nexus with external financial context.</p>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Integrations</h2>
+                <p className="text-slate-500 dark:text-slate-400">Connect cloud accounts to enrich Nexus with external financial context.</p>
+              </div>
+              {onStartSetupWizard && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full h-9 px-3 text-xs border-[#00875A]/30 text-[#00875A] hover:bg-[#00875A]/10 dark:border-emerald-800 dark:text-emerald-400 shrink-0"
+                  onClick={onStartSetupWizard}
+                  data-testid="settings-launch-wizard"
+                >
+                  <Wand2 className="h-3.5 w-3.5 mr-1" />
+                  Guided Setup
+                </Button>
+              )}
+            </div>
           </div>
 
           <SetupHealthCard />
