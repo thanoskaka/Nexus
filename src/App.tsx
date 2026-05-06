@@ -16,8 +16,13 @@ import { parseInitialViewFromQuery } from './lib/appNavigation';
 import { PublicHome } from './components/PublicHome';
 import { CenteredState } from './components/CenteredState';
 import { GettingStartedChecklist } from './components/GettingStartedChecklist';
+import { NextActionPanel } from './components/NextActionPanel';
 import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
+import { WorkspaceOwnershipSetup } from './components/WorkspaceOwnershipSetup';
+import { getWorkspaceOwnership, saveWorkspaceOwnership } from './store/workspaceOwnership';
+import type { FirebaseClientConfig, WorkspaceMode } from './store/workspaceOwnership';
+import { SampleModeProvider, useSampleMode } from './lib/samplePortfolio';
 
 type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
 
@@ -26,6 +31,7 @@ function MainApp() {
   const { assets, refreshPrices, isRefreshing, portfolios, activePortfolioId, setActivePortfolioId } = usePortfolio();
   const { upstox } = useConnectedAccounts();
   const { status: splitwiseStatus } = useSplitwise();
+  const { isSampleMode, disableSampleMode } = useSampleMode();
   const initialView = parseInitialViewFromQuery();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
@@ -33,6 +39,11 @@ function MainApp() {
   const [settingsSection, setSettingsSection] = useState<SettingsSection | undefined>(initialView.settingsSection);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [aiKeyConfigured, setAiKeyConfigured] = useState(false);
+  const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false);
+
+  const handleStartSetupWizard = React.useCallback(() => {
+    setIsSetupWizardOpen(true);
+  }, []);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem('nexus-theme');
@@ -180,13 +191,30 @@ function MainApp() {
               aiKeyConfigured={aiKeyConfigured}
               onNavigateToSettings={navigateToSettings}
               onNavigateToDocs={navigateToDocs}
+              onStartSetupWizard={handleStartSetupWizard}
             />
-            <Dashboard onAddAsset={() => setIsAddModalOpen(true)} />
+            <NextActionPanel
+              assetsCount={assets.length}
+              upstoxConnected={upstoxConnected}
+              splitwiseConnected={splitwiseConnected}
+              aiKeyConfigured={aiKeyConfigured}
+              userUid={user?.uid}
+              onNavigateToSettings={navigateToSettings}
+              onNavigateToDocs={navigateToDocs}
+              onAddAsset={() => setIsAddModalOpen(true)}
+            />
+            <Dashboard onAddAsset={() => {
+              if (isSampleMode) disableSampleMode();
+              setIsAddModalOpen(true);
+            }} />
           </>
         )}
-        {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => setIsAddModalOpen(true)} />}
-        {currentView === 'settings' && <Settings initialSection={settingsSection} />}
-        {currentView === 'docs' && <Docs onBack={() => setCurrentView('dashboard')} />}
+        {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => {
+          if (isSampleMode) disableSampleMode();
+          setIsAddModalOpen(true);
+        }} />}
+        {currentView === 'settings' && <Settings initialSection={settingsSection} onStartSetupWizard={handleStartSetupWizard} />}
+        {currentView === 'docs' && <Docs onBack={() => setCurrentView('dashboard')} onStartSetupWizard={handleStartSetupWizard} />}
       </main>
 
       <AddAssetModal
@@ -198,6 +226,12 @@ function MainApp() {
         assetToEdit={editingAsset}
       />
       <ImportProgressOverlay />
+      <SetupWizard
+        open={isSetupWizardOpen}
+        onClose={() => setIsSetupWizardOpen(false)}
+        onNavigateToSettings={navigateToSettings}
+        onNavigateToDocs={navigateToDocs}
+      />
     </div>
   );
 }
@@ -209,12 +243,29 @@ function AuthenticatedApp() {
   const prevUserRef = useRef(user);
   const [signedOut, setSignedOut] = useState(false);
 
+  const [ownershipChoice, setOwnershipChoice] = useState<WorkspaceMode | null>(null);
+  const [ownershipChecked, setOwnershipChecked] = useState(false);
+
   useEffect(() => {
     if (prevUserRef.current && !user) {
       setSignedOut(true);
     }
     prevUserRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const existing = getWorkspaceOwnership(user.uid);
+    if (existing) {
+      setOwnershipChoice(existing.mode);
+    }
+    setOwnershipChecked(true);
+  }, [user]);
+
+  const handleOwnershipChoice = (mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
+    saveWorkspaceOwnership(mode, firebaseConfig, user?.uid);
+    setOwnershipChoice(mode);
+  };
 
   if (loading || (user && isPortfolioLoading)) {
     return <CenteredState title="Loading portfolio" description="Connecting to Firebase and syncing your shared portfolio..." />;
@@ -238,6 +289,14 @@ function AuthenticatedApp() {
     );
   }
 
+  if (ownershipChecked && !ownershipChoice) {
+    return <WorkspaceOwnershipSetup onChooseMode={handleOwnershipChoice} />;
+  }
+
+  if (!ownershipChecked) {
+    return null;
+  }
+
   return <MainApp />;
 }
 
@@ -254,6 +313,7 @@ export default function App() {
     active: typeof window !== 'undefined' && window.location.pathname.startsWith('/docs'),
     section: getDocSectionFromPath(),
   }));
+  const [standaloneWizardOpen, setStandaloneWizardOpen] = useState(false);
 
   useEffect(() => {
     const handlePop = () => {
@@ -271,8 +331,22 @@ export default function App() {
     setDocRoute({ active: false, section: undefined });
   };
 
+  const handleDocWizard = () => {
+    closeDocs();
+    setStandaloneWizardOpen(true);
+  };
+
+  const handleCloseStandaloneWizard = () => {
+    setStandaloneWizardOpen(false);
+  };
+
   if (docRoute.active) {
-    return <Docs initialSection={docRoute.section as any} onBack={closeDocs} />;
+    return (
+      <>
+        <Docs initialSection={docRoute.section as any} onBack={closeDocs} onStartSetupWizard={handleDocWizard} />
+        <SetupWizard open={standaloneWizardOpen} onClose={handleCloseStandaloneWizard} />
+      </>
+    );
   }
 
   return (
@@ -280,7 +354,11 @@ export default function App() {
       <ConnectedAccountsProvider>
         <SplitwiseProvider>
           <PortfolioProvider>
-            <AuthenticatedApp />
+            <SampleModeProvider>
+              <SampleModeProvider>
+              <AuthenticatedApp />
+            </SampleModeProvider>
+            </SampleModeProvider>
           </PortfolioProvider>
         </SplitwiseProvider>
       </ConnectedAccountsProvider>

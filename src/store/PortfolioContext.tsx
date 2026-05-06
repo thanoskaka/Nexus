@@ -44,13 +44,17 @@ import {
 import {
   DEFAULT_BROKER_CONNECTIONS,
   DEFAULT_USER_PROVIDER_OVERRIDES,
+  DEFAULT_WORKSPACE_PREFERENCES,
   type UserBrokerConnections,
   type UserProviderOverrides,
+  type WorkspacePreferences,
   getUserBrokerConnectionsKey,
   getUserProviderOverridesKey,
+  getWorkspacePreferencesKey,
   mergePriceProviderSettings,
   normalizeUserBrokerConnections,
   normalizeUserProviderOverrides,
+  normalizeWorkspacePreferences,
 } from './userPreferences';
 import { useConnectedAccounts } from './ConnectedAccountsContext';
 import { useSplitwise } from './SplitwiseContext';
@@ -91,6 +95,8 @@ export interface PortfolioContextType {
   updateUserProviderOverrides: (settings: UserProviderOverrides) => Promise<void>;
   userBrokerConnections: UserBrokerConnections;
   updateUserBrokerConnections: (settings: UserBrokerConnections) => Promise<void>;
+  workspacePreferences: WorkspacePreferences;
+  updateWorkspacePreferences: (prefs: WorkspacePreferences) => Promise<void>;
   addAsset: (asset: Omit<Asset, 'id'>) => Promise<void>;
   duplicateAsset: (id: string) => Promise<void>;
   updateAsset: (asset: Asset) => Promise<void>;
@@ -238,6 +244,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [rates, setRates] = useState<Record<string, number> | null>(null);
   const [userProviderOverrides, setUserProviderOverrides] = useState<UserProviderOverrides>(DEFAULT_USER_PROVIDER_OVERRIDES);
   const [userBrokerConnections, setUserBrokerConnections] = useState<UserBrokerConnections>(DEFAULT_BROKER_CONNECTIONS);
+  const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(DEFAULT_WORKSPACE_PREFERENCES);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshQueue, setRefreshQueue] = useState<{ pending: number; nextRunAt: number | null; provider: 'massive' | 'alphavantage' | null }>({
     pending: 0,
@@ -346,6 +353,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       setSharedIntegrationMembers([]);
       setUserProviderOverrides(DEFAULT_USER_PROVIDER_OVERRIDES);
       setUserBrokerConnections(DEFAULT_BROKER_CONNECTIONS);
+      setWorkspacePreferences(DEFAULT_WORKSPACE_PREFERENCES);
       setBulkRefreshState(EMPTY_BULK_REFRESH_STATE);
       setRefreshQueue({ pending: 0, nextRunAt: null, provider: null });
       setHasAccess(false);
@@ -520,14 +528,17 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     void Promise.all([
       getSetting<UserProviderOverrides>(getUserProviderOverridesKey(user.uid)),
       getSetting<UserBrokerConnections>(getUserBrokerConnectionsKey(user.uid)),
-    ]).then(([storedOverrides, storedBrokerConnections]) => {
+      getSetting<WorkspacePreferences>(getWorkspacePreferencesKey(user.uid)),
+    ]).then(([storedOverrides, storedBrokerConnections, storedWorkspace]) => {
       if (cancelled) return;
       setUserProviderOverrides(normalizeUserProviderOverrides(storedOverrides));
       setUserBrokerConnections(normalizeUserBrokerConnections(storedBrokerConnections));
+      setWorkspacePreferences(normalizeWorkspacePreferences(storedWorkspace));
     }).catch(() => {
       if (cancelled) return;
       setUserProviderOverrides(DEFAULT_USER_PROVIDER_OVERRIDES);
       setUserBrokerConnections(DEFAULT_BROKER_CONNECTIONS);
+      setWorkspacePreferences(DEFAULT_WORKSPACE_PREFERENCES);
     });
 
     return () => {
@@ -596,6 +607,13 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     setUserBrokerConnections(normalized);
     if (!user?.uid) return;
     await saveSetting(getUserBrokerConnectionsKey(user.uid), normalized);
+  };
+
+  const updateWorkspacePreferences = async (prefs: WorkspacePreferences) => {
+    const normalized = normalizeWorkspacePreferences(prefs);
+    setWorkspacePreferences(normalized);
+    if (!user?.uid) return;
+    await saveSetting(getWorkspacePreferencesKey(user.uid), normalized);
   };
 
   const disconnectMemberIntegration = React.useCallback(async (

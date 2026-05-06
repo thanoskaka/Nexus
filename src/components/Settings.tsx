@@ -3,8 +3,19 @@ import Papa from 'papaparse';
 import { usePortfolio } from '../store/PortfolioContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera } from 'lucide-react';
+import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson, FlaskConical, Wand2 } from 'lucide-react';
+import {
+  buildExportPayload,
+  computeImportResult,
+  downloadExportFile,
+  getImportPreview,
+  validateImportPayload,
+  type ImportMode,
+  type ImportPreview,
+  type NexusExportData,
+} from '../lib/dataPortability';
 import { GoogleDriveSync } from './GoogleDriveSync';
+import { useSampleMode } from '../lib/samplePortfolio';
 import { SyncHistoryPanel } from './SyncHistoryPanel';
 import { Asset, AssetClassDef, getAllAssetClasses, getAllAssets, getSetting } from '../store/db';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -12,20 +23,25 @@ import { DEFAULT_PRICE_PROVIDER_SETTINGS, PriceProvider, PriceProviderSettings, 
 import { AddAssetClassModal } from './AddAssetClassModal';
 import { ScreenshotImportModal } from './ScreenshotImportModal';
 import { AiSettingsCard } from './AiSettingsCard';
+import { ProviderCredentialsSection } from './ProviderCredentialsSection';
 import { AssetClassLogo } from '../lib/assetClassBranding';
 import { SYSTEM_ASSET_CLASSES } from '../lib/systemAssetClasses';
 import { Input } from './ui/input';
 import { Select } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES, type BrokerConnectionConfig, type UserBrokerConnections, type UserProviderOverrides } from '../store/userPreferences';
+import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES, DEFAULT_WORKSPACE_PREFERENCES, type BrokerConnectionConfig, type UserBrokerConnections, type UserProviderOverrides, type WorkspacePreferences } from '../store/userPreferences';
 import { useSplitwise } from '../store/SplitwiseContext';
 import { useConnectedAccounts } from '../store/ConnectedAccountsContext';
 import type { CurrencyAmount } from '../lib/splitwiseTypes';
 import { useAuth } from '../store/AuthContext';
 import { SetupHealthCard } from './SetupHealthCard';
+import { ProviderCapabilityMatrix } from './ProviderCapabilityMatrix';
+import { getWorkspaceOwnership, resetWorkspaceOwnership, type WorkspaceMode } from '../store/workspaceOwnership';
+import { SetupHistoryPanel } from './SetupHistoryPanel';
+import { recordEvent, getSetupHistory, clearSetupHistory } from '../store/setupHistory';
 
-export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations';
-type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations';
+export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
+type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'credentials' | 'workspace';
 
 function getTabForSection(section?: SettingsSection): SettingsTab {
   switch (section) {
@@ -39,6 +55,8 @@ function getTabForSection(section?: SettingsSection): SettingsTab {
     case 'data-management':
     case 'cloud-sync':
       return 'data';
+    case 'workspace':
+      return 'workspace';
     case 'integrations':
       return 'integrations';
     default:
@@ -46,7 +64,7 @@ function getTabForSection(section?: SettingsSection): SettingsTab {
   }
 }
 
-export function Settings({ initialSection }: { initialSection?: SettingsSection } = {}) {
+export function Settings({ initialSection, onStartSetupWizard }: { initialSection?: SettingsSection; onStartSetupWizard?: () => void } = {}) {
   const showDeveloperMigrationTools =
     typeof window !== 'undefined' &&
     (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
@@ -82,6 +100,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     disconnectMemberIntegration,
     refreshMemberIntegration,
     setImportProgress,
+    workspacePreferences,
+    updateWorkspacePreferences,
   } = usePortfolio();
   const { user } = useAuth();
   const {
@@ -101,9 +121,20 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     refreshUpstox,
     disconnectUpstox,
   } = useConnectedAccounts();
+  const { isSampleMode, sampleData, disableSampleMode } = useSampleMode();
+  const displayAssets = isSampleMode ? sampleData.assets : assets;
+  const displayAssetClasses = isSampleMode ? sampleData.assetClasses : assetClasses;
+  const displayMembers = isSampleMode ? sampleData.members : members;
+
   const indiaFileRef = useRef<HTMLInputElement>(null);
   const canadaFileRef = useRef<HTMLInputElement>(null);
   const classesFileRef = useRef<HTMLInputElement>(null);
+  const importJsonFileRef = useRef<HTMLInputElement>(null);
+
+  // Data portability state
+  const [importPreview, setImportPreview] = React.useState<ImportPreview | null>(null);
+  const [importMode, setImportMode] = React.useState<ImportMode>('merge');
+  const [importPayloadData, setImportPayloadData] = React.useState<NexusExportData | null>(null);
 
   const [confirmDialog, setConfirmDialog] = React.useState<{ open: boolean, title: string, description: string, onConfirm: () => void }>({ open: false, title: '', description: '', onConfirm: () => {} });
   const [alertDialog, setAlertDialog] = React.useState<{ open: boolean, title: string, description: string }>({ open: false, title: '', description: '' });
@@ -113,6 +144,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const [sharedProviderForm, setSharedProviderForm] = React.useState<PriceProviderSettings>(DEFAULT_PRICE_PROVIDER_SETTINGS);
   const [overrideForm, setOverrideForm] = React.useState<UserProviderOverrides>(DEFAULT_USER_PROVIDER_OVERRIDES);
   const [brokerForm, setBrokerForm] = React.useState<UserBrokerConnections>(DEFAULT_BROKER_CONNECTIONS);
+  const [workspaceForm, setWorkspaceForm] = React.useState<WorkspacePreferences>(DEFAULT_WORKSPACE_PREFERENCES);
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [inviteRole, setInviteRole] = React.useState<'owner' | 'partner'>('partner');
   const [migrationPreview, setMigrationPreview] = React.useState<{
@@ -146,6 +178,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const lastIntegrationAutoRefreshRef = React.useRef<number>(0);
   const [teamIntegrationBusyKey, setTeamIntegrationBusyKey] = React.useState<string | null>(null);
   const [selectedIntegrationMemberKey, setSelectedIntegrationMemberKey] = React.useState<string>('mine');
+  const [workspaceMode, setWorkspaceMode] = React.useState<WorkspaceMode | null>(null);
+  const [workspaceResetBusy, setWorkspaceResetBusy] = React.useState(false);
   const canEditCurrencies = currentUserRole === 'owner';
 
   const formatCurrencyAmount = React.useCallback((entry: CurrencyAmount) => {
@@ -243,6 +277,10 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   }, [userBrokerConnections]);
 
   React.useEffect(() => {
+    setWorkspaceForm(workspacePreferences);
+  }, [workspacePreferences]);
+
+  React.useEffect(() => {
     setPersonalPricingMode(userProviderOverrides.enabled ? 'override' : 'system');
   }, [userProviderOverrides.enabled]);
 
@@ -265,6 +303,27 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     if (!initialSection) return;
     setActiveTab(getTabForSection(initialSection));
   }, [initialSection]);
+
+  React.useEffect(() => {
+    const ownership = getWorkspaceOwnership(user?.uid);
+    setWorkspaceMode(ownership?.mode || null);
+  }, [user?.uid]);
+
+  const handleResetWorkspace = () => {
+    setConfirmDialog({
+      open: true,
+      title: 'Reset Workspace Ownership',
+      description: 'This will clear your workspace ownership choice. On your next visit, you will be asked to choose between Nexus Hosted and self-owned Firebase again. Your existing portfolio data is not affected — this only controls how Nexus connects to Firebase.',
+      onConfirm: () => {
+        setWorkspaceResetBusy(true);
+        resetWorkspaceOwnership(user?.uid);
+        setWorkspaceMode(null);
+        setWorkspaceResetBusy(false);
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        setAlertDialog({ open: true, title: 'Workspace Reset', description: 'Your workspace ownership preference has been cleared. You will be asked to choose again on your next visit.' });
+      },
+    });
+  };
 
   React.useEffect(() => {
     if (activeTab !== 'integrations') return;
@@ -479,6 +538,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
       csv,
       targetCountry === 'India' ? 'india_holdings_export.csv' : 'canada_holdings_export.csv',
     );
+    recordEvent('csv_export_run', `Exported ${countryAssets.length} ${targetCountry} holdings as CSV`, 'success');
+    refreshSetupHistory();
   };
 
   const downloadCSV = (csv: string, filename: string) => {
@@ -856,6 +917,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           if (targetCountry === 'India' && indiaFileRef.current) indiaFileRef.current.value = '';
           if (targetCountry === 'Canada' && canadaFileRef.current) canadaFileRef.current.value = '';
           setAlertDialog({ open: true, title: 'Import Successful', description: `Successfully imported ${newAssets.length} ${targetCountry} holdings! Prices can be refreshed afterwards.` });
+          recordEvent('csv_import_run', `Imported ${newAssets.length} ${targetCountry} holdings from CSV`, 'success');
+          refreshSetupHistory();
         } catch (error) {
           setImportProgress({ visible: false, current: 0, total: 0, message: '' });
           setAlertDialog({
@@ -906,6 +969,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           setImportProgress({ visible: false, current: 0, total: 0, message: '' });
           if (classesFileRef.current) classesFileRef.current.value = '';
           setAlertDialog({ open: true, title: 'Import Successful', description: `Successfully imported ${newClasses.length} asset classes!` });
+          recordEvent('csv_import_run', `Imported ${newClasses.length} asset classes from CSV`, 'success');
+          refreshSetupHistory();
         } catch (error) {
           setImportProgress({ visible: false, current: 0, total: 0, message: '' });
           setAlertDialog({
@@ -920,7 +985,7 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
 
   const owners = Array.from(new Set(assets.map(a => a.owner).filter(Boolean))).map(String);
   
-  const allAssetClasses = [...SYSTEM_ASSET_CLASSES, ...assetClasses];
+  const allAssetClasses = [...SYSTEM_ASSET_CLASSES, ...displayAssetClasses];
 
   // Group asset classes by country
   const assetClassesByCountry = allAssetClasses.reduce((acc, cls) => {
@@ -944,21 +1009,29 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
   const saveSharedProviderPreferences = async () => {
     await updatePriceProviderSettings(sharedProviderForm);
     setAlertDialog({ open: true, title: 'Saved', description: 'Shared provider defaults have been updated.' });
+    recordEvent('provider_preference_changed', 'Shared price providers saved', 'info', `Primary: ${sharedProviderForm.primaryProvider}, Secondary: ${sharedProviderForm.secondaryProvider}`);
+    refreshSetupHistory();
   };
 
   const savePersonalProviderOverrides = async () => {
     await updateUserProviderOverrides({ ...overrideForm, enabled: true });
     setAlertDialog({ open: true, title: 'Saved', description: 'Your personal provider overrides are stored on this device.' });
+    recordEvent('provider_preference_changed', 'Personal provider overrides saved', 'info', `Primary: ${overrideForm.primaryProviderOverride}, Secondary: ${overrideForm.secondaryProviderOverride}`);
+    refreshSetupHistory();
   };
 
   const saveSystemProvidedPricing = async () => {
     await updateUserProviderOverrides({ ...overrideForm, enabled: false });
     setAlertDialog({ open: true, title: 'Using System Pricing', description: 'This device will use the shared app pricing setup.' });
+    recordEvent('provider_preference_changed', 'Reverted to system pricing', 'info');
+    refreshSetupHistory();
   };
 
   const saveBrokerConnections = async () => {
     await updateUserBrokerConnections(brokerForm);
     setAlertDialog({ open: true, title: 'Saved', description: 'Broker connection details are stored on this device.' });
+    recordEvent('key_saved', 'Broker credentials saved', 'info');
+    refreshSetupHistory();
   };
 
   const saveCurrencyPreferences = async () => {
@@ -986,6 +1059,24 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
       groww: { ...brokerForm.groww, enabled: false },
     });
     setAlertDialog({ open: true, title: 'Using System Routing', description: 'This device will keep using the shared/default India stock routing.' });
+  };
+
+  const saveWorkspacePreferences = async () => {
+    await updateWorkspacePreferences(workspaceForm);
+    setAlertDialog({ open: true, title: 'Workspace Saved', description: 'Your workspace preferences have been updated.' });
+  };
+
+  const resetWorkspacePreferences = () => {
+    setConfirmDialog({
+      open: true,
+      title: 'Reset Workspace Settings',
+      description: 'This will reset workspace name, currency, region, label and market preference to their defaults. Your portfolio data is not affected.',
+      onConfirm: () => {
+        setWorkspaceForm(DEFAULT_WORKSPACE_PREFERENCES);
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        setAlertDialog({ open: true, title: 'Workspace Reset', description: 'Workspace settings have been reset to defaults. Save to persist these changes.' });
+      },
+    });
   };
 
   const handleInvite = async () => {
@@ -1069,6 +1160,130 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     }
   };
 
+  // ── Data portability handlers ────────────────────────────────
+
+  const handleExportData = () => {
+    const confirmExport = () => {
+      try {
+        const payload = buildExportPayload({
+          assets: displayAssets,
+          assetClasses: displayAssetClasses,
+          baseCurrency,
+          primaryCurrency,
+          secondaryCurrency,
+          connectedAccounts: {
+            upstox: upstox ? {
+              status: upstox.status,
+              connectedAt: upstox.connectedAt,
+              lastSyncAt: upstox.lastSyncAt,
+              accountCount: upstox.accounts.length,
+              holdingsCount: upstox.holdingsSummary.totalHoldingsCount,
+              positionsCount: upstox.holdingsSummary.totalPositionsCount,
+            } : null,
+          },
+        });
+        downloadExportFile(payload);
+      } catch (error) {
+        setAlertDialog({
+          open: true,
+          title: 'Export Failed',
+          description: error instanceof Error ? error.message : 'Could not generate export file.',
+        });
+      }
+    };
+
+    if (isSampleMode) {
+      setConfirmDialog({
+        open: true,
+        title: 'Export Sample Data?',
+        description: 'Your portfolio is currently showing sample data. The export will include these sample holdings. They are not your real financial data. Continue?',
+        onConfirm: () => {
+          setConfirmDialog(prev => ({ ...prev, open: false }));
+          confirmExport();
+        },
+      });
+    } else {
+      confirmExport();
+    }
+  };
+
+  const handleImportJsonFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(reader.result as string);
+        const validation = validateImportPayload(raw);
+
+        if (!validation.valid) {
+          setAlertDialog({
+            open: true,
+            title: 'Invalid Import File',
+            description: validation.errors.join(' '),
+          });
+          return;
+        }
+
+        const preview = getImportPreview(validation.data!);
+        setImportPayloadData(validation.data!);
+        setImportPreview(preview);
+        setImportMode('merge');
+      } catch {
+        setAlertDialog({
+          open: true,
+          title: 'Invalid File',
+          description: 'The selected file is not valid JSON. Please check the file and try again.',
+        });
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset file input so the same file can be re-selected
+    if (importJsonFileRef.current) importJsonFileRef.current.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importPayloadData) return;
+
+    try {
+      const result = computeImportResult(importPayloadData, importMode, assets, assetClasses);
+
+      await replaceCloudPortfolio({
+        assets: result.assets,
+        assetClasses: result.assetClasses,
+        baseCurrency: result.baseCurrency,
+        primaryCurrency: result.primaryCurrency,
+        secondaryCurrency: result.secondaryCurrency,
+      });
+
+      // Restore checklist preferences if present
+      if (importPayloadData.preferences?.checklist) {
+        try {
+          window.localStorage.setItem(
+            'nexus-checklist-state',
+            JSON.stringify(importPayloadData.preferences.checklist),
+          );
+        } catch { /* silently skip */ }
+      }
+
+      setImportPreview(null);
+      setImportPayloadData(null);
+      setAlertDialog({
+        open: true,
+        title: 'Import Successful',
+        description: `Successfully imported ${result.assets.length} assets and ${result.assetClasses.length} asset classes using ${importMode === 'replace' ? 'replace' : 'merge'} mode.`,
+      });
+    } catch (error) {
+      setAlertDialog({
+        open: true,
+        title: 'Import Failed',
+        description: error instanceof Error ? error.message : 'Could not import portfolio data.',
+      });
+    }
+  };
+
   const updateBrokerConfig = (
     broker: keyof UserBrokerConnections,
     field: keyof BrokerConnectionConfig,
@@ -1095,6 +1310,8 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
     { id: 'structure', label: 'Structure', description: 'Classes and organization' },
     { id: 'data', label: 'Data', description: 'Imports, sync, migration' },
     { id: 'integrations', label: 'Integrations', description: 'Connected accounts' },
+    { id: 'workspace', label: 'Workspace', description: 'Portfolio identity and region' },
+    { id: 'credentials', label: 'Credentials', description: 'Provider API keys' },
   ];
 
   return (
@@ -1102,17 +1319,24 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
       <div className="mb-8 space-y-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">Settings</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Settings</h1>
+            {isSampleMode && (
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300" title="Not your real portfolio">
+                Sample data
+              </span>
+            )}
+          </div>
             <p className="text-lg text-slate-500 dark:text-slate-400">Configure your portfolio tracker without digging through one long page.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="text-slate-500 dark:text-slate-400">Members</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{members.length}</div>
+              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{displayMembers.length}</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="text-slate-500 dark:text-slate-400">Assets</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{assets.length}</div>
+              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{displayAssets.length}</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="text-slate-500 dark:text-slate-400">Classes</div>
@@ -1129,8 +1353,45 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           </div>
         </div>
 
+        {workspaceMode && (
+          <Card className="border-none shadow-sm rounded-2xl mb-4">
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 ${
+                    workspaceMode === 'hosted'
+                      ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400'
+                  }`}>
+                    {workspaceMode === 'hosted' ? <Globe2 className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                      Workspace Mode: {workspaceMode === 'hosted' ? 'Nexus Hosted' : 'Self-Owned Firebase'}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {workspaceMode === 'hosted'
+                        ? 'Your portfolio data is stored in Nexus-hosted infrastructure.'
+                        : 'You are using your own Firebase project. Server-side Admin credentials are configured separately in Integrations.'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleResetWorkspace}
+                  disabled={workspaceResetBusy}
+                  className="shrink-0 rounded-full"
+                >
+                  <RotateCw className="h-4 w-4 mr-1.5" />
+                  Reset / Change Mode
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-7">
             {tabItems.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -1952,6 +2213,170 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
         </CardContent>
       </Card>
 
+      {isSampleMode && (
+        <Card className="border-none shadow-sm rounded-2xl border-amber-200 dark:border-amber-900/60">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <CardTitle>Sample Portfolio</CardTitle>
+            </div>
+            <CardDescription>
+              You are currently viewing a sample portfolio for demonstration.
+              <span className="block mt-1 font-medium text-amber-700 dark:text-amber-300">This is not your real financial data.</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+              onClick={() => {
+                setConfirmDialog({
+                  open: true,
+                  title: 'Clear Sample Data',
+                  description: 'Remove all sample holdings, asset classes, and exit demo mode. Your real portfolio (if any) will remain unchanged.',
+                  onConfirm: () => {
+                    disableSampleMode();
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                    setAlertDialog({
+                      open: true,
+                      title: 'Sample Data Cleared',
+                      description: 'Sample portfolio has been removed. You can now add your real financial data.',
+                    });
+                  },
+                });
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear Sample Data
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-none shadow-sm rounded-2xl">
+        <CardHeader>
+          <CardTitle>Data Portability</CardTitle>
+          <CardDescription>Export your portfolio data as a portable JSON file, or restore from a previous export.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handleExportData}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Data (JSON)
+            </Button>
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              ref={importJsonFileRef}
+              onChange={handleImportJsonFile}
+            />
+            <Button variant="outline" onClick={() => importJsonFileRef.current?.click()}>
+              <FileJson className="mr-2 h-4 w-4" />
+              Import Data (JSON)
+            </Button>
+          </div>
+
+          {importPreview && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4 dark:border-slate-800 dark:bg-slate-900">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Import Preview</h4>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Portfolios</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.portfolioCount}</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Assets</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.assets}</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Asset Classes</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.assetClasses}</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider">Connected Accounts</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.connectedAccounts}</div>
+                  </div>
+                </div>
+                {importPreview.hasChecklist && (
+                  <p className="text-xs text-slate-500 mt-2">Includes onboarding checklist preferences.</p>
+                )}
+                {importPreview.warnings.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                    {importPreview.warnings.map((warning, i) => (
+                      <p key={i}>{warning}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Import Mode</h4>
+                <div className="flex gap-2">
+                  <Button
+                    variant={importMode === 'merge' ? 'default' : 'outline'}
+                    className={`rounded-full ${importMode === 'merge' ? 'bg-[#00875A] text-white hover:bg-[#007A51]' : ''}`}
+                    onClick={() => setImportMode('merge')}
+                  >
+                    Merge
+                  </Button>
+                  <Button
+                    variant={importMode === 'replace' ? 'default' : 'outline'}
+                    className={`rounded-full ${importMode === 'replace' ? 'bg-[#00875A] text-white hover:bg-[#007A51]' : ''}`}
+                    onClick={() => setImportMode('replace')}
+                  >
+                    Replace
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {importMode === 'merge'
+                    ? 'Merge adds imported assets and classes alongside your existing portfolio data.'
+                    : 'Replace clears your current portfolio and loads only the imported data.'}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
+                Your export may contain financial holdings data. Store it safely.
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]"
+                  onClick={() => {
+                    setConfirmDialog({
+                      open: true,
+                      title: `${importMode === 'replace' ? 'Replace' : 'Merge'} Portfolio Data`,
+                      description: `This will ${importMode === 'replace' ? 'replace your current portfolio' : 'merge into your current portfolio'} with ${importPreview.assets} assets and ${importPreview.assetClasses} asset classes. Continue?`,
+                      onConfirm: () => {
+                        setConfirmDialog(prev => ({ ...prev, open: false }));
+                        handleConfirmImport();
+                      },
+                    });
+                  }}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Apply Import
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setImportPreview(null);
+                    setImportPayloadData(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+            Your export may contain financial holdings data. Store it safely.
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="border-none shadow-sm rounded-2xl">
         <CardHeader>
           <CardTitle>Danger Zone</CardTitle>
@@ -1974,17 +2399,147 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
           </Button>
         </CardContent>
       </Card>
+
+      {isSampleMode && (
+        <Card className="border-none shadow-sm rounded-2xl border-amber-200 dark:border-amber-900/60">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <CardTitle>Sample Portfolio</CardTitle>
+            </div>
+            <CardDescription>
+              You are currently viewing a sample portfolio for demonstration.
+              <span className="block mt-1 font-medium text-amber-700 dark:text-amber-300">This is not your real financial data.</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+              onClick={() => {
+                setConfirmDialog({
+                  open: true,
+                  title: 'Clear Sample Data',
+                  description: 'Remove all sample holdings, asset classes, and exit demo mode. Your real portfolio (if any) will remain unchanged.',
+                  onConfirm: () => {
+                    disableSampleMode();
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                  },
+                });
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear Sample Data
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       </div>
+      )}
+
+      {activeTab === 'workspace' && (
+        <Card id="workspace" className="border-none shadow-sm rounded-2xl mb-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Globe2 className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+              <CardTitle>Workspace Settings</CardTitle>
+            </div>
+            <CardDescription>Configure how your portfolio identifies itself and what defaults to use across the app.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Workspace / Portfolio Name</label>
+                <Input
+                  value={workspaceForm.workspaceName}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, workspaceName: event.target.value }))}
+                  placeholder="e.g. Family Wealth Tracker"
+                />
+                <p className="text-xs text-slate-500">Shown in the header and portfolio selector when set.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Base Currency</label>
+                <Select
+                  value={workspaceForm.baseCurrency}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, baseCurrency: event.target.value as 'CAD' | 'INR' | 'USD' }))}
+                >
+                  <option value="CAD">CAD</option>
+                  <option value="INR">INR</option>
+                  <option value="USD">USD</option>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Primary Country / Region</label>
+                <Select
+                  value={workspaceForm.primaryRegion}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, primaryRegion: event.target.value }))}
+                >
+                  <option value="Canada">Canada</option>
+                  <option value="India">India</option>
+                  <option value="US">United States</option>
+                  <option value="Global">Global</option>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Household / Family Label</label>
+                <Input
+                  value={workspaceForm.householdLabel}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, householdLabel: event.target.value }))}
+                  placeholder="e.g. The Smith Family"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-900 dark:text-white">Default Market Preference</label>
+                <Select
+                  value={workspaceForm.defaultMarketPreference}
+                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, defaultMarketPreference: event.target.value as 'India' | 'Canada' | 'US' | 'Global' }))}
+                >
+                  <option value="Canada">Canada</option>
+                  <option value="India">India</option>
+                  <option value="US">United States</option>
+                  <option value="Global">Global</option>
+                </Select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <Button onClick={() => void saveWorkspacePreferences()} className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]">
+                Save Workspace Settings
+              </Button>
+              <Button variant="outline" onClick={resetWorkspacePreferences} className="rounded-full">
+                <RotateCw className="h-4 w-4 mr-1.5" />
+                Reset to Defaults
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {activeTab === 'integrations' && (
         <div id="integrations" className="space-y-6">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Integrations</h2>
-            <p className="text-slate-500 dark:text-slate-400">Connect cloud accounts to enrich Nexus with external financial context.</p>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Integrations</h2>
+                <p className="text-slate-500 dark:text-slate-400">Connect cloud accounts to enrich Nexus with external financial context.</p>
+              </div>
+              {onStartSetupWizard && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full h-9 px-3 text-xs border-[#00875A]/30 text-[#00875A] hover:bg-[#00875A]/10 dark:border-emerald-800 dark:text-emerald-400 shrink-0"
+                  onClick={onStartSetupWizard}
+                  data-testid="settings-launch-wizard"
+                >
+                  <Wand2 className="h-3.5 w-3.5 mr-1" />
+                  Guided Setup
+                </Button>
+              )}
+            </div>
           </div>
 
           <SetupHealthCard />
+
+          <ProviderCapabilityMatrix />
 
           <Card className="border-none shadow-sm rounded-2xl">
             <CardHeader>
@@ -2492,7 +3047,16 @@ export function Settings({ initialSection }: { initialSection?: SettingsSection 
               ) : null}
             </CardContent>
           </Card>
+
+          <SetupHistoryPanel
+            events={setupEvents}
+            onClear={() => { clearSetupHistory(); refreshSetupHistory(); }}
+          />
         </div>
+      )}
+
+      {activeTab === 'credentials' && (
+        <ProviderCredentialsSection />
       )}
 
       <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>

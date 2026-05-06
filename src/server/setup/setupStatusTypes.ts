@@ -99,3 +99,33 @@ export type SetupCapabilitiesInput = {
   publicEnv?: Record<string, string | undefined>;
   mode?: RuntimeMode;
 };
+
+export type VerificationState = 'not-configured' | 'configured-not-tested' | 'testing' | 'working' | 'failed';
+
+export type VerificationGuidance = {
+  missingEnvKeys: string[];
+  docsPath?: string;
+  hint?: string;
+};
+
+export type VerificationResult = {
+  capabilityId: string;
+  status: VerificationState;
+  checkedAt: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  guidance: VerificationGuidance;
+};
+
+export const VERIFIABLE_CAPABILITIES = [
+  'firebase-auth',
+  'firebase-admin',
+  'price-provider',
+  'ai-provider',
+  'logo-provider',
+  'cas-parser',
+  'upstox',
+  'splitwise',
+] as const;
+
+export type VerifiableCapabilityId = typeof VERIFIABLE_CAPABILITIES[number];

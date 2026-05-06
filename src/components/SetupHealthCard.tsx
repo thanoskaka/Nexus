@@ -2,8 +2,9 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
-import { Loader2, CheckCircle, XCircle, AlertCircle, RefreshCw, Server, Activity, ExternalLink, Copy, Settings } from 'lucide-react';
-import { fetchSetupStatus, type SetupStatusResponse } from '../lib/setupStatusApi';
+import { Loader2, CheckCircle, XCircle, AlertCircle, RefreshCw, Server, Activity, ExternalLink, Copy, Settings, Play, HelpCircle } from 'lucide-react';
+import { fetchSetupStatus, verifyCapability, verifyAllCapabilities, type SetupStatusResponse } from '../lib/setupStatusApi';
+import { loadVerificationResults, saveVerificationResult, saveVerificationResults, type ClientVerificationResult } from '../lib/verificationStore';
 
 type HealthItemStatus = 'configured' | 'partial' | 'missing';
 type FeatureImportance = 'required' | 'recommended' | 'optional';
@@ -31,6 +32,31 @@ type FeatureDetail = {
   needsRestart: boolean;
   docsPath?: string;
   aiSettingsLink?: boolean;
+  verificationHint?: string;
+};
+
+const VERIFY_KEYS: Record<string, string> = {
+  'firebase-auth': 'firebase-auth',
+  'firebase-admin': 'firebase-admin',
+  'price-refresh': 'price-provider',
+  upstox: 'upstox',
+  splitwise: 'splitwise',
+  'cas-parser': 'cas-parser',
+  'screenshot-import': 'ai-provider',
+  'ai-assistant': 'ai-provider',
+  'logo-provider': 'logo-provider',
+  'google-drive': null as unknown as string,
+};
+
+const VERIFY_LABELS: Record<string, string> = {
+  'firebase-auth': 'Firebase Auth',
+  'firebase-admin': 'Firebase Admin',
+  'price-provider': 'Price Providers',
+  'ai-provider': 'AI Provider',
+  'logo-provider': 'Logo Provider',
+  'cas-parser': 'CAS Parser',
+  upstox: 'Upstox',
+  splitwise: 'Splitwise',
 };
 
 const FEATURE_DETAILS: Record<string, FeatureDetail> = {
@@ -58,6 +84,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     ],
     needsRestart: true,
     docsPath: 'docs/setup-modes.md',
+    verificationHint: 'Verifies that all 6 NEXT_PUBLIC_FIREBASE_* environment variables are set. No live Firebase API call is made.',
   },
   'firebase-admin': {
     summary: 'Firebase Admin SDK verifies ID tokens server-side. Required for connected accounts, Splitwise, AI, and server endpoints.',
@@ -77,6 +104,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     ],
     needsRestart: true,
     docsPath: 'docs/setup-modes.md',
+    verificationHint: 'Verifies that FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY are set. No live Firebase API call is made.',
   },
   'price-refresh': {
     summary: 'Automatic price updates for stocks, ETFs, and mutual funds. Yahoo Finance fallback works without any keys.',
@@ -96,6 +124,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     ],
     needsRestart: true,
     docsPath: 'docs/capability-cost-posture.md',
+    verificationHint: 'Checks that at least one price provider key is configured. Yahoo Finance fallback always works without a key.',
   },
   upstox: {
     summary: 'Sync your Upstox portfolio as read-only connected holdings.',
@@ -118,6 +147,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     redirectUri: '{APP_BASE_URL}/api/connections/upstox/callback',
     needsRestart: true,
     docsPath: 'docs/capability-cost-posture.md',
+    verificationHint: 'Verifies that Upstox OAuth credentials and encryption keys are configured. A real connection requires user OAuth authorization.',
   },
   splitwise: {
     summary: 'Sync shared expenses from Splitwise into your portfolio.',
@@ -140,6 +170,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     redirectUri: '{APP_BASE_URL}/api/splitwise/callback',
     needsRestart: true,
     docsPath: 'docs/capability-cost-posture.md',
+    verificationHint: 'Verifies that Splitwise OAuth credentials, encryption key, and state secret are configured. A real connection requires user OAuth authorization.',
   },
   'cas-parser': {
     summary: 'Parse CAS (Consolidated Account Statement) PDFs to import India mutual fund holdings.',
@@ -161,6 +192,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     ],
     needsRestart: true,
     docsPath: 'docs/capability-cost-posture.md',
+    verificationHint: 'Verifies that a CAS parser URL or an external fallback API key is configured. No paid API call is made during verification.',
   },
   'screenshot-import': {
     summary: 'Upload screenshots of holdings for AI-powered OCR extraction.',
@@ -193,6 +225,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     ],
     needsRestart: true,
     docsPath: 'docs/capability-cost-posture.md',
+    verificationHint: 'Google Drive verification requires the VITE_GOOGLE_CLIENT_ID to be set. A real connection requires user OAuth authorization.',
   },
   'ai-assistant': {
     summary: 'Ask questions about your portfolio using AI. Works with Gemini or DeepSeek.',
@@ -212,6 +245,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     needsRestart: true,
     aiSettingsLink: true,
     docsPath: 'docs/capability-cost-posture.md',
+    verificationHint: 'Verifies that a server-level AI key or the infrastructure for user credentials is configured. No paid API call is made during verification.',
   },
   'logo-provider': {
     summary: 'Show mutual fund and stock logos in the asset list.',
@@ -229,6 +263,7 @@ const FEATURE_DETAILS: Record<string, FeatureDetail> = {
     ],
     needsRestart: true,
     docsPath: 'docs/capability-cost-posture.md',
+    verificationHint: 'Verifies that a Logo.dev key is configured. No API call is made during verification.',
   },
 };
 
@@ -382,6 +417,19 @@ function adminHint(admin: SetupStatusResponse['firebaseAdmin']): string {
   return `Needs: ${parts.join(', ')}`;
 }
 
+function formatTimeAgo(isoString: string | null): string {
+  if (!isoString) return '';
+  const diff = Date.now() - new Date(isoString).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function ModeBadge({ mode }: { mode: SetupStatusResponse['mode'] }) {
   const colors: Record<string, string> = {
     local: 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200',
@@ -433,6 +481,26 @@ function ImportanceBadge({ importance }: { importance: FeatureImportance }) {
   );
 }
 
+function VerificationBadge({ status }: { status: ClientVerificationResult['status'] }) {
+  if (status === 'configured-not-tested') return null;
+  const styles: Record<string, string> = {
+    working: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+    failed: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+    'not-configured': 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+  };
+  const icons: Record<string, React.ReactNode> = {
+    working: <CheckCircle className="h-3 w-3" />,
+    failed: <XCircle className="h-3 w-3" />,
+    'not-configured': <AlertCircle className="h-3 w-3" />,
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] || ''}`}>
+      {icons[status] || null}
+      {status === 'working' ? 'verified' : status}
+    </span>
+  );
+}
+
 function EnvBlock({ snippet }: { snippet: EnvSnippet; key?: number }) {
   const [copied, setCopied] = useState(false);
   const text = snippet.template || snippet.vars.join(' ');
@@ -462,6 +530,9 @@ function EnvBlock({ snippet }: { snippet: EnvSnippet; key?: number }) {
 
 function SetupDetailPanel({ item, open, onClose }: { item: HealthItem; open: boolean; onClose: () => void }) {
   const detail = FEATURE_DETAILS[item.key];
+  const verifyKey = VERIFY_KEYS[item.key];
+  const verifyDetail = verifyKey ? FEATURE_DETAILS[verifyKey] : null;
+  const verifyHint = verifyDetail?.verificationHint;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -518,6 +589,13 @@ function SetupDetailPanel({ item, open, onClose }: { item: HealthItem; open: boo
               </ol>
             </div>
 
+            {verifyHint && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-900/40 dark:bg-sky-950/20">
+                <p className="text-xs font-medium text-sky-700 dark:text-sky-300 mb-1">Verification info</p>
+                <p className="text-xs text-sky-600 dark:text-sky-400">{verifyHint}</p>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-3 pt-2">
               {detail.aiSettingsLink && (
                 <Button
@@ -549,13 +627,20 @@ export function SetupHealthCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<HealthItem | null>(null);
+  const [verificationResults, setVerificationResults] = useState<Record<string, ClientVerificationResult>>({});
+  const [testingCapabilities, setTestingCapabilities] = useState<Set<string>>(new Set());
+  const [testingAll, setTestingAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchSetupStatus();
+      const [result, stored] = await Promise.all([
+        fetchSetupStatus(),
+        Promise.resolve(loadVerificationResults()),
+      ]);
       setData(result);
+      setVerificationResults(stored);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load setup status');
     } finally {
@@ -567,6 +652,66 @@ export function SetupHealthCard() {
     void load();
   }, [load]);
 
+  const handleVerify = useCallback(async (healthKey: string) => {
+    const verifyKey = VERIFY_KEYS[healthKey];
+    if (!verifyKey) return;
+
+    setTestingCapabilities((prev) => new Set(prev).add(verifyKey));
+
+    try {
+      const result = await verifyCapability(verifyKey);
+      setVerificationResults((prev) => ({ ...prev, [verifyKey]: result }));
+      saveVerificationResult(result);
+    } catch (err) {
+      const failed: ClientVerificationResult = {
+        capabilityId: verifyKey,
+        status: 'failed',
+        checkedAt: new Date().toISOString(),
+        errorCode: 'REQUEST_FAILED',
+        errorMessage: err instanceof Error ? err.message : 'Verification request failed',
+        guidance: { missingEnvKeys: [] },
+      };
+      setVerificationResults((prev) => ({ ...prev, [verifyKey]: failed }));
+      saveVerificationResult(failed);
+    } finally {
+      setTestingCapabilities((prev) => {
+        const next = new Set(prev);
+        next.delete(verifyKey);
+        return next;
+      });
+    }
+  }, []);
+
+  const handleVerifyAll = useCallback(async () => {
+    setTestingAll(true);
+    try {
+      const results = await verifyAllCapabilities();
+      const mapped: Record<string, ClientVerificationResult> = {};
+      for (const r of results) {
+        mapped[r.capabilityId] = r;
+      }
+      setVerificationResults((prev) => ({ ...prev, ...mapped }));
+      saveVerificationResults(results);
+    } catch (err) {
+    } finally {
+      setTestingAll(false);
+    }
+  }, []);
+
+  const getResult = useCallback((healthKey: string): ClientVerificationResult | undefined => {
+    const verifyKey = VERIFY_KEYS[healthKey];
+    if (!verifyKey) return undefined;
+    return verificationResults[verifyKey];
+  }, [verificationResults]);
+
+  const isTesting = useCallback((healthKey: string): boolean => {
+    const verifyKey = VERIFY_KEYS[healthKey];
+    if (!verifyKey) return false;
+    return testingCapabilities.has(verifyKey);
+  }, [testingCapabilities]);
+
+  const hasConfiguredItems = data && buildItems(data).some((item) => item.status === 'configured' || item.status === 'partial');
+
   return (
     <Card className="border-none shadow-sm rounded-2xl">
       <CardHeader>
@@ -575,7 +720,25 @@ export function SetupHealthCard() {
             <Activity className="h-5 w-5 text-slate-700 dark:text-slate-300" />
             <CardTitle>Setup Health</CardTitle>
           </div>
-          {data && <ModeBadge mode={data.mode} />}
+          <div className="flex items-center gap-2">
+            {hasConfiguredItems && !loading && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs rounded-full"
+                onClick={handleVerifyAll}
+                disabled={testingAll}
+              >
+                {testingAll ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Play className="h-3 w-3 mr-1" />
+                )}
+                Verify All
+              </Button>
+            )}
+            {data && <ModeBadge mode={data.mode} />}
+          </div>
         </div>
         <CardDescription>
           Environment diagnostics and feature availability
@@ -606,6 +769,10 @@ export function SetupHealthCard() {
             {buildItems(data).map((item) => {
               const isUnconfigured = item.status !== 'configured';
               const isOptional = item.importance === 'optional';
+              const result = getResult(item.key);
+              const testing = isTesting(item.key);
+              const canTest = item.status === 'configured' || item.status === 'partial';
+
               return (
                 <div
                   key={item.key}
@@ -620,13 +787,34 @@ export function SetupHealthCard() {
                         </span>
                         <StatusBadge status={item.status} />
                         {isUnconfigured && <ImportanceBadge importance={item.importance} />}
+                        {result && !isUnconfigured && <VerificationBadge status={result.status} />}
                       </div>
+                      {result && !isUnconfigured && result.checkedAt && (
+                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                          Last tested: {formatTimeAgo(result.checkedAt)}
+                        </p>
+                      )}
                       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                         {item.hint}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pl-7">
+
+                  {result?.status === 'failed' && result.errorMessage && (
+                    <div className="flex items-start gap-2 pl-7">
+                      <div className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300 flex-1">
+                        <p className="font-medium mb-0.5">Fix this</p>
+                        <p>{result.errorMessage}</p>
+                        {result.guidance.missingEnvKeys.length > 0 && (
+                          <p className="mt-1 text-rose-600 dark:text-rose-400">
+                            Missing: {result.guidance.missingEnvKeys.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pl-7 flex-wrap">
                     {item.status === 'configured' ? (
                       <Button
                         variant="ghost"
@@ -657,6 +845,33 @@ export function SetupHealthCard() {
                         onClick={() => setDetailItem(item)}
                       >
                         Setup
+                      </Button>
+                    )}
+                    {canTest && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs rounded-full"
+                        onClick={() => void handleVerify(item.key)}
+                        disabled={testing}
+                      >
+                        {testing ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Play className="h-3 w-3 mr-1" />
+                        )}
+                        {result ? 'Re-test' : 'Test'}
+                      </Button>
+                    )}
+                    {result?.status === 'failed' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs rounded-full text-rose-500"
+                        onClick={() => setDetailItem(item)}
+                      >
+                        <HelpCircle className="h-3 w-3 mr-1" />
+                        Fix this
                       </Button>
                     )}
                   </div>
