@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, Menu, X, ChevronRight, ExternalLink, CheckCircle2, AlertTriangle, BookOpen, ArrowLeft } from 'lucide-react';
+import { Wallet, Menu, X, ChevronRight, ExternalLink, CheckCircle2, AlertTriangle, BookOpen, ArrowLeft, Wand2 } from 'lucide-react';
 
 type DocSection =
   | 'getting-started'
   | 'firebase'
+  | 'bring-firebase'
   | 'localhost'
   | 'vercel'
   | 'api-keys'
@@ -20,6 +21,7 @@ interface DocNavItem {
 const NAV_ITEMS: DocNavItem[] = [
   { id: 'getting-started', label: 'Getting Started' },
   { id: 'firebase', label: 'Firebase Setup' },
+  { id: 'bring-firebase', label: 'Bring Your Own Firebase' },
   { id: 'localhost', label: 'Local Development' },
   { id: 'vercel', label: 'Vercel Deployment' },
   { id: 'api-keys', label: 'API Keys & Providers' },
@@ -338,6 +340,203 @@ const sectionContent: Record<DocSection, { title: string; content: React.ReactNo
             Example: <Code>{'FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQ...\n-----END PRIVATE KEY-----\n"'}</Code>
           </Warning>
           <Tip>On Google Cloud Platform (GCP) with workload identity, default credentials can be used instead of a service account file.</Tip>
+        </div>
+      </div>
+    ),
+  },
+
+  'bring-firebase': {
+    title: 'Bring Your Own Firebase',
+    content: (
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Bring Your Own Firebase</h2>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+            Nexus lets you use your own Firebase project for authentication and data storage. Your portfolio
+            data never touches Nexus infrastructure — it lives entirely in your Firebase project.
+            Follow these steps after signing in to Nexus for the first time.
+          </p>
+          <Tip>This is recommended if you want full data ownership, multi-family isolation, or plan to self-host the backend later.</Tip>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#00875A] text-white text-sm font-bold mr-2">1</span>
+            Create a Firebase Project
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Go to <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline font-medium">console.firebase.google.com</a> and create a new project.
+            Give it a name (e.g. <Code>nexus-myfamily</Code>). Google Analytics is optional — you can disable it.
+          </p>
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-6 text-center text-slate-400 dark:text-slate-500 text-sm mb-3">
+            📸 Screenshot: Firebase Console → "Add project" → project name field
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#00875A] text-white text-sm font-bold mr-2">2</span>
+            Register a Web App & Copy Config
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            In your Firebase project, go to <strong>Project Settings → General → Your apps</strong> and click the web icon (<Code>&lt;/&gt;</Code>) to add a web app.
+            After registering, Firebase shows you a config object — copy all 6 values.
+          </p>
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-6 text-center text-slate-400 dark:text-slate-500 text-sm mb-3">
+            📸 Screenshot: Project Settings → Your apps → web config block with apiKey, authDomain, projectId etc.
+          </div>
+          <CodeBlock>{`const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project",
+  storageBucket: "your-project.firebasestorage.app",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc123"
+};`}</CodeBlock>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">You will paste these values into Nexus in Step 5.</p>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#00875A] text-white text-sm font-bold mr-2">3</span>
+            Enable Google Sign-in
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Go to <strong>Authentication → Sign-in method</strong> and enable the <strong>Google</strong> provider.
+            Enter a public-facing project name and a support email, then save.
+          </p>
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-6 text-center text-slate-400 dark:text-slate-500 text-sm mb-3">
+            📸 Screenshot: Authentication → Sign-in method → Google toggle enabled → support email field
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#00875A] text-white text-sm font-bold mr-2">4</span>
+            Add Authorized Domain
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Go to <strong>Authentication → Settings → Authorized domains</strong> and add the domain where Nexus is hosted.
+          </p>
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-6 text-center text-slate-400 dark:text-slate-500 text-sm mb-3">
+            📸 Screenshot: Authentication → Settings → Authorized domains → "Add domain" with nexus-phi-inky.vercel.app
+          </div>
+          <Checklist items={[
+            <><Code>nexus-phi-inky.vercel.app</Code> — if using the hosted Nexus deployment</>,
+            <><Code>localhost</Code> — for local testing</>,
+            <>Your own domain — if self-hosting Nexus</>,
+          ]} />
+          <Warning>Missing this step causes "auth/unauthorized-domain" when signing in. Always add the exact domain you are using.</Warning>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#00875A] text-white text-sm font-bold mr-2">5</span>
+            Create Firestore Database
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Go to <strong>Databases & Storage → Firestore</strong> and click <strong>Create database</strong>.
+            Choose a region close to you. Start in <strong>production mode</strong> (you will add rules in the next step).
+          </p>
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-6 text-center text-slate-400 dark:text-slate-500 text-sm mb-3">
+            📸 Screenshot: Firestore → Create database → region selector → production mode option
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#00875A] text-white text-sm font-bold mr-2">6</span>
+            Set Firestore Security Rules
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            In Firestore, go to the <strong>Rules</strong> tab and replace the default rules with the following.
+            This allows any signed-in Google user to read and write their own data.
+          </p>
+          <CodeBlock>{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}`}</CodeBlock>
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-6 text-center text-slate-400 dark:text-slate-500 text-sm my-3">
+            📸 Screenshot: Firestore → Rules tab → rules editor → Publish button
+          </div>
+          <Tip>Rules take effect within ~60 seconds of publishing. If you see "Access denied by Firestore rules" immediately after publishing, wait a moment and reload.</Tip>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#00875A] text-white text-sm font-bold mr-2">7</span>
+            Enter Config in Nexus
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Back in Nexus, after signing in with Google, you are asked to choose your workspace mode.
+            Select <strong>Bring Your Own Firebase</strong> and paste the 6 config values from Step 2.
+          </p>
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-6 text-center text-slate-400 dark:text-slate-500 text-sm mb-3">
+            📸 Screenshot: Nexus → workspace ownership screen → "Bring Your Own Firebase" selected → config fields filled in
+          </div>
+          <Checklist items={[
+            'Paste apiKey from Firebase config',
+            'Paste authDomain (usually your-project.firebaseapp.com)',
+            'Paste projectId',
+            'Paste storageBucket',
+            'Paste messagingSenderId',
+            'Paste appId',
+          ]} />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#00875A] text-white text-sm font-bold mr-2">8</span>
+            Sign in to Your Firebase & Done
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Nexus will initialize your Firebase project and prompt you to sign in with Google one more time —
+            this time against <em>your</em> Firebase project. After sign-in, your portfolio data lives entirely
+            in your own Firestore database.
+          </p>
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-6 text-center text-slate-400 dark:text-slate-500 text-sm mb-3">
+            📸 Screenshot: Nexus dashboard loaded with user's own Firebase active
+          </div>
+          <Tip>Your config is stored in your browser's localStorage. If you clear browser data, you will need to re-enter the config. Nexus never sends your Firebase credentials to its servers.</Tip>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Troubleshooting</h3>
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+              <p className="font-medium text-slate-800 dark:text-slate-200 text-sm mb-1"><Code>auth/configuration-not-found</Code></p>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">One or more config values are wrong or missing. Double-check all 6 fields from Project Settings.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+              <p className="font-medium text-slate-800 dark:text-slate-200 text-sm mb-1"><Code>auth/unauthorized-domain</Code></p>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">The current domain is not in Authorized domains. Add it in Authentication → Settings → Authorized domains.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+              <p className="font-medium text-slate-800 dark:text-slate-200 text-sm mb-1">Firestore database does not exist</p>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">You skipped Step 5. Go to Firebase Console → Databases & Storage → Firestore → Create database.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+              <p className="font-medium text-slate-800 dark:text-slate-200 text-sm mb-1">Access denied by Firestore rules</p>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">Rules not published yet or still propagating. Publish the rules from Step 6 and wait up to 60 seconds.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+              <p className="font-medium text-slate-800 dark:text-slate-200 text-sm mb-1">Stuck on "Sign in to your Firebase" screen</p>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">Your stored config may be invalid. Open browser DevTools → Console → run <Code>localStorage.clear()</Code> then reload.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">What Does Not Work in Self-Owned Mode</h3>
+          <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-3">
+            Server-side features (AI chat, Upstox, Splitwise, CAS import) use the hosted Nexus backend and cannot
+            verify tokens from your own Firebase project. These features return errors in self-owned mode.
+          </p>
+          <Tip>To use all server features with your own Firebase, self-host the full Nexus backend with your Firebase Admin credentials. See the <strong>Firebase Setup</strong> doc.</Tip>
         </div>
       </div>
     ),
