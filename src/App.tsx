@@ -39,6 +39,11 @@ function MainApp() {
   const [settingsSection, setSettingsSection] = useState<SettingsSection | undefined>(initialView.settingsSection);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [aiKeyConfigured, setAiKeyConfigured] = useState(false);
+  const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false);
+
+  const handleStartSetupWizard = React.useCallback(() => {
+    setIsSetupWizardOpen(true);
+  }, []);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem('nexus-theme');
@@ -186,6 +191,7 @@ function MainApp() {
               aiKeyConfigured={aiKeyConfigured}
               onNavigateToSettings={navigateToSettings}
               onNavigateToDocs={navigateToDocs}
+              onStartSetupWizard={handleStartSetupWizard}
             />
             <NextActionPanel
               assetsCount={assets.length}
@@ -207,8 +213,8 @@ function MainApp() {
           if (isSampleMode) disableSampleMode();
           setIsAddModalOpen(true);
         }} />}
-        {currentView === 'settings' && <Settings initialSection={settingsSection} />}
-        {currentView === 'docs' && <Docs onBack={() => setCurrentView('dashboard')} />}
+        {currentView === 'settings' && <Settings initialSection={settingsSection} onStartSetupWizard={handleStartSetupWizard} />}
+        {currentView === 'docs' && <Docs onBack={() => setCurrentView('dashboard')} onStartSetupWizard={handleStartSetupWizard} />}
       </main>
 
       <AddAssetModal
@@ -220,6 +226,12 @@ function MainApp() {
         assetToEdit={editingAsset}
       />
       <ImportProgressOverlay />
+      <SetupWizard
+        open={isSetupWizardOpen}
+        onClose={() => setIsSetupWizardOpen(false)}
+        onNavigateToSettings={navigateToSettings}
+        onNavigateToDocs={navigateToDocs}
+      />
     </div>
   );
 }
@@ -301,6 +313,7 @@ export default function App() {
     active: typeof window !== 'undefined' && window.location.pathname.startsWith('/docs'),
     section: getDocSectionFromPath(),
   }));
+  const [standaloneWizardOpen, setStandaloneWizardOpen] = useState(false);
 
   useEffect(() => {
     const handlePop = () => {
@@ -318,8 +331,22 @@ export default function App() {
     setDocRoute({ active: false, section: undefined });
   };
 
+  const handleDocWizard = () => {
+    closeDocs();
+    setStandaloneWizardOpen(true);
+  };
+
+  const handleCloseStandaloneWizard = () => {
+    setStandaloneWizardOpen(false);
+  };
+
   if (docRoute.active) {
-    return <Docs initialSection={docRoute.section as any} onBack={closeDocs} />;
+    return (
+      <>
+        <Docs initialSection={docRoute.section as any} onBack={closeDocs} onStartSetupWizard={handleDocWizard} />
+        <SetupWizard open={standaloneWizardOpen} onClose={handleCloseStandaloneWizard} />
+      </>
+    );
   }
 
   return (

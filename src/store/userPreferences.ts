@@ -1,4 +1,13 @@
 import type { PriceProvider, PriceProviderSettings } from '../lib/api';
+import type { PortfolioCurrency } from './portfolioHelpers';
+
+export interface WorkspacePreferences {
+  workspaceName: string;
+  baseCurrency: PortfolioCurrency;
+  primaryRegion: string;
+  householdLabel: string;
+  defaultMarketPreference: 'India' | 'Canada' | 'US' | 'Global';
+}
 
 export interface UserProviderOverrides {
   enabled: boolean;
@@ -21,6 +30,14 @@ export interface UserBrokerConnections {
   upstox: BrokerConnectionConfig;
   groww: BrokerConnectionConfig;
 }
+
+export const DEFAULT_WORKSPACE_PREFERENCES: WorkspacePreferences = {
+  workspaceName: '',
+  baseCurrency: 'CAD',
+  primaryRegion: 'Canada',
+  householdLabel: '',
+  defaultMarketPreference: 'Canada',
+};
 
 export const DEFAULT_USER_PROVIDER_OVERRIDES: UserProviderOverrides = {
   enabled: false,
@@ -49,12 +66,23 @@ export const DEFAULT_BROKER_CONNECTIONS: UserBrokerConnections = {
   },
 };
 
+export function getWorkspacePreferencesKey(uid: string) {
+  return `workspace-preferences:${uid}`;
+}
+
 export function getUserProviderOverridesKey(uid: string) {
   return `user-provider-overrides:${uid}`;
 }
 
 export function getUserBrokerConnectionsKey(uid: string) {
   return `user-broker-connections:${uid}`;
+}
+
+export function normalizeWorkspacePreferences(data?: Partial<WorkspacePreferences> | null): WorkspacePreferences {
+  return {
+    ...DEFAULT_WORKSPACE_PREFERENCES,
+    ...(data || {}),
+  };
 }
 
 export function normalizeUserProviderOverrides(data?: Partial<UserProviderOverrides> | null): UserProviderOverrides {
