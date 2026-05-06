@@ -104,9 +104,23 @@ export function checkWorkspaceChosen(userUid?: string): boolean {
   try {
     const key = userUid ? `nexus.workspaceOwnership.v1:${userUid}` : 'nexus.workspaceOwnership.v1';
     const raw = window.localStorage.getItem(key);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    return parsed.mode === 'hosted' || parsed.mode === 'selfOwned';
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.mode === 'hosted' || parsed.mode === 'selfOwned') return true;
+    }
+    // Self-owned mode: ownership saved under hosted uid but app runs under self-owned uid.
+    // Scan all keys for any valid ownership entry.
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k?.startsWith('nexus.workspaceOwnership.v1')) {
+        const r = window.localStorage.getItem(k);
+        if (r) {
+          const p = JSON.parse(r);
+          if (p.mode === 'hosted' || p.mode === 'selfOwned') return true;
+        }
+      }
+    }
+    return false;
   } catch {
     return false;
   }
