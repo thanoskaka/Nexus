@@ -24,7 +24,7 @@ const NAV_ITEMS: DocNavItem[] = [
   { id: 'bring-firebase', label: 'Bring Your Own Firebase' },
   { id: 'localhost', label: 'Local Development' },
   { id: 'vercel', label: 'Vercel Deployment' },
-  { id: 'api-keys', label: 'API Keys & Providers' },
+  { id: 'api-keys', label: 'AI Assistant Keys' },
   { id: 'integrations', label: 'Integrations' },
   { id: 'user-guide', label: 'User Guide' },
   { id: 'data-portability', label: 'Data Portability' },
@@ -176,68 +176,72 @@ const sectionContent: Record<DocSection, { title: string; content: React.ReactNo
     content: (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">What is Nexus Portfolio?</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">What is Nexus?</h2>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Nexus Portfolio is a shared wealth tracker for families managing money across Canada and India.
-            It combines market-linked investments, manual assets, liabilities, and read-only connected broker snapshots
-            in one cloud-backed workspace. Nexus supports multiple family members in one shared portfolio with
-            live-priced and manual-priced assets side by side.
+            Nexus is a shared wealth tracker built for families managing money across India and Canada.
+            Whether you have mutual funds in Mumbai and a TFSA in Toronto, Nexus shows everything in one
+            place — in INR, CAD, and USD side by side. Invite your partner or family members so everyone
+            sees the same picture.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Hosted vs Self-Hosted</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Who is it for?</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+            Families, couples, and NRIs who want one honest view of their total wealth across both countries —
+            without spreadsheets.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Two ways to use Nexus</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-              <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Hosted (Nexus Cloud)</h4>
+              <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Nexus Hosted</h4>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                The easiest way to use Nexus. Visit{' '}
+                The fastest way to start. Visit{' '}
                 <a href="https://nexus-phi-inky.vercel.app" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline inline-flex items-center gap-1">
                   nexus-phi-inky.vercel.app <ExternalLink className="h-3 w-3" />
                 </a>
-                , sign in with Google, and start tracking. No setup required.
+                , sign in with Google, and you are tracking. Zero setup, no technical knowledge required.
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-              <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Self-Hosted</h4>
+              <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Bring Your Own Firebase</h4>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                Run Nexus on your own infrastructure. You manage Firebase, Vercel, and API keys.
-                Full control over data and costs. Follow the Firebase, Local, and Vercel guides below.
+                Connect your own free Google Firebase account and your data never touches Nexus servers —
+                it lives entirely in your own storage. Great for families who want full data ownership.
+                See the <strong>Bring Your Own Firebase</strong> guide to set this up in about 10 minutes.
               </p>
             </div>
           </div>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Local Mock / Demo Mode</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Nexus works fully offline using IndexedDB. No Firebase credentials needed for the demo.
-            The app launches in browser-local mode where you can import holdings, test features,
-            and explore the UI. All data stays in your browser.
-          </p>
-          <Checklist items={[
-            <>Run <Code>npm install</Code> to install dependencies.</>,
-            <>Run <Code>npm run dev:mock</Code> to start the local mock server.</>,
-            'Open http://localhost:6868 in your browser.',
-            'Use the preloaded demo portfolio. No Firebase credentials are needed.',
-            'Switch to real Firebase mode later by filling .env.local and running npm run dev.',
-          ]} />
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">What you can track</h3>
+          <ul className="list-disc list-inside space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
+            <li>Indian stocks, mutual funds, and ETFs (live prices from NSE/BSE)</li>
+            <li>Canadian and U.S. stocks and ETFs (live prices)</li>
+            <li>Gold, fixed deposits, PPF, NPS, and EPF</li>
+            <li>Real estate and other manual assets</li>
+            <li>Loans and liabilities (to see your net worth, not just gross)</li>
+            <li>Bank balances in INR, CAD, and USD</li>
+            <li>Crypto holdings</li>
+          </ul>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Core Features</h3>
-          <ul className="list-disc list-inside space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
-            <li>Canada and India holdings in one app</li>
-            <li>Multiple family members in one shared portfolio</li>
-            <li>Stocks, ETFs, mutual funds, gold, bank balances, PF/PPF/NPS/FD, real estate, and liabilities</li>
-            <li>Live-priced and manual-priced assets side by side</li>
-            <li>Cloud-backed connected holdings snapshots (Upstox)</li>
-            <li>AI assistant for portfolio analysis</li>
-            <li>CAS PDF import for Indian mutual funds</li>
-            <li>Screenshot import for broker portfolios</li>
-            <li>Splitwise integration for shared expense tracking</li>
-            <li>Dark mode support</li>
-          </ul>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">What Nexus does for you</h3>
+          <Checklist items={[
+            'Shows your total net worth in your chosen currency, updated with live prices',
+            'Breaks down wealth by country, asset type, and family member',
+            'Lets multiple family members share one portfolio — each with their own login',
+            'Imports your Indian mutual fund holdings from a CAS PDF (a statement from CAMS or Karvy)',
+            'Imports holdings from a broker screenshot using AI',
+            'Auto-syncs your Upstox stock holdings (read-only — Nexus cannot place trades)',
+            'Lets you ask the AI assistant questions about your portfolio in plain English',
+            'Backs up your data to Google Drive and lets you export it anytime',
+          ]} />
         </div>
       </div>
     ),
@@ -662,116 +666,55 @@ npm run test:run # Run tests once`}</CodeBlock>
   },
 
   'api-keys': {
-    title: 'API Keys & Providers',
+    title: 'AI Assistant Keys',
     content: (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Provider / API Key Setup</h2>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-            Nexus integrates with multiple data providers for pricing, AI analysis, and broker connectivity.
-            Below is every API key and how to generate it.
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Setting up your AI assistant</h2>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+            The AI assistant lets you ask questions about your portfolio in plain English — things like
+            "how concentrated are we in equities?" or "what percentage is in India?". To use it, you
+            need a free key from one of the two supported AI providers below. The whole setup takes
+            about 2 minutes.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Gemini (AI Assistant)</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Env: Server-side (stored per-user via API)</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Option 1 — Gemini (Google AI)</h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Powers the AI assistant for portfolio analysis, natural-language queries, and screenshot data extraction.
+            Gemini is Google&apos;s AI. The free tier is generous and works well for portfolio questions.
           </p>
           <Checklist items={[
-            <>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">Google AI Studio</a>.</>,
-            'Click "Get API Key" and create a key for the Gemini API.',
-            'In Nexus Settings > AI Assistant, enter the key and select a model (Gemini 2.5 Flash, Pro, or Flash Lite).',
-            'The key is encrypted and stored server-side, associated with your Firebase user.',
+            <>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">Google AI Studio <ExternalLink className="h-3 w-3 inline" /></a> and sign in with your Google account.</>,
+            'Click "Get API Key" → "Create API key". Copy the key.',
+            'In Nexus, go to Settings → Pricing → AI Assistant.',
+            'Select "Gemini" as the provider, paste your key, and save.',
+          ]} />
+          <Tip>Gemini 2.5 Flash is the recommended model — it is fast and free for personal use.</Tip>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Option 2 — DeepSeek</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            DeepSeek is an alternative AI that works equally well. Some users prefer it for more detailed reasoning.
+          </p>
+          <Checklist items={[
+            <>Go to <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">platform.deepseek.com <ExternalLink className="h-3 w-3 inline" /></a> and create a free account.</>,
+            'Generate an API key from the dashboard. Copy it.',
+            'In Nexus, go to Settings → Pricing → AI Assistant.',
+            'Select "DeepSeek" as the provider, paste your key, and save.',
           ]} />
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">DeepSeek (AI Assistant)</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Env: Server-side (stored per-user via API)</p>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Alternative AI provider. Supports DeepSeek Chat (V3) and DeepSeek Reasoner (R1) models.
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Stock price data</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+            You do not need to set up anything for stock prices. Nexus automatically fetches prices
+            for Indian stocks (NSE/BSE), Indian mutual funds (AMFI), Canadian and U.S. equities, and gold.
+            Price data works out of the box on Nexus Hosted.
           </p>
-          <Checklist items={[
-            <>Visit <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">DeepSeek Platform</a>.</>,
-            'Create an account and generate an API key.',
-            'In Nexus Settings > AI Assistant, select DeepSeek as provider and enter your key.',
-          ]} />
+          <Tip>If you are running your own Nexus server and want to use premium price data providers, see the Firebase Setup and Vercel Deployment docs for advanced server configuration.</Tip>
         </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Massive (U.S. Close Prices)</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Env: <Code>MASSIVE_API_KEY</Code> (server-only)</p>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Massive provides U.S. equity close-price data. The server uses it for auto-matched U.S. ticker pricing.
-          </p>
-          <Checklist items={[
-            'Go to the Massive website and sign up for an API key.',
-            <>Copy the key and add it as <Code>MASSIVE_API_KEY</Code> in your server environment variables.</>,
-            'The server uses this automatically when matching U.S. stocks (NASDAQ:, NYSE:, AMEX:).',
-          ]} />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Alpha Vantage</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Env: <Code>ALPHA_VANTAGE_API_KEY</Code> (server-only) or user override</p>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Real-time and historical stock prices. Used as a secondary price provider.
-          </p>
-          <Checklist items={[
-            <>Register at <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">Alpha Vantage</a>.</>,
-            'Receive a free API key via email.',
-            'Set as server env var or enter in Settings > Pricing > Override Credentials.',
-            'The free tier is limited to 5 calls/minute and 500 calls/day.',
-          ]} />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Finnhub</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Env: <Code>FINNHUB_API_KEY</Code> (server-only) or user override</p>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Alternative price provider. Can be used as primary or secondary fallback.
-          </p>
-          <Checklist items={[
-            <>Register at <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">Finnhub</a>.</>,
-            'Get your free API key from the dashboard.',
-            'Set as server env var or enter in Settings > Pricing > Override Credentials.',
-          ]} />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Logo.dev</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Env: <Code>LOGO_DEV_SECRET_KEY</Code> (server-only), <Code>VITE_LOGO_DEV_PUBLISHABLE_KEY</Code> (client)</p>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Fetches company logos for asset display in the dashboard and ledger.
-          </p>
-          <Checklist items={[
-            <>Sign up at <a href="https://logo.dev" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">logo.dev</a>.</>,
-            'Generate a secret API key for server-side use and a publishable key for client-side use.',
-            <>Set <Code>LOGO_DEV_SECRET_KEY</Code> and <Code>VITE_LOGO_DEV_PUBLISHABLE_KEY</Code> in your environment.</>,
-          ]} />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">CAS Parser Service</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Env: <Code>CAS_PARSER_API_KEY</Code>, <Code>CAS_PARSER_SERVICE_URL</Code></p>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Parses CAS (Consolidated Account Statement) PDFs from Indian mutual fund holdings.
-          </p>
-          <Checklist items={[
-            <>Sign up at <a href="https://casparser.in" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">casparser.in</a> for an API key.</>,
-            <>Alternatively, self-host the CAS parser and set <Code>CAS_PARSER_SERVICE_URL</Code>.</>,
-            <>Set <Code>CAS_PARSER_API_KEY</Code> for the external API (or <Code>CASPARSER_API_KEY</Code> as fallback).</>,
-            <>Set <Code>CAS_PARSER_ALLOW_EXTERNAL_FALLBACK=true</Code> to fall back to the hosted casparser.in API.</>,
-            <>In production, the server requires <Code>CAS_PARSER_SERVICE_URL</Code> to be configured.</>,
-            <>In development, defaults to <Code>http://localhost:8000</Code>.</>,
-          ]} />
-        </div>
-
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
-          For OAuth-based provider keys (Upstox, Splitwise, Google Drive), see the Integrations section.
-        </p>
       </div>
     ),
   },
@@ -781,72 +724,56 @@ npm run test:run # Run tests once`}</CodeBlock>
     content: (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Integration Setup</h2>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-            Nexus supports multiple OAuth-based integrations. These require server-side environment variables.
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Connecting other services</h2>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+            Nexus connects to a few external services to save you time. All integrations work out of the box
+            on Nexus Hosted \u2014 just connect them from Settings.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Upstox OAuth</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Connected Accounts \u2014 Read-only broker sync</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Upstox \u2014 auto-import your Indian stocks</h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Sync India stock holdings and positions from Upstox as read-only snapshots.
+            If you have an Upstox account, Nexus can pull your current stock holdings automatically.
+            This is <strong>read-only</strong> \u2014 Nexus can see your holdings but cannot place, modify, or
+            cancel any trades.
           </p>
           <Checklist items={[
-            <>Create an app in the <a href="https://developer.upstox.com" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">Upstox Developer Console</a>.</>,
-            <>Configure redirect URI: <Code>http://localhost:6868/api/connections/upstox/callback</Code> (local) or <Code>https://your-domain.vercel.app/api/connections/upstox/callback</Code>.</>,
-            'Set the following server env vars.',
+            'Go to Settings \u2192 Integrations.',
+            'Click "Connect Upstox" and sign in to your Upstox account.',
+            'Nexus imports your current holdings. Click Refresh any time to sync the latest.',
           ]} />
-          <EnvTable rows={[
-            { var: 'UPSTOX_CLIENT_ID', description: 'Upstox app client ID', required: true },
-            { var: 'UPSTOX_CLIENT_SECRET', description: 'Upstox app client secret', required: true },
-            { var: 'UPSTOX_REDIRECT_URI', description: 'OAuth callback URL', required: true },
-            { var: 'CONNECTED_ACCOUNTS_ENCRYPTION_KEY', description: 'Encryption key for stored tokens', required: true },
-            { var: 'CONNECTED_ACCOUNTS_STATE_SECRET', description: 'State parameter signing secret', required: true },
-            { var: 'APP_BASE_URL', description: 'Base URL of the app', required: true },
-          ]} />
+          <Tip>On Nexus Hosted, Upstox is ready to connect immediately. If you are running your own Nexus server, ask your server admin to configure the Upstox credentials first.</Tip>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Splitwise OAuth</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Shared expense tracking</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Splitwise \u2014 see shared expenses alongside your portfolio</h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Connect Splitwise to display shared-expense balances, group-level balances, and recent expenses in Nexus.
+            Connect your Splitwise account to see your shared expense balances (what you are owed or owe)
+            right alongside your portfolio. Useful for families or housemates who split costs.
           </p>
           <Checklist items={[
-            <>Register an app at <a href="https://secure.splitwise.com/apps" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">Splitwise Apps</a>.</>,
-            'Configure callback URL to match your deployment.',
-            'Set the following server env vars.',
+            'Go to Settings \u2192 Integrations.',
+            'Click "Connect Splitwise" and approve access.',
+            'Your group balances appear in the Integrations panel.',
           ]} />
-          <EnvTable rows={[
-            { var: 'SPLITWISE_CLIENT_ID', description: 'Splitwise app consumer key', required: true },
-            { var: 'SPLITWISE_CLIENT_SECRET', description: 'Splitwise app consumer secret', required: true },
-            { var: 'SPLITWISE_REDIRECT_URI', description: 'OAuth callback URL', required: true },
-            { var: 'SPLITWISE_API_BASE_URL', description: 'Splitwise API base URL', required: false },
-            { var: 'SPLITWISE_OAUTH_TOKEN_URL', description: 'OAuth token endpoint', required: false },
-            { var: 'SPLITWISE_OAUTH_AUTHORIZE_URL', description: 'OAuth authorize endpoint', required: false },
-            { var: 'SPLITWISE_STATE_SECRET', description: 'OAuth state signing secret', required: true },
-            { var: 'INTEGRATION_TOKEN_ENCRYPTION_KEY', description: 'Encryption key for OAuth tokens', required: true },
-          ]} />
+          <Tip>Like Upstox, Splitwise works out of the box on Nexus Hosted. Self-hosters need server-side configuration \u2014 see the Vercel Deployment docs.</Tip>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Google Drive OAuth</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Cloud backup and sync</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Google Drive \u2014 back up your portfolio data</h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Sync portfolio data to Google Drive for backup and cross-device transfer.
+            Save a copy of your portfolio to your own Google Drive. This gives you a personal backup
+            you can restore from at any time, and makes it easy to move data between devices or Nexus setups.
           </p>
           <Checklist items={[
-            'Create a Google Cloud Console project and enable the Google Drive API.',
-            'Create OAuth 2.0 credentials (Web application type).',
-            'Add your app domain to Authorized JavaScript origins and Authorized redirect URIs.',
-            <>Set <Code>VITE_GOOGLE_CLIENT_ID</Code> to your OAuth client ID.</>,
-            <>Nexus uses <Code>https://www.googleapis.com/auth/drive.file</Code> scope for app-specific files.</>,
+            'Go to Settings \u2192 Data \u2192 Google Drive Sync.',
+            'Click "Connect Google Drive" and grant access.',
+            'Use "Save to Drive" to backup, or "Restore from Drive" to bring data back.',
           ]} />
-          <EnvTable rows={[
-            { var: 'VITE_GOOGLE_CLIENT_ID', description: 'Google OAuth client ID for Drive API', required: true },
-          ]} />
+          <p className="text-slate-600 dark:text-slate-400 text-sm mt-2">
+            Nexus only accesses files it creates \u2014 it cannot see any other files in your Drive.
+          </p>
         </div>
       </div>
     ),
@@ -855,130 +782,157 @@ npm run test:run # Run tests once`}</CodeBlock>
   'user-guide': {
     title: 'User Guide',
     content: (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Using Nexus Portfolio</h2>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Sign In</h3>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">How to use Nexus</h2>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Open Nexus and click &quot;Sign in with Google&quot;. Sign in with any Google account.
-            If you are invited to a shared portfolio, the data loads automatically.
-            First-time users get a personal portfolio created automatically.
+            A walkthrough of the main things you will do in Nexus \u2014 from signing in for the first time
+            to importing your holdings and asking the AI about your portfolio.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Dashboard</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">1</span>
+            Sign in &amp; first-time setup
+          </h3>
+          <Checklist items={[
+            'Open Nexus and click "Sign in with Google". Use any Google account.',
+            'On your first visit, you will be asked how you want to store your data \u2014 choose "Nexus Hosted" for zero setup, or "Bring Your Own Firebase" for full data ownership.',
+            "That's it. Your portfolio workspace is ready.",
+          ]} />
+          <Tip>If you were invited to a family portfolio, just sign in \u2014 your access is granted automatically based on your Google email.</Tip>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">2</span>
+            Your dashboard
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            The dashboard is your bird&apos;s-eye view. It shows:
+          </p>
+          <ul className="list-disc list-inside space-y-1.5 text-sm text-slate-600 dark:text-slate-400 mb-3">
+            <li><strong>Total net worth</strong> \u2014 all assets minus all liabilities, in your preferred currency</li>
+            <li><strong>Allocation chart</strong> \u2014 how your money is spread across asset types (stocks, mutual funds, gold, etc.)</li>
+            <li><strong>By family member</strong> \u2014 how much each person owns</li>
+            <li><strong>By country</strong> \u2014 India vs Canada breakdown</li>
+          </ul>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            The dashboard shows total wealth, allocation charts (by country, currency, asset class),
-            performance attribution, growth over time, and member contribution breakdowns.
-            Use the scope filter (ALL / INDIA / CANADA) to focus on specific markets.
+            Use the <strong>All / India / Canada</strong> filter at the top to focus on one geography at a time.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Assets Ledger</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            The Assets view is a full-featured ledger with sorting, filtering, subtotals, and bulk refresh.
-            Columns include name, owner, asset class, ticker, quantity, cost basis, current price, and value.
-            Click any row to edit or delete the asset.
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">3</span>
+            Adding an asset
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+            Click <strong>Add Asset</strong> (on the dashboard or the Assets page) and fill in the form:
+          </p>
+          <ul className="list-disc list-inside space-y-1.5 text-sm text-slate-600 dark:text-slate-400 mb-3">
+            <li><strong>Name</strong> \u2014 whatever you want to call it (e.g., "HDFC Mid-Cap Fund")</li>
+            <li><strong>Owner</strong> \u2014 which family member holds this asset</li>
+            <li><strong>Asset class</strong> \u2014 Mutual Fund, Stock, Gold, Real Estate, etc.</li>
+            <li><strong>Quantity &amp; cost</strong> \u2014 how many units and what you paid</li>
+            <li><strong>Ticker (optional)</strong> \u2014 the exchange symbol for live prices, e.g. <Code>NSE:RELIANCE</Code> or <Code>TSX:XIU</Code>. Leave blank to enter prices manually.</li>
+          </ul>
+          <Tip>Not sure of the ticker? Leave it blank for now. You can always add it later, and Nexus will start fetching live prices from that point.</Tip>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">4</span>
+            Inviting family members
+          </h3>
+          <Checklist items={[
+            'Go to Settings \u2192 Access.',
+            'Enter their Google email address and click Invite.',
+            'They sign in with that Google account \u2014 and your shared portfolio loads automatically.',
+          ]} />
+          <p className="text-slate-600 dark:text-slate-400 text-sm mt-2">
+            Each member gets their own login. Everyone sees the same data. You stay in control as the owner.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Add / Edit Assets</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Click the Add Asset button (from the ledger or dashboard) to open the modal.
-            Fill in name, owner, country, asset class, quantity, cost basis, currency, and ticker.
-            If a ticker is provided, Nexus can auto-fetch live prices. Ticker format:
-            <Code>EXCHANGE:SYMBOL</Code> (e.g., <Code>NASDAQ:AAPL</Code>, <Code>NSE:RELIANCE</Code>).
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">5</span>
+            Refreshing prices
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
+            Click the <strong>refresh icon</strong> in the top bar (or go to Settings \u2192 Pricing \u2192 Refresh All Prices).
+            Nexus fetches the latest prices for every asset that has a ticker.
           </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Price Refresh</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Click the refresh button (header icon or Settings &gt; Pricing &gt; Refresh All Prices).
-            The app uses a multi-provider fallback chain: primary provider, then secondary, then Yahoo.
-            India mutual funds use AMFI. U.S. stocks use Massive (if configured).
-            Gold uses gold-api.com with exchange rate fallback.
-          </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Import Holdings</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            In Settings &gt; Data, download CSV templates for India and Canada holdings.
-            Fill in your data and upload. The importer handles flexible column headers
-            and resolves purchase price / quantity triangles automatically.
-          </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Screenshot Import</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Upload screenshots of broker portfolios or transaction receipts.
-            The AI assistant extracts asset names, quantities, and prices,
-            then matches against your existing holdings. Access from Settings &gt; Data or the quick action button.
-          </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">CAS Import</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Upload a CAS (Consolidated Account Statement) PDF from Indian mutual fund providers.
-            The server parses the PDF (via casparser.in or self-hosted parser) and extracts
-            all folios, scheme names, units, NAVs, and values. Access from Settings &gt; Data.
-          </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Settings</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Settings has five tabs:
-          </p>
-          <ul className="list-disc list-inside space-y-1.5 text-sm text-slate-600 dark:text-slate-400 mt-2">
-            <li><strong>Access</strong> \u2014 Manage members, invite by email, assign roles (owner/partner)</li>
-            <li><strong>Pricing</strong> \u2014 Price providers, currency preferences, AI assistant credentials, price refresh</li>
-            <li><strong>Structure</strong> \u2014 Asset classes, add/edit/delete custom classes</li>
-            <li><strong>Data</strong> \u2014 Import/export holdings, Google Drive sync, local-to-cloud migration</li>
-            <li><strong>Integrations</strong> \u2014 Connected Accounts (Upstox), Splitwise, member integration views</li>
+          <ul className="list-disc list-inside space-y-1 text-sm text-slate-600 dark:text-slate-400">
+            <li><strong>Auto-updated:</strong> Indian stocks (NSE/BSE), Indian mutual funds (AMFI NAV), Canadian and U.S. stocks</li>
+            <li><strong>Manual:</strong> Real estate, fixed deposits, bank balances, and anything without a ticker \u2014 you update these yourself</li>
           </ul>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Integrations</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            In Settings &gt; Integrations, connect Upstox for read-only holdings sync and Splitwise for
-            shared expense tracking. Each member can have their own connections.
-            Owners can view and refresh other members&apos; integrations.
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">6</span>
+            Import from a broker screenshot
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
+            Take a screenshot of your broker app or portfolio page, then go to <strong>Settings \u2192 Data \u2192 Screenshot Import</strong>.
+            Upload the image and the AI reads the holdings, quantities, and prices for you.
+            Review the results and confirm which assets to add.
+          </p>
+          <Tip>This requires an AI assistant key (Gemini or DeepSeek). See the AI Keys section to set one up \u2014 it takes about 2 minutes and is free.</Tip>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">7</span>
+            Import from a CAS PDF
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
+            A <strong>CAS PDF</strong> (Consolidated Account Statement) is a single document listing all your Indian
+            mutual fund holdings across all fund houses. You can download it from{' '}
+            <a href="https://www.camsonline.com/InvestorServices/MF_PORTFOLIO_CAS.aspx" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">CAMS</a>
+            {' '}or{' '}
+            <a href="https://mfs.kfintech.com/investor/General/ConsolidatedAccountStatement" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">Karvy/KFintech</a>.
+          </p>
+          <Checklist items={[
+            'Download your CAS PDF from CAMS or Karvy using your PAN number.',
+            'Go to Settings \u2192 Data \u2192 CAS Import.',
+            'Upload the PDF. Nexus reads all your folios, scheme names, units, and NAVs.',
+            'Review and confirm the import.',
+          ]} />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">8</span>
+            AI assistant
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
+            Ask the AI assistant anything about your portfolio in plain English. For example:
+          </p>
+          <ul className="list-disc list-inside space-y-1 text-sm text-slate-600 dark:text-slate-400 mb-3">
+            <li>"How much of our wealth is in India vs Canada?"</li>
+            <li>"Which asset class are we most concentrated in?"</li>
+            <li>"What is our total mutual fund exposure?"</li>
+          </ul>
+          <p className="text-slate-600 dark:text-slate-400 text-sm">
+            The AI sees your actual portfolio data. To enable it, add a free Gemini or DeepSeek key in{' '}
+            <strong>Settings \u2192 Pricing \u2192 AI Assistant</strong>. See the <strong>AI Keys</strong> section for how to get one.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">AI Assistant</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#00875A] text-white text-xs font-bold mr-2">9</span>
+            Exporting &amp; migrating your data
+          </h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            The AI assistant is available in Settings &gt; Pricing or via the chat widget.
-            Configure with a Gemini or DeepSeek API key. Ask questions about your portfolio,
-            analyze allocation, identify concentration risks, or get market insights.
-            The AI has access to your portfolio context including holdings, prices, and asset classes.
+            You can export your entire portfolio as a file at any time and import it into a different Nexus setup.
+            This is useful if you switch from Nexus Hosted to your own Firebase, or just want a backup.
+            See the <strong>Data Portability</strong> section for full details.
           </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Shared Portfolio &amp; Member Access</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Nexus supports shared portfolios. The owner can invite members via email.
-            Members see the same portfolio data. Each member can set personal price provider overrides
-            and broker connections (stored locally on their device).
-            Owners can view and refresh connected accounts for all members.
-          </p>
-          <Tip>
-            Member access is controlled via Firestore. When a user signs in with Google for the first time,
-            a personal portfolio is created. Owners can invite additional members in Settings {'>'} Access.
-          </Tip>
         </div>
       </div>
     ),
@@ -989,97 +943,58 @@ npm run test:run # Run tests once`}</CodeBlock>
     content: (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Data Portability</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Your data, your way</h2>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-            Nexus supports data portability so you always own your financial data. You can export your
-            full portfolio as a machine-readable JSON file and restore it later &mdash; or move it to another
-            Nexus instance.
+            Your portfolio data always belongs to you. Nexus lets you export everything at any time
+            and import it back — whether you are making a backup, switching from Nexus Hosted to your
+            own Firebase, or just moving to a new device.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Exporting Your Data</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Exporting your data</h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Navigate to <strong>Settings &gt; Data &gt; Data Portability</strong> and click
-            <strong> Export Data (JSON)</strong>. The export file includes:
+            Go to <strong>Settings → Data → Data Portability</strong> and click <strong>Export Data</strong>.
+            Nexus downloads a file to your computer that includes:
           </p>
           <Checklist items={[
-            <>All portfolio holdings (assets with tickers, quantities, cost bases, and metadata)</>,
-            <>All custom asset class definitions</>,
-            <>Currency settings (primary/secondary/base)</>,
-            <>Connected account metadata (provider status, account counts) &mdash; <em>never OAuth tokens or secrets</em></>,
-            <>Onboarding checklist preferences (if locally stored)</>,
+            'All your assets — names, quantities, cost, tickers, and which family member owns each',
+            'Your asset class setup (e.g. custom categories you created)',
+            'Your currency preferences',
           ]} />
-          <Tip>The export file never includes API keys, OAuth tokens, client secrets, passwords, or any other authentication credentials.</Tip>
+          <Tip>The export file never contains passwords, API keys, or login credentials of any kind. It is safe to store alongside other financial documents.</Tip>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Importing Your Data</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Importing your data</h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Navigate to <strong>Settings &gt; Data &gt; Data Portability</strong>, click
-            <strong> Import Data (JSON)</strong>, and select your <Code>.json</Code> export file.
+            Go to <strong>Settings → Data → Data Portability</strong>, click <strong>Import Data</strong>,
+            and select the file you exported. Nexus shows you a preview of what will be imported,
+            then asks you to choose one of two modes:
           </p>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Before the import is applied, Nexus validates the file and shows a preview with counts of
-            assets, asset classes, portfolios, and connected accounts. You can then choose between two
-            import modes:
-          </p>
-          <ul className="list-disc list-inside space-y-1.5 text-sm text-slate-600 dark:text-slate-400 mb-3">
-            <li><strong>Merge</strong> &mdash; adds imported assets and classes alongside your existing data. Duplicate assets (by ID) and classes (by name) are skipped.</li>
-            <li><strong>Replace</strong> &mdash; clears your current portfolio and loads only the imported data. Use with caution.</li>
+          <ul className="list-disc list-inside space-y-2 text-sm text-slate-600 dark:text-slate-400 mb-3">
+            <li><strong>Merge</strong> — adds the imported assets alongside what you already have. Anything that already exists is left untouched. Safe to use at any time.</li>
+            <li><strong>Replace</strong> — clears your current portfolio entirely and loads the imported data fresh. Use this when migrating to a new setup.</li>
           </ul>
           <Warning>
-            <strong>Replace</strong> mode will overwrite your current portfolio. Make sure you have a
-            recent export before using this mode.
+            Replace mode deletes your current data before importing. Export first so you have a backup.
           </Warning>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Schema</h3>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            The export format is versioned to ensure compatibility. Each export file contains:
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Moving from Nexus Hosted to your own Firebase</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+            Ready to move your data to a self-owned Firebase project? Here is the two-step process:
           </p>
-          <CodeBlock>{`{
-  "nexusExportVersion": 1,
-  "app": "nexus-portfolio",
-  "exportedAt": "2026-01-01T00:00:00.000Z",
-  "portfolios": [
-    {
-      "assets": [ ... ],
-      "assetClasses": [ ... ],
-      "baseCurrency": "CAD",
-      "primaryCurrency": "CAD",
-      "secondaryCurrency": "USD"
-    }
-  ],
-  "connectedAccounts": [
-    {
-      "provider": "upstox",
-      "status": "connected",
-      "accountCount": 1,
-      "holdingsCount": 5,
-      "positionsCount": 2
-    }
-  ],
-  "preferences": {
-    "checklist": { "sign-in": "done" }
-  }
-}`}</CodeBlock>
-          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mt-3">
-            Nexus validates the <Code>nexusExportVersion</Code> and <Code>app</Code> fields on import
-            and rejects files with unknown versions or identifiers. This prevents accidental data
-            corruption from incompatible files.
-          </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Security Notes</h3>
           <Checklist items={[
-            <>The export never includes OAuth tokens, API keys, client secrets, or passwords.</>,
-            <>Connected account metadata includes only provider name, status, and counts &mdash; no credentials.</>,
-            <>Store your export files securely. They contain financial holdings data.</>,
-            <>Re-importing does not restore OAuth connections. You must reconnect providers after import.</>,
+            'On Nexus Hosted: Settings → Data → Export Data. Save the file.',
+            'Set up your own Firebase following the Bring Your Own Firebase guide. Sign in.',
+            'On your new setup: Settings → Data → Import Data → select the file → Replace.',
           ]} />
+          <p className="text-slate-600 dark:text-slate-400 text-sm mt-2">
+            After importing, you will need to reconnect Upstox, Splitwise, and Google Drive — those
+            connections are not included in the export file.
+          </p>
         </div>
       </div>
     ),
@@ -1090,121 +1005,93 @@ npm run test:run # Run tests once`}</CodeBlock>
     content: (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Common Issues</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Something not working?</h2>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+            Here are fixes for the most common issues. If you are still stuck, file an issue on the{' '}
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-[#00875A] hover:underline">Nexus GitHub repository</a>.
+          </p>
         </div>
 
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Firebase env missing</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              If the app fails to load or shows Firebase errors, check that all <Code>NEXT_PUBLIC_FIREBASE_*</Code> variables are set.
-              The app reads them from <Code>import.meta.env</Code> at runtime. Verify your <Code>.env.local</Code> or Vercel env settings.
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">I cannot sign in</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              If the sign-in popup closes without logging you in, there are two likely causes:
             </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">unauthorized-domain</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              The current domain is not in Firebase Authentication &gt; Authorized domains.
-              Add <Code>localhost</Code>, <Code>127.0.0.1</Code>, or your production domain to the list.
-              Wait a few minutes for the change to propagate.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Firestore permission denied</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Firestore security rules are blocking reads/writes. For development, set rules to allow
-              all authenticated users. For production, implement proper per-portfolio access control.
-              Nexus expects to read/write the <Code>{'portfolios/{portfolioId}'}</Code> document.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Firebase Admin missing</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Server-side features (connected accounts, Splitwise, AI credentials) require Firebase Admin setup.
-              If you see &quot;Firebase Admin is not configured&quot; or 401 errors from API routes,
-              ensure <Code>FIREBASE_ADMIN_PROJECT_ID</Code>, <Code>FIREBASE_ADMIN_CLIENT_EMAIL</Code>, and
-              <Code>FIREBASE_ADMIN_PRIVATE_KEY</Code> are set in the server environment.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">OAuth redirect mismatch</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Upstox and Splitwise OAuth flows require exact redirect URI matching.
-              Ensure the redirect URI configured in the provider console exactly matches
-              what is set in your environment variables (including protocol, domain, port, and path).
-              For local: <Code>http://localhost:6868/...</Code>. For production: <Code>https://your-domain.vercel.app/...</Code>.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">API key present but feature unavailable</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              If you set an API key but the feature still shows as unavailable:
-            </p>
-            <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 mt-2 space-y-1">
-              <li>Server-only keys (e.g., <Code>MASSIVE_API_KEY</Code>) must be set in the server environment, not client-side.</li>
-              <li>User-facing keys (e.g., Gemini) must be saved in Nexus Settings {'>'} AI Assistant, not just as env vars.</li>
-              <li>Price provider keys can be either server env vars or user overrides in Settings {'>'} Pricing.</li>
-              <li>Some features require both Firebase Admin AND the provider key to be configured.</li>
+            <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+              <li><strong>Using your own Firebase?</strong> Your current web address needs to be added to the allowed domains list in your Firebase project. See the Bring Your Own Firebase guide, Step 4.</li>
+              <li><strong>On Nexus Hosted?</strong> Try a different browser or disable any popup blockers.</li>
             </ul>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Local works but production fails</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Common causes:
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">I am stuck on a Firebase sign-in screen and cannot get back</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              This usually means a previous Firebase setup was saved and is now misconfigured. To reset:
             </p>
-            <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 mt-2 space-y-1">
-              <li>Missing environment variables in Vercel (set them in Vercel Dashboard {'>'} Project Settings).</li>
-              <li>Production domain not in Firebase Authorized domains.</li>
-              <li>OAuth redirect URI points to <Code>localhost</Code> instead of production URL.</li>
-              <li>Vercel preview deployment needs its own env vars or uses production Firebase data.</li>
-              <li>CORS issues with the finance API route.</li>
+            <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+              <li>Open your browser&apos;s developer console (press F12 or right-click \u2192 Inspect \u2192 Console).</li>
+              <li>Type <Code>localStorage.clear()</Code> and press Enter.</li>
+              <li>Reload the page. You will be back at the sign-in screen.</li>
+            </ol>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">My data is not loading / I see &quot;Access denied&quot;</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              If you are using your own Firebase and see an access error right after signing in,
+              your Firebase database security rules may not be published yet. Go to your Firebase project,
+              open the Firestore Rules tab, and make sure the rules are published. It can take up to
+              60 seconds for changes to take effect. See the Bring Your Own Firebase guide, Step 6 for the exact rules to use.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Prices are not updating</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              A few things to check:
+            </p>
+            <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+              <li>Assets without a ticker (stocks, funds, gold) need a ticker to get live prices. Edit the asset and add one.</li>
+              <li>Manual assets like real estate, FDs, and bank balances always require a manual update \u2014 there is no live feed for these.</li>
+              <li>If the refresh spinner spins but prices do not change, try again in a few minutes. Price sources occasionally have brief outages and Nexus retries automatically.</li>
             </ul>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Production works but local fails</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Common causes:
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">The AI assistant is not working</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              The AI assistant needs a key before it can work. To set one up:
             </p>
-            <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 mt-2 space-y-1">
-              <li>Missing <Code>.env.local</Code> file or empty Firebase values.</li>
-              <li><Code>localhost</Code> and <Code>127.0.0.1</Code> not in Firebase Authorized domains.</li>
-              <li>Firebase Admin private key not properly formatted with <Code>\n</Code> escape sequences.</li>
-              <li>OAuth redirect URIs still pointing to production.</li>
-              <li>Port 6868 already in use \u2014 check <Code>lsof -i :6868</Code>.</li>
+            <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+              <li>Go to Settings \u2192 Pricing \u2192 AI Assistant.</li>
+              <li>Select a provider (Gemini or DeepSeek) and paste your API key.</li>
+              <li>Click Save. The assistant should be available immediately.</li>
+            </ol>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+              See the <strong>AI Assistant Keys</strong> section for step-by-step instructions to get a free key.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">I imported data but nothing changed</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Make sure you are importing a file exported from Nexus itself (Settings \u2192 Data \u2192 Export Data).
+              Nexus checks that the file is a valid Nexus export and will show an error for any other file type.
+              If you chose <strong>Merge</strong> mode and already had the same assets, duplicates are skipped \u2014
+              that is expected. Try <strong>Replace</strong> mode if you want the imported data to fully take over.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">I connected Upstox but my holdings are empty</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              Two things to try:
+            </p>
+            <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+              <li>Go to Settings \u2192 Integrations and click <strong>Refresh</strong> next to Upstox. The first sync can take a moment.</li>
+              <li>If it is still empty, disconnect and reconnect Upstox. This re-authorises the connection and often resolves stale permission issues.</li>
             </ul>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Empty states hidden because account already has data</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              If you set up Nexus with real data, the onboarding empty states (welcome messages,
-              import prompts) will not appear. To reset, use Settings &gt; Data &gt; Danger Zone &gt;
-              Erase All Holdings, or use the Local To Cloud Migration tool to replace cloud data.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Yahoo Finance rate limiting</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Yahoo Finance has aggressive rate limiting. If you see &quot;Yahoo is temporarily rate-limiting requests&quot;,
-              the app automatically switches to secondary providers. The cooldown lasts 5 minutes.
-              Configure a paid provider (Alpha Vantage or Finnhub) to avoid this.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Getting Help</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              For issues with self-hosting, check the project README and the docs in this section.
-              For bugs or feature requests, file an issue on the Nexus GitHub repository.
-            </p>
           </div>
         </div>
       </div>
