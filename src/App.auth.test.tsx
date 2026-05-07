@@ -289,6 +289,57 @@ describe('App authentication flow', () => {
     expect(screen.getByText('Welcome to Nexus Portfolio')).toBeInTheDocument();
   });
 
+  it('signing out and then signing in as user B does not reuse user A ownership', () => {
+    storeOwnership('user-a', 'hosted');
+
+    mockUseAuth.mockReturnValue({
+      user: { uid: 'user-a', email: 'a@example.com' },
+      loading: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+    mockUsePortfolio.mockReturnValue({
+      isPortfolioLoading: false,
+      hasAccess: true,
+      accessError: null,
+      refreshPrices: vi.fn(),
+      isRefreshing: false,
+      portfolios: [],
+      activePortfolioId: null,
+      setActivePortfolioId: vi.fn(),
+      assets: [],
+    });
+
+    const { rerender } = render(<App />);
+
+    expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(2);
+
+    mockUseAuth.mockReturnValue({
+      user: null,
+      loading: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    rerender(<App />);
+
+    expect(screen.getByText('Nexus Portfolio')).toBeInTheDocument();
+
+    mockUseAuth.mockReturnValue({
+      user: { uid: 'user-b', email: 'b@example.com' },
+      loading: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    rerender(<App />);
+
+    expect(screen.getByText('Welcome to Nexus Portfolio')).toBeInTheDocument();
+  });
+
   it('does not crash on corrupt global localStorage ownership', () => {
     store['nexus.workspaceOwnership.v1'] = 'not-json-at-all';
 
