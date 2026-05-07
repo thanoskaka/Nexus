@@ -7,6 +7,7 @@ import { createUpstoxRouter } from './src/server/providers/upstox/upstoxRoutes';
 import { createSharedIntegrationsRouter } from './src/server/integrations/sharedRoutes';
 import { createScreenshotRouter } from './src/server/providers/screenshot/screenshotRoutes.js';
 import { createAiCredentialsRouter } from './src/server/user/aiCredentialsRoutes.js';
+import { createAccountDeletionRouter } from './src/server/user/accountDeletionRoutes.js';
 import { createSetupStatusRouter } from './src/server/setup/setupStatusRoutes.js';
 
 function getNormalizedTicker(result: unknown) {
@@ -95,6 +96,7 @@ export function createApp() {
   app.use('/api/import', createScreenshotRouter());
   app.use('/api/user/ai-credentials', createAiCredentialsRouter());
   app.use('/api/setup', createSetupStatusRouter());
+  app.use('/api/user/account', createAccountDeletionRouter());
 
   return app;
 }

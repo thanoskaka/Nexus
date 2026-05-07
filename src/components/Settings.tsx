@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { usePortfolio } from '../store/PortfolioContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson, FlaskConical, Wand2 } from 'lucide-react';
+import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson, FlaskConical, Wand2, AlertTriangle } from 'lucide-react';
 import {
   buildExportPayload,
   computeImportResult,
@@ -37,6 +37,9 @@ import { useAuth } from '../store/AuthContext';
 import { SetupHealthCard } from './SetupHealthCard';
 import { ProviderCapabilityMatrix } from './ProviderCapabilityMatrix';
 import { getWorkspaceOwnership, resetWorkspaceOwnership, type WorkspaceMode } from '../store/workspaceOwnership';
+import { deleteAccount as deleteAccountApi, DeleteAccountError } from '../lib/accountApi';
+import { signOut } from 'firebase/auth';
+import { auth as hostedAuth } from '../lib/firebase';
 import { SetupHistoryPanel } from './SetupHistoryPanel';
 import { recordEvent, getSetupHistory, clearSetupHistory } from '../store/setupHistory';
 
@@ -180,6 +183,10 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
   const [selectedIntegrationMemberKey, setSelectedIntegrationMemberKey] = React.useState<string>('mine');
   const [workspaceMode, setWorkspaceMode] = React.useState<WorkspaceMode | null>(null);
   const [workspaceResetBusy, setWorkspaceResetBusy] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const canEditCurrencies = currentUserRole === 'owner';
 
   const formatCurrencyAmount = React.useCallback((entry: CurrencyAmount) => {
@@ -323,6 +330,60 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
         setAlertDialog({ open: true, title: 'Workspace Reset', description: 'Your workspace ownership preference has been cleared. You will be asked to choose again on your next visit.' });
       },
     });
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    setDeleteError(null);
+    try {
+      const { authDeleted } = await deleteAccountApi();
+
+      clearSetupHistory();
+      const uid = user?.uid;
+      if (uid) {
+        resetWorkspaceOwnership(uid);
+        const keysToRemove = [
+          `nexus-active-portfolio:${uid}`,
+          `nexus_assets_cache_${uid}`,
+        ];
+        for (const key of keysToRemove) {
+          try { window.localStorage.removeItem(key); } catch { }
+        }
+      }
+      try { window.localStorage.removeItem('nexus-checklist-state'); } catch { }
+
+      setDeleteDialogOpen(false);
+      setDeleteConfirmText('');
+      setIsDeletingAccount(false);
+
+      const currentUser = hostedAuth.currentUser;
+      if (currentUser) {
+        if (!authDeleted) {
+          try {
+            await currentUser.delete();
+          } catch (err) {
+            const fbErr = err as { code?: string };
+            if (fbErr.code === 'auth/requires-recent-login') {
+              setAlertDialog({
+                open: true,
+                title: 'Sign in again required',
+                description: 'For security, please sign out and sign in again, then retry account deletion. Your server data has already been removed.',
+              });
+              await signOut(hostedAuth);
+              return;
+            }
+          }
+        }
+        await signOut(hostedAuth);
+      }
+    } catch (err) {
+      setIsDeletingAccount(false);
+      if (err instanceof DeleteAccountError) {
+        setDeleteError(err.message);
+      } else {
+        setDeleteError(err instanceof Error ? err.message : 'Account deletion failed. Please try again.');
+      }
+    }
   };
 
   React.useEffect(() => {
@@ -2437,7 +2498,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
       </div>
       )}
 
-      {activeTab === 'workspace' && (
+      {activeTab === 'workspace' && (<>
         <Card id="workspace" className="border-none shadow-sm rounded-2xl mb-6">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -2512,6 +2573,87 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
             </div>
           </CardContent>
         </Card>
+
+        <Card className="border-none shadow-sm rounded-2xl border-red-200 dark:border-red-900/50">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+            </div>
+            <CardDescription>Irreversible actions that affect your entire Nexus account.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-950/20">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">Delete Account</h3>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Permanently delete your Nexus account and all associated data. This will:
+                  </p>
+                  <ul className="list-disc pl-5 text-sm text-red-700 dark:text-red-300 space-y-1">
+                    <li>Remove all portfolio data, connected accounts, and API credentials from our servers</li>
+                    <li>Remove you from any shared portfolios</li>
+                    <li>Delete your Firebase Auth account (you will need a new account to use Nexus again)</li>
+                    <li>Reset all local browser preferences and setup choices</li>
+                  </ul>
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-200">This action is permanent and cannot be undone.</p>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setDeleteConfirmText('');
+                    setDeleteError(null);
+                    setDeleteDialogOpen(true);
+                  }}
+                  className="rounded-full shrink-0"
+                  data-testid="delete-account-button"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Account
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Dialog open={deleteDialogOpen} onOpenChange={(open) => { if (!isDeletingAccount) setDeleteDialogOpen(open); }}>
+          <DialogHeader>
+            <DialogTitle>Delete Account</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all your Nexus data. Type <strong>{user?.email || 'DELETE'}</strong> to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            {deleteError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+                {deleteError}
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Type {user?.email || 'DELETE'} to confirm</label>
+              <Input
+                value={deleteConfirmText}
+                onChange={(event) => setDeleteConfirmText(event.target.value)}
+                placeholder={user?.email || 'DELETE'}
+                data-testid="delete-confirm-input"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setDeleteError(null); }} disabled={isDeletingAccount}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleteConfirmText.trim() !== (user?.email || 'DELETE') || isDeletingAccount}
+                onClick={() => void handleDeleteAccount()}
+                data-testid="delete-confirm-button"
+              >
+                {isDeletingAccount ? 'Deleting...' : 'Permanently Delete Account'}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      </>
       )}
 
       {activeTab === 'integrations' && (
