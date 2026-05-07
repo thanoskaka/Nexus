@@ -1,4 +1,64 @@
 {
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "framework": "vite",
+        "installCommand": "npm install",
+        "buildCommand": "npm run build",
+        "outputDirectory": "dist"
+      }
+    },
+    {
+      "src": "api/finance.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/setup/status.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/splitwise/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/integrations/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/connections/upstox/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/connections/screenshot/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/connections/cas/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/ai/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/user/account/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/user/ai-credentials/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/user/workspace-ownership/[...route].ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/user/onboarding/[...route].ts",
+      "use": "@vercel/node"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/integrations/splitwise/(.*)",
