@@ -41,7 +41,7 @@ import { deleteAccount as deleteAccountApi, DeleteAccountError } from '../lib/ac
 import { signOut } from 'firebase/auth';
 import { auth as hostedAuth } from '../lib/firebase';
 import { SetupHistoryPanel } from './SetupHistoryPanel';
-import { recordEvent, getSetupHistory, clearSetupHistory } from '../store/setupHistory';
+import { recordEvent, getSetupHistory, clearSetupHistory, type SetupEvent } from '../store/setupHistory';
 
 export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
 type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'credentials' | 'workspace';
@@ -187,6 +187,10 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
   const [deleteConfirmText, setDeleteConfirmText] = React.useState('');
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [setupEvents, setSetupEvents] = React.useState<SetupEvent[]>(() => getSetupHistory());
+  const refreshSetupHistory = React.useCallback(() => {
+    setSetupEvents(getSetupHistory());
+  }, []);
   const canEditCurrencies = currentUserRole === 'owner';
 
   const formatCurrencyAmount = React.useCallback((entry: CurrencyAmount) => {
@@ -310,6 +314,10 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
     if (!initialSection) return;
     setActiveTab(getTabForSection(initialSection));
   }, [initialSection]);
+
+  React.useEffect(() => {
+    refreshSetupHistory();
+  }, [refreshSetupHistory]);
 
   React.useEffect(() => {
     const ownership = getWorkspaceOwnership(user?.uid);
