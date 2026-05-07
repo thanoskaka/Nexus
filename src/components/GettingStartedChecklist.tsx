@@ -81,6 +81,7 @@ export interface GettingStartedChecklistProps {
   aiKeyConfigured: boolean;
   onNavigateToSettings?: (section: string) => void;
   onNavigateToDocs?: () => void;
+  onStartSetupWizard?: () => void;
 }
 
 export function GettingStartedChecklist({
