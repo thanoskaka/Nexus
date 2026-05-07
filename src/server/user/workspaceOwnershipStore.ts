@@ -1,4 +1,4 @@
-import { getFirebaseAdminFirestore } from '../firebaseAdmin.js';
+import { getStorageAdapter } from '../storage/index.js';
 import {
   WORKSPACE_OWNERSHIP_COLLECTION,
   type WorkspaceOwnershipDocument,
@@ -8,10 +8,6 @@ import type { FirebaseClientConfig, WorkspaceMode } from '../../store/workspaceO
 
 function now() {
   return Date.now();
-}
-
-function getDocRef(uid: string) {
-  return getFirebaseAdminFirestore().collection(WORKSPACE_OWNERSHIP_COLLECTION).doc(uid);
 }
 
 function toResponse(doc: WorkspaceOwnershipDocument): WorkspaceOwnershipResponse {
@@ -25,9 +21,9 @@ function toResponse(doc: WorkspaceOwnershipDocument): WorkspaceOwnershipResponse
 }
 
 export async function getServerWorkspaceOwnership(uid: string): Promise<WorkspaceOwnershipResponse> {
-  const snapshot = await getDocRef(uid).get();
-  if (!snapshot.exists) return { ownership: null };
-  return toResponse(snapshot.data() as WorkspaceOwnershipDocument);
+  const doc = await getStorageAdapter().getDoc<WorkspaceOwnershipDocument>(WORKSPACE_OWNERSHIP_COLLECTION, uid);
+  if (!doc) return { ownership: null };
+  return toResponse(doc);
 }
 
 export async function saveServerWorkspaceOwnership(input: {
@@ -36,23 +32,21 @@ export async function saveServerWorkspaceOwnership(input: {
   mode: WorkspaceMode;
   firebaseConfig?: FirebaseClientConfig;
 }): Promise<WorkspaceOwnershipResponse> {
-  const existing = await getDocRef(input.uid).get();
+  const existing = await getStorageAdapter().getDoc<WorkspaceOwnershipDocument>(WORKSPACE_OWNERSHIP_COLLECTION, input.uid);
   const timestamp = now();
   const payload: WorkspaceOwnershipDocument = {
     uid: input.uid,
     email: input.email,
     mode: input.mode,
     firebaseConfig: input.mode === 'selfOwned' ? input.firebaseConfig : undefined,
-    createdAt: existing.exists
-      ? ((existing.data() as Partial<WorkspaceOwnershipDocument>)?.createdAt || timestamp)
-      : timestamp,
+    createdAt: existing?.createdAt || timestamp,
     updatedAt: timestamp,
   };
 
-  await getDocRef(input.uid).set(payload, { merge: true });
+  await getStorageAdapter().setDoc(WORKSPACE_OWNERSHIP_COLLECTION, input.uid, payload as unknown as Record<string, unknown>, true);
   return toResponse(payload);
 }
 
 export async function deleteServerWorkspaceOwnership(uid: string): Promise<void> {
-  await getDocRef(uid).delete();
+  await getStorageAdapter().deleteDoc(WORKSPACE_OWNERSHIP_COLLECTION, uid);
 }

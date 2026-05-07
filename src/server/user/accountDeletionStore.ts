@@ -1,5 +1,5 @@
-import { getFirebaseAdminFirestore, getFirebaseAdminAuth } from '../firebaseAdmin.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import { getFirebaseAdminAuth } from '../firebaseAdmin.js';
+import { getStorageAdapter } from '../storage/index.js';
 
 const PORTFOLIOS_COLLECTION = 'portfolios';
 const EXTERNAL_CONNECTIONS_COLLECTION = 'external_connections';
@@ -20,6 +20,7 @@ interface PortfolioMember {
 }
 
 interface PortfolioDocument {
+  id: string;
   members?: PortfolioMember[];
   memberEmails?: string[];
   ownerUid?: string;
@@ -32,48 +33,29 @@ function getPersonalPortfolioId(uid: string): string {
   return `user-${uid}`;
 }
 
-async function deleteCollectionByUid(db: FirebaseFirestore.Firestore, collectionName: string, uid: string, batchSize = 50): Promise<number> {
-  let totalDeleted = 0;
-  let hasMore = true;
+async function deleteCollectionByUid(collectionName: string, uid: string): Promise<number> {
+  const docs = await getStorageAdapter().queryWhere<{ id: string }>(collectionName, 'uid', '==', uid);
+  if (docs.length === 0) return 0;
 
-  while (hasMore) {
-    const snapshot = await db
-      .collection(collectionName)
-      .where('uid', '==', uid)
-      .limit(batchSize)
-      .get();
-
-    if (snapshot.empty) {
-      hasMore = false;
-      break;
-    }
-
-    const batch = db.batch();
-    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-    totalDeleted += snapshot.size;
-
-    if (snapshot.size < batchSize) {
-      hasMore = false;
-    }
+  const batch = getStorageAdapter().batch();
+  for (const doc of docs) {
+    batch.delete(collectionName, doc.id);
   }
-
-  return totalDeleted;
+  await batch.commit();
+  return docs.length;
 }
 
-async function deleteDocIfExists(db: FirebaseFirestore.Firestore, collectionName: string, docId: string): Promise<boolean> {
-  const ref = db.collection(collectionName).doc(docId);
-  const snapshot = await ref.get();
-  if (snapshot.exists) {
-    await ref.delete();
+async function deleteDocIfExists(collectionName: string, docId: string): Promise<boolean> {
+  const doc = await getStorageAdapter().getDoc(collectionName, docId);
+  if (doc) {
+    await getStorageAdapter().deleteDoc(collectionName, docId);
     return true;
   }
   return false;
 }
 
 export async function deleteUserData(uid: string, email?: string): Promise<{ deleted: Record<string, number> }> {
-  const db = getFirebaseAdminFirestore();
-  const   deleted: Record<string, number> = {
+  const deleted: Record<string, number> = {
     externalConnections: 0,
     externalAccounts: 0,
     externalHoldings: 0,
@@ -88,30 +70,30 @@ export async function deleteUserData(uid: string, email?: string): Promise<{ del
     sharedPortfolios: 0,
   };
 
-  deleted.externalConnections = await deleteCollectionByUid(db, EXTERNAL_CONNECTIONS_COLLECTION, uid);
-  deleted.externalAccounts = await deleteCollectionByUid(db, EXTERNAL_ACCOUNTS_COLLECTION, uid);
-  deleted.externalHoldings = await deleteCollectionByUid(db, EXTERNAL_HOLDINGS_COLLECTION, uid);
-  deleted.externalOverrides = await deleteCollectionByUid(db, EXTERNAL_OVERRIDES_COLLECTION, uid);
-  deleted.externalSyncRuns = await deleteCollectionByUid(db, EXTERNAL_SYNC_RUNS_COLLECTION, uid);
+  deleted.externalConnections = await deleteCollectionByUid(EXTERNAL_CONNECTIONS_COLLECTION, uid);
+  deleted.externalAccounts = await deleteCollectionByUid(EXTERNAL_ACCOUNTS_COLLECTION, uid);
+  deleted.externalHoldings = await deleteCollectionByUid(EXTERNAL_HOLDINGS_COLLECTION, uid);
+  deleted.externalOverrides = await deleteCollectionByUid(EXTERNAL_OVERRIDES_COLLECTION, uid);
+  deleted.externalSyncRuns = await deleteCollectionByUid(EXTERNAL_SYNC_RUNS_COLLECTION, uid);
 
-  if (await deleteDocIfExists(db, AI_CREDENTIALS_COLLECTION, uid)) {
+  if (await deleteDocIfExists(AI_CREDENTIALS_COLLECTION, uid)) {
     deleted.aiCredentials = 1;
   }
-  if (await deleteDocIfExists(db, SPLITWISE_CONNECTIONS_COLLECTION, uid)) {
+  if (await deleteDocIfExists(SPLITWISE_CONNECTIONS_COLLECTION, uid)) {
     deleted.splitwiseConnections = 1;
   }
-  if (await deleteDocIfExists(db, SPLITWISE_OAUTH_STATES_COLLECTION, uid)) {
+  if (await deleteDocIfExists(SPLITWISE_OAUTH_STATES_COLLECTION, uid)) {
     deleted.splitwiseOAuthStates = 1;
   }
-  if (await deleteDocIfExists(db, WORKSPACE_OWNERSHIP_COLLECTION, uid)) {
+  if (await deleteDocIfExists(WORKSPACE_OWNERSHIP_COLLECTION, uid)) {
     deleted.workspaceOwnership = 1;
   }
-  if (await deleteDocIfExists(db, ONBOARDING_COLLECTION, uid)) {
+  if (await deleteDocIfExists(ONBOARDING_COLLECTION, uid)) {
     deleted.onboarding = 1;
   }
 
   const personalPortfolioId = getPersonalPortfolioId(uid);
-  if (await deleteDocIfExists(db, PORTFOLIOS_COLLECTION, personalPortfolioId)) {
+  if (await deleteDocIfExists(PORTFOLIOS_COLLECTION, personalPortfolioId)) {
     deleted.personalPortfolio = 1;
   }
 
@@ -121,28 +103,32 @@ export async function deleteUserData(uid: string, email?: string): Promise<{ del
 
   if (email) {
     const normalizedEmail = email.trim().toLowerCase();
-    const emailSnapshot = await db
-      .collection(PORTFOLIOS_COLLECTION)
-      .where('memberEmails', 'array-contains', normalizedEmail)
-      .get();
+    const emailDocs = await getStorageAdapter().queryWhere<PortfolioDocument>(
+      PORTFOLIOS_COLLECTION,
+      'memberEmails',
+      'array-contains',
+      normalizedEmail,
+    );
 
-    for (const doc of emailSnapshot.docs) {
+    for (const doc of emailDocs) {
       if (seenPortfolioIds.has(doc.id)) continue;
       seenPortfolioIds.add(doc.id);
-      await handleSharedPortfolio(db, uid, normalizedEmail, doc);
+      await handleSharedPortfolio(doc.id, doc, uid, normalizedEmail);
       deleted.sharedPortfolios++;
     }
   }
 
-  const ownerSnapshot = await db
-    .collection(PORTFOLIOS_COLLECTION)
-    .where('ownerUid', '==', uid)
-    .get();
+  const ownerDocs = await getStorageAdapter().queryWhere<PortfolioDocument>(
+    PORTFOLIOS_COLLECTION,
+    'ownerUid',
+    '==',
+    uid,
+  );
 
-  for (const doc of ownerSnapshot.docs) {
+  for (const doc of ownerDocs) {
     if (seenPortfolioIds.has(doc.id)) continue;
     seenPortfolioIds.add(doc.id);
-    await handleSharedPortfolio(db, uid, email?.trim().toLowerCase() || '', doc);
+    await handleSharedPortfolio(doc.id, doc, uid, email?.trim().toLowerCase() || '');
     deleted.sharedPortfolios++;
   }
 
@@ -150,12 +136,11 @@ export async function deleteUserData(uid: string, email?: string): Promise<{ del
 }
 
 async function handleSharedPortfolio(
-  db: FirebaseFirestore.Firestore,
+  docId: string,
+  data: PortfolioDocument,
   uid: string,
   normalizedEmail: string,
-  doc: FirebaseFirestore.QueryDocumentSnapshot,
 ): Promise<void> {
-  const data = doc.data() as PortfolioDocument;
   const members = Array.isArray(data.members) ? data.members : [];
 
   const userMemberEntry = members.find(
@@ -170,17 +155,17 @@ async function handleSharedPortfolio(
   const isSoleOwner = isUserOwner && otherOwners.length === 0;
 
   if (isSoleOwner || members.length <= 1) {
-    await doc.ref.delete();
+    await getStorageAdapter().deleteDoc(PORTFOLIOS_COLLECTION, docId);
   } else {
     const updatedMembers = members.filter(
       (m) => m.uid !== uid && (normalizedEmail ? m.email.toLowerCase() !== normalizedEmail : true),
     );
     const updatedEmails = updatedMembers.map((m) => m.email.toLowerCase());
-    await doc.ref.update({
+    await getStorageAdapter().updateDoc(PORTFOLIOS_COLLECTION, docId, {
       members: updatedMembers,
       memberEmails: updatedEmails,
       updatedAt: Date.now(),
-    });
+    } as unknown as Record<string, unknown>);
   }
 }
 

@@ -1,4 +1,4 @@
-import { getFirebaseAdminFirestore } from '../firebaseAdmin.js';
+import { getStorageAdapter } from '../storage/index.js';
 import {
   ONBOARDING_COLLECTION,
   type OnboardingDocument,
@@ -11,30 +11,24 @@ function now() {
   return Date.now();
 }
 
-function getDocRef(uid: string) {
-  return getFirebaseAdminFirestore().collection(ONBOARDING_COLLECTION).doc(uid);
-}
-
 function toResponse(doc: OnboardingDocument): OnboardingResponse {
   return { onboarding: doc };
 }
 
 export async function getOnboardingState(uid: string): Promise<OnboardingResponse> {
-  const snapshot = await getDocRef(uid).get();
-  if (!snapshot.exists) return { onboarding: null };
-  return toResponse(snapshot.data() as OnboardingDocument);
+  const doc = await getStorageAdapter().getDoc<OnboardingDocument>(ONBOARDING_COLLECTION, uid);
+  if (!doc) return { onboarding: null };
+  return toResponse(doc);
 }
 
 export async function saveOnboardingStep(
   uid: string,
   body: OnboardingPutBody,
 ): Promise<OnboardingResponse> {
-  const existing = await getDocRef(uid).get();
+  const existing = await getStorageAdapter().getDoc<OnboardingDocument>(ONBOARDING_COLLECTION, uid);
   const timestamp = now();
 
-  const base = existing.exists
-    ? (existing.data() as OnboardingDocument)
-    : getEmptyOnboardingDocument(uid);
+  const base = existing || getEmptyOnboardingDocument(uid);
 
   const merged: OnboardingDocument = {
     ...base,
@@ -53,31 +47,33 @@ export async function saveOnboardingStep(
     updatedAt: timestamp,
   };
 
-  await getDocRef(uid).set(merged, { merge: true });
+  await getStorageAdapter().setDoc(ONBOARDING_COLLECTION, uid, merged as unknown as Record<string, unknown>, true);
   return toResponse(merged);
 }
 
 export async function completeOnboarding(uid: string): Promise<OnboardingResponse> {
-  const existing = await getDocRef(uid).get();
-  if (!existing.exists) {
+  const existing = await getStorageAdapter().getDoc<OnboardingDocument>(ONBOARDING_COLLECTION, uid);
+  if (!existing) {
     const empty = getEmptyOnboardingDocument(uid);
     empty.status = 'completed';
     empty.completedAt = now();
     empty.updatedAt = now();
-    await getDocRef(uid).set(empty, { merge: true });
+    await getStorageAdapter().setDoc(ONBOARDING_COLLECTION, uid, empty as unknown as Record<string, unknown>, true);
     return toResponse(empty);
   }
 
   const timestamp = now();
-  await getDocRef(uid).set(
-    { status: 'completed', completedAt: timestamp, updatedAt: timestamp },
-    { merge: true },
+  await getStorageAdapter().setDoc(
+    ONBOARDING_COLLECTION,
+    uid,
+    { status: 'completed', completedAt: timestamp, updatedAt: timestamp } as unknown as Record<string, unknown>,
+    true,
   );
 
-  const updated = await getDocRef(uid).get();
-  return toResponse(updated.data() as OnboardingDocument);
+  const updated = await getStorageAdapter().getDoc<OnboardingDocument>(ONBOARDING_COLLECTION, uid);
+  return toResponse(updated!);
 }
 
 export async function resetOnboarding(uid: string): Promise<void> {
-  await getDocRef(uid).delete();
+  await getStorageAdapter().deleteDoc(ONBOARDING_COLLECTION, uid);
 }

@@ -1,0 +1,46 @@
+# Docker Compose override for self-hosted mode with optional Postgres.
+# Usage:
+#   export NEXUS_STORAGE_DRIVER=postgres
+#   docker compose -f docker-compose.yml -f docker-compose.selfhost.yml up -d
+#
+# For SQLite (no additional service needed):
+#   export NEXUS_STORAGE_DRIVER=sqlite
+#   docker compose up -d
+#
+# For Firebase (default, unchanged):
+#   docker compose up -d
+
+version: "3.9"
+
+services:
+  nexus:
+    environment:
+      - NEXUS_STORAGE_DRIVER=${NEXUS_STORAGE_DRIVER:-firebase}
+      - DATABASE_URL=${DATABASE_URL:-postgres://nexus:nexus@postgres:5432/nexus}
+      - SQLITE_PATH=${SQLITE_PATH:-/data/nexus.db}
+    volumes:
+      - nexus-data:/data
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexus-postgres
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus
+      POSTGRES_DB: nexus
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  nexus-data:
+  postgres-data:
