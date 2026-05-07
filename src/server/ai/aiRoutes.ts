@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { requireFirebaseUser } from '../auth/requireFirebaseUser.js';
 import { writeAiRun } from './aiRunStore.js';
 import { buildPortfolioSnapshot } from './contextBuilder.js';
-import { generatePortfolioAnswer, getGeminiApiKey, resolveAiConfigFromEnv } from './geminiClient.js';
+import { generatePortfolioAnswer } from './geminiClient.js';
 import { resolveAiApiKey } from '../user/aiCredentialsStore.js';
 import { getPersonalPortfolioByUid, getPortfolioById, isPortfolioMember } from './portfolioAccess.js';
 import { validateAiChatBody } from './validation.js';
@@ -18,7 +18,7 @@ function toSafeErrorMessage(error: unknown) {
     const rawMessage = error.message || '';
     const message = rawMessage.toLowerCase();
     if (message.includes('ai configuration missing') || message.includes('api key is not configured')) {
-      return 'AI API key is not configured. Set one in Settings → Pricing → AI Provider & API Key, or add GEMINI_API_KEY to .env.local.';
+      return 'AI API key is not configured. Set one in Settings, or add an API key environment variable (e.g. GEMINI_API_KEY, OPENAI_API_KEY).';
     }
     if (message.includes('timeout') || message.includes('abort')) {
       return 'AI request timed out. Please try again.';
@@ -119,7 +119,7 @@ export function createAiRouter() {
       const aiConfig = await resolveAiApiKey(user.uid);
       if (!aiConfig) {
         return res.status(500).json({
-          error: 'AI API key is not configured. Set one in Settings → Pricing → AI Provider & API Key, or add GEMINI_API_KEY to .env.local.',
+          error: 'AI API key is not configured. Set one in Settings, or add an API key environment variable (e.g. GEMINI_API_KEY, OPENAI_API_KEY).',
         });
       }
 

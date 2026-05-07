@@ -44,7 +44,7 @@ describe('ProviderCredentialsSection', () => {
     const { fetchSetupStatus } = await import('../lib/setupStatusApi');
     const { getAiCredentials } = await import('../lib/aiCredentialsApi');
     vi.mocked(fetchSetupStatus).mockResolvedValue(baseSetupStatus);
-    vi.mocked(getAiCredentials).mockResolvedValue({ provider: null, model: null, apiKeyLast4: null });
+    vi.mocked(getAiCredentials).mockResolvedValue({ provider: null, model: null, apiKeyLast4: null, source: 'none', defaultUsageCap: null });
     render(React.createElement(ProviderCredentialsSection));
     await waitFor(() => { expect(screen.getByText('Provider Credentials')).toBeTruthy(); });
   }

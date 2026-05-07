@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Select } from './ui/select';
-import { Key, CheckCircle, AlertCircle, Loader2, Trash2, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Key, CheckCircle, AlertCircle, Loader2, Trash2, Eye, EyeOff, RefreshCw, Info } from 'lucide-react';
 import {
   type AiProvider,
   type AiCredentialsResponse,
@@ -16,6 +16,8 @@ import {
 const PROVIDER_LABELS: Record<AiProvider, string> = {
   gemini: 'Google Gemini',
   deepseek: 'DeepSeek',
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
 };
 
 const PROVIDER_MODELS: Record<AiProvider, { label: string; value: string }[]> = {
@@ -28,11 +30,21 @@ const PROVIDER_MODELS: Record<AiProvider, { label: string; value: string }[]> = 
     { label: 'DeepSeek Chat (V3, general purpose)', value: 'deepseek-chat' },
     { label: 'DeepSeek Reasoner (R1, reasoning)', value: 'deepseek-reasoner' },
   ],
+  openai: [
+    { label: 'GPT-4o mini (fast, cost-effective)', value: 'gpt-4o-mini' },
+    { label: 'GPT-4o (best accuracy)', value: 'gpt-4o' },
+  ],
+  anthropic: [
+    { label: 'Claude 3.5 Haiku (fast, cost-effective)', value: 'claude-3-5-haiku-latest' },
+    { label: 'Claude 3.5 Sonnet (best accuracy)', value: 'claude-3-5-sonnet-latest' },
+  ],
 };
 
 const DEFAULT_MODEL: Record<AiProvider, string> = {
   gemini: 'gemini-2.5-flash',
   deepseek: 'deepseek-chat',
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-3-5-haiku-latest',
 };
 
 type StatusType = 'success' | 'error' | 'info' | null;
@@ -126,7 +138,7 @@ export function AiSettingsCard() {
       setShowKey(false);
       setProvider('gemini');
       setModel(DEFAULT_MODEL.gemini);
-      setStatus({ type: 'info', message: 'AI configuration cleared. Falling back to server env GEMINI_API_KEY if configured.' });
+      setStatus({ type: 'info', message: 'AI configuration cleared. Falling back to server default key if configured.' });
     } catch (error) {
       setStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to remove AI configuration.' });
     } finally {
@@ -153,6 +165,7 @@ export function AiSettingsCard() {
 
   const isDirty = hasChanges;
   const hasSavedKey = Boolean(savedConfig?.provider && savedConfig?.apiKeyLast4);
+  const source = savedConfig?.source;
 
   return (
     <Card className="border-none shadow-sm rounded-2xl">
@@ -228,6 +241,33 @@ export function AiSettingsCard() {
               )}
             </div>
 
+            {source === 'server-default' && !hasSavedKey && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300">
+                <div className="flex items-center gap-2 mb-1">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span className="font-medium">Using server default key</span>
+                </div>
+                <p>Nexus/server default key is configured. A shared usage cap may apply.</p>
+                {savedConfig?.defaultUsageCap && (
+                  <p className="mt-1">Monthly cap: {savedConfig.defaultUsageCap}</p>
+                )}
+              </div>
+            )}
+
+            {source === 'none' && !hasSavedKey && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                <div className="flex items-center gap-2 mb-1">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span className="font-medium">No API key configured</span>
+                </div>
+                <p>Add your own API key below, or configure a server default key via environment variables to enable all AI features.</p>
+              </div>
+            )}
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Your key — used for your AI requests, encrypted at rest, never shown again after save.
+            </p>
+
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]"
@@ -291,11 +331,11 @@ export function AiSettingsCard() {
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
               <ul className="space-y-1.5 list-disc list-inside">
+                <li><strong>Your own key (BYOK):</strong> You pay the provider directly. Full control over which model and provider you use.</li>
+                <li><strong>Nexus default key:</strong> Convenience fallback provided by the server. Limited/experimental — shared usage cap may apply.</li>
                 <li>The API key is encrypted at rest and never exposed to the client after save.</li>
-                <li>If no user-level API key is saved, the server falls back to the GEMINI_API_KEY environment variable.</li>
                 <li>Portfolio Q&amp;A uses the selected provider for all responses.</li>
-                <li>Screenshot import uses the selected provider for OCR extraction.</li>
-                <li>DeepSeek vision support depends on the model. For reliable OCR, Gemini is recommended.</li>
+                <li>Screenshot import uses the selected provider for OCR extraction. For reliable OCR, Gemini is recommended.</li>
               </ul>
             </div>
           </>

@@ -1,12 +1,14 @@
 import { auth } from './firebase';
 import { assertHostedMode } from './workspaceGuard';
 
-export type AiProvider = 'gemini' | 'deepseek';
+export type AiProvider = 'gemini' | 'deepseek' | 'openai' | 'anthropic';
 
 export type AiCredentialsResponse = {
   provider: AiProvider | null;
   model: string | null;
   apiKeyLast4: string | null;
+  source: 'user' | 'server-default' | 'none';
+  defaultUsageCap: string | null;
 };
 
 export type AiTestResult = {
