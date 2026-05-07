@@ -8,6 +8,8 @@ import { createSharedIntegrationsRouter } from './src/server/integrations/shared
 import { createScreenshotRouter } from './src/server/providers/screenshot/screenshotRoutes.js';
 import { createAiCredentialsRouter } from './src/server/user/aiCredentialsRoutes.js';
 import { createAccountDeletionRouter } from './src/server/user/accountDeletionRoutes.js';
+import { createWorkspaceOwnershipRouter } from './src/server/user/workspaceOwnershipRoutes.js';
+import { createOnboardingRouter } from './src/server/user/onboardingRoutes.js';
 import { createSetupStatusRouter } from './src/server/setup/setupStatusRoutes.js';
 
 function getNormalizedTicker(result: unknown) {
@@ -95,6 +97,8 @@ export function createApp() {
   app.use('/api/connections/screenshot', createScreenshotRouter());
   app.use('/api/import', createScreenshotRouter());
   app.use('/api/user/ai-credentials', createAiCredentialsRouter());
+  app.use('/api/user/workspace-ownership', createWorkspaceOwnershipRouter());
+  app.use('/api/user/onboarding', createOnboardingRouter());
   app.use('/api/setup', createSetupStatusRouter());
   app.use('/api/user/account', createAccountDeletionRouter());
 

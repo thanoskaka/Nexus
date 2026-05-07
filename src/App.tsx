@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { PortfolioProvider, usePortfolio } from './store/PortfolioContext';
 import { AuthProvider, useAuth } from './store/AuthContext';
-import { Asset } from './store/db';
+import { Asset, saveSetting } from './store/db';
 import { Dashboard } from './components/Dashboard';
 import { Ledger } from './components/Ledger';
 import { AddAssetModal } from './components/AddAssetModal';
@@ -21,13 +21,17 @@ import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
 import { SetupWizard } from './components/SetupWizard';
 import { WorkspaceOwnershipSetup } from './components/WorkspaceOwnershipSetup';
+import { OnboardingWizard } from './components/OnboardingWizard';
 import { getWorkspaceOwnership, saveWorkspaceOwnership, resetWorkspaceOwnership } from './store/workspaceOwnership';
 import type { FirebaseClientConfig, WorkspaceMode } from './store/workspaceOwnership';
+import { getServerWorkspaceOwnership, saveServerWorkspaceOwnership } from './lib/workspaceOwnershipApi';
+import { getOnboardingState } from './lib/onboardingApi';
 import { SampleModeProvider, useSampleMode } from './lib/samplePortfolio';
 import { WorkspaceProvider } from './lib/WorkspaceContext';
 import { createSelfOwnedRuntime, destroySelfOwnedRuntime, getHostedRuntime } from './lib/firebaseRuntime';
 import type { FirebaseRuntime } from './lib/firebaseRuntime';
 import { setWorkspaceMode } from './lib/workspaceGuard';
+import { getWorkspacePreferencesKey, type WorkspacePreferences } from './store/userPreferences';
 
 type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
 
@@ -353,8 +357,13 @@ function AuthenticatedApp() {
   const [ownershipChoice, setOwnershipChoice] = useState<WorkspaceMode | null>(null);
   const [ownershipChecked, setOwnershipChecked] = useState(false);
   const [ownershipCheckedUid, setOwnershipCheckedUid] = useState<string | null>(null);
+  const [ownershipError, setOwnershipError] = useState<string | null>(null);
   const [selfOwnedConfig, setSelfOwnedConfig] = useState<FirebaseClientConfig | undefined>(undefined);
   const [selfOwnedSignInDone, setSelfOwnedSignInDone] = useState(false);
+
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (prevUserRef.current && !user) {
@@ -369,22 +378,105 @@ function AuthenticatedApp() {
     setSelfOwnedSignInDone(false);
     setOwnershipChecked(false);
     setOwnershipCheckedUid(null);
+    setOwnershipError(null);
     if (!user) return;
 
-    const existing = getWorkspaceOwnership(user.uid);
-    if (existing) {
-      setOwnershipChoice(existing.mode);
-      setSelfOwnedConfig(existing.mode === 'selfOwned' ? existing.firebaseConfig : undefined);
+    let cancelled = false;
+    const localOwnership = getWorkspaceOwnership(user.uid);
+    if (localOwnership) {
+      setOwnershipChoice(localOwnership.mode);
+      setSelfOwnedConfig(localOwnership.mode === 'selfOwned' ? localOwnership.firebaseConfig : undefined);
+      setOwnershipChecked(true);
+      setOwnershipCheckedUid(user.uid);
     }
-    setOwnershipChecked(true);
-    setOwnershipCheckedUid(user.uid);
+
+    void (async () => {
+      try {
+        const serverOwnership = await getServerWorkspaceOwnership();
+        if (cancelled) return;
+        const ownership = serverOwnership || localOwnership;
+        if (ownership) {
+          setOwnershipChoice(ownership.mode);
+          setSelfOwnedConfig(ownership.mode === 'selfOwned' ? ownership.firebaseConfig : undefined);
+          saveWorkspaceOwnership(ownership.mode, ownership.firebaseConfig, user.uid);
+          if (!serverOwnership) {
+            void saveServerWorkspaceOwnership(ownership.mode, ownership.firebaseConfig).catch(() => undefined);
+          }
+        }
+      } catch (error) {
+        if (cancelled) return;
+        if (localOwnership) {
+          setOwnershipError('Using cached workspace choice. Nexus could not refresh hosted setup state.');
+        } else {
+          setOwnershipError(error instanceof Error ? error.message : 'Could not load your workspace setup.');
+        }
+      } finally {
+        if (!cancelled) {
+          setOwnershipChecked(true);
+          setOwnershipCheckedUid(user.uid);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user?.uid]);
 
-  const handleOwnershipChoice = useCallback((mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
-    saveWorkspaceOwnership(mode, firebaseConfig, user?.uid);
-    setOwnershipChoice(mode);
-    setOwnershipCheckedUid(user?.uid ?? null);
-    setSelfOwnedConfig(mode === 'selfOwned' ? firebaseConfig : undefined);
+  const ownershipReady = ownershipChecked && ownershipCheckedUid === user?.uid;
+
+  useEffect(() => {
+    if (!ownershipReady || !ownershipChoice || onboardingChecked) return;
+    let cancelled = false;
+    const uid = user?.uid;
+    if (!uid) return;
+
+    void getOnboardingState()
+      .then((state) => {
+        if (cancelled) return;
+        setOnboardingComplete(state?.status === 'completed');
+        setOnboardingChecked(true);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setOnboardingError(err instanceof Error ? err.message : 'Onboarding check failed');
+        setOnboardingChecked(true);
+      });
+
+    return () => { cancelled = true; };
+  }, [ownershipReady, ownershipChoice, onboardingChecked, user?.uid]);
+
+  const handleOnboardingComplete = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const state = await getOnboardingState();
+      if (state && state.status === 'completed') {
+        const prefs: WorkspacePreferences = {
+          workspaceName: '',
+          baseCurrency: (state.primaryCurrency as WorkspacePreferences['baseCurrency']) || 'CAD',
+          primaryRegion: state.primaryCountry || '',
+          householdLabel: '',
+          defaultMarketPreference: (state.primaryCountry === 'IN' ? 'India' : state.primaryCountry === 'CA' ? 'Canada' : 'US') as WorkspacePreferences['defaultMarketPreference'],
+        };
+        await saveSetting(getWorkspacePreferencesKey(user.uid), prefs);
+      }
+    } catch {
+    }
+    setOnboardingComplete(true);
+  }, [user?.uid]);
+
+  const handleOwnershipChoice = useCallback(async (mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
+    if (!user?.uid) return;
+    setOwnershipError(null);
+    try {
+      const saved = await saveServerWorkspaceOwnership(mode, firebaseConfig);
+      saveWorkspaceOwnership(saved.mode, saved.firebaseConfig, user.uid);
+      setOwnershipChoice(saved.mode);
+      setOwnershipCheckedUid(user.uid);
+      setSelfOwnedConfig(saved.mode === 'selfOwned' ? saved.firebaseConfig : undefined);
+    } catch (error) {
+      setOwnershipError(error instanceof Error ? error.message : 'Could not save your workspace setup.');
+    }
   }, [user?.uid]);
 
   const handleSwitchToHosted = useCallback(() => {
@@ -406,10 +498,22 @@ function AuthenticatedApp() {
     return <PublicHome authError={authError} onLaunch={() => void signInWithGoogle()} signedOut={signedOut} />;
   }
 
-  const ownershipReady = ownershipChecked && ownershipCheckedUid === user.uid;
+  if (ownershipReady && ownershipError && !ownershipChoice) {
+    return (
+      <CenteredState
+        title="Workspace setup unavailable"
+        description={ownershipError}
+        action={(
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        )}
+      />
+    );
+  }
 
   if (ownershipReady && !ownershipChoice) {
-    return <WorkspaceOwnershipSetup onChooseMode={handleOwnershipChoice} />;
+    return <WorkspaceOwnershipSetup onChooseMode={(mode, config) => void handleOwnershipChoice(mode, config)} />;
   }
 
   if (ownershipReady && ownershipChoice === 'selfOwned' && selfOwnedConfig && !selfOwnedSignInDone) {
@@ -422,6 +526,33 @@ function AuthenticatedApp() {
 
   if (!ownershipReady) {
     return null;
+  }
+
+  if (ownershipReady && !onboardingChecked) {
+    if (onboardingError) {
+      return (
+        <CenteredState
+          title="Setup check"
+          description={onboardingError}
+          action={(
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Try again
+            </Button>
+          )}
+        />
+      );
+    }
+    return (
+      <CenteredState title="Loading portfolio" description="Checking your setup progress..." />
+    );
+  }
+
+  if (ownershipReady && onboardingChecked && !onboardingComplete) {
+    return (
+      <OnboardingWizard
+        onComplete={() => void handleOnboardingComplete()}
+      />
+    );
   }
 
   const shouldUseSelfOwned = ownershipChoice === 'selfOwned' && selfOwnedConfig && selfOwnedSignInDone;
