@@ -73,6 +73,73 @@ describe('workspaceOwnership', () => {
       store['nexus.workspaceOwnership.v1:user1'] = JSON.stringify({ mode: 'invalid', savedAt: 1 });
       expect(getWorkspaceOwnership('user1')).toBeNull();
     });
+
+    it('rejects selfOwned without firebaseConfig', () => {
+      store['nexus.workspaceOwnership.v1:user1'] = JSON.stringify({ mode: 'selfOwned', savedAt: 1 });
+      expect(getWorkspaceOwnership('user1')).toBeNull();
+    });
+
+    it('rejects selfOwned with incomplete firebaseConfig', () => {
+      store['nexus.workspaceOwnership.v1:user1'] = JSON.stringify({
+        mode: 'selfOwned',
+        firebaseConfig: { apiKey: 'key' },
+        savedAt: 1,
+      });
+      expect(getWorkspaceOwnership('user1')).toBeNull();
+    });
+
+    it('migrates valid global ownership to uid-scoped key', () => {
+      store['nexus.workspaceOwnership.v1'] = JSON.stringify({ mode: 'hosted', savedAt: 100 });
+      const result = getWorkspaceOwnership('user1');
+      expect(result).not.toBeNull();
+      expect(result!.mode).toBe('hosted');
+      expect(store['nexus.workspaceOwnership.v1:user1']).toBeDefined();
+      expect(store['nexus.workspaceOwnership.v1']).toBeUndefined();
+    });
+
+    it('migrates valid global selfOwned ownership to uid-scoped key', () => {
+      const config: FirebaseClientConfig = {
+        apiKey: 'test-key',
+        authDomain: 'test.firebaseapp.com',
+        projectId: 'test-project',
+        storageBucket: 'test.appspot.com',
+        messagingSenderId: '123',
+        appId: '1:123:web:abc',
+      };
+      store['nexus.workspaceOwnership.v1'] = JSON.stringify({ mode: 'selfOwned', firebaseConfig: config, savedAt: 100 });
+      const result = getWorkspaceOwnership('user1');
+      expect(result).not.toBeNull();
+      expect(result!.mode).toBe('selfOwned');
+      expect(result!.firebaseConfig).toEqual(config);
+      expect(store['nexus.workspaceOwnership.v1:user1']).toBeDefined();
+      expect(store['nexus.workspaceOwnership.v1']).toBeUndefined();
+    });
+
+    it('ignores corrupt global ownership and does not migrate', () => {
+      store['nexus.workspaceOwnership.v1'] = '{corrupt';
+      const result = getWorkspaceOwnership('user1');
+      expect(result).toBeNull();
+      expect(store['nexus.workspaceOwnership.v1:user1']).toBeUndefined();
+      expect(store['nexus.workspaceOwnership.v1']).toBe('{corrupt');
+    });
+
+    it('ignores invalid mode global ownership and does not migrate', () => {
+      store['nexus.workspaceOwnership.v1'] = JSON.stringify({ mode: 'invalid', savedAt: 1 });
+      const result = getWorkspaceOwnership('user1');
+      expect(result).toBeNull();
+      expect(store['nexus.workspaceOwnership.v1:user1']).toBeUndefined();
+    });
+
+    it('prefers uid-scoped over global key when both exist', () => {
+      store['nexus.workspaceOwnership.v1:user1'] = JSON.stringify({ mode: 'hosted', savedAt: 200 });
+      store['nexus.workspaceOwnership.v1'] = JSON.stringify({ mode: 'selfOwned', firebaseConfig: {
+        apiKey: 'k', authDomain: 'd', projectId: 'p', storageBucket: 's', messagingSenderId: 'm', appId: 'a',
+      }, savedAt: 100 });
+      const result = getWorkspaceOwnership('user1');
+      expect(result).not.toBeNull();
+      expect(result!.mode).toBe('hosted');
+      expect(result!.savedAt).toBe(200);
+    });
   });
 
   describe('saveWorkspaceOwnership', () => {

@@ -352,6 +352,7 @@ function AuthenticatedApp() {
 
   const [ownershipChoice, setOwnershipChoice] = useState<WorkspaceMode | null>(null);
   const [ownershipChecked, setOwnershipChecked] = useState(false);
+  const [ownershipCheckedUid, setOwnershipCheckedUid] = useState<string | null>(null);
   const [selfOwnedConfig, setSelfOwnedConfig] = useState<FirebaseClientConfig | undefined>(undefined);
   const [selfOwnedSignInDone, setSelfOwnedSignInDone] = useState(false);
 
@@ -363,18 +364,26 @@ function AuthenticatedApp() {
   }, [user]);
 
   useEffect(() => {
+    setOwnershipChoice(null);
+    setSelfOwnedConfig(undefined);
+    setSelfOwnedSignInDone(false);
+    setOwnershipChecked(false);
+    setOwnershipCheckedUid(null);
     if (!user) return;
+
     const existing = getWorkspaceOwnership(user.uid);
     if (existing) {
       setOwnershipChoice(existing.mode);
       setSelfOwnedConfig(existing.mode === 'selfOwned' ? existing.firebaseConfig : undefined);
     }
     setOwnershipChecked(true);
-  }, [user]);
+    setOwnershipCheckedUid(user.uid);
+  }, [user?.uid]);
 
   const handleOwnershipChoice = useCallback((mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
     saveWorkspaceOwnership(mode, firebaseConfig, user?.uid);
     setOwnershipChoice(mode);
+    setOwnershipCheckedUid(user?.uid ?? null);
     setSelfOwnedConfig(mode === 'selfOwned' ? firebaseConfig : undefined);
   }, [user?.uid]);
 
@@ -397,11 +406,13 @@ function AuthenticatedApp() {
     return <PublicHome authError={authError} onLaunch={() => void signInWithGoogle()} signedOut={signedOut} />;
   }
 
-  if (ownershipChecked && !ownershipChoice) {
+  const ownershipReady = ownershipChecked && ownershipCheckedUid === user.uid;
+
+  if (ownershipReady && !ownershipChoice) {
     return <WorkspaceOwnershipSetup onChooseMode={handleOwnershipChoice} />;
   }
 
-  if (ownershipChecked && ownershipChoice === 'selfOwned' && selfOwnedConfig && !selfOwnedSignInDone) {
+  if (ownershipReady && ownershipChoice === 'selfOwned' && selfOwnedConfig && !selfOwnedSignInDone) {
     return (
       <WorkspaceGate selfOwnedConfig={selfOwnedConfig}>
         <SelfOwnedSignInGate onSignedIn={handleSelfOwnedSignInDone} />
@@ -409,7 +420,7 @@ function AuthenticatedApp() {
     );
   }
 
-  if (!ownershipChecked) {
+  if (!ownershipReady) {
     return null;
   }
 
