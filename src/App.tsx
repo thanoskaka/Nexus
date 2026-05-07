@@ -14,6 +14,7 @@ import { SplitwiseProvider, useSplitwise } from './store/SplitwiseContext';
 import { ConnectedAccountsProvider, useConnectedAccounts } from './store/ConnectedAccountsContext';
 import { parseInitialViewFromQuery } from './lib/appNavigation';
 import { PublicHome } from './components/PublicHome';
+import { PricingPage } from './components/PricingPage';
 import { CenteredState } from './components/CenteredState';
 import { GettingStartedChecklist } from './components/GettingStartedChecklist';
 import { NextActionPanel } from './components/NextActionPanel';
@@ -495,6 +496,9 @@ function AuthenticatedApp() {
   }
 
   if (!user) {
+    if (typeof window !== 'undefined' && window.location.pathname === '/pricing') {
+      return <PricingPage onLaunch={() => void signInWithGoogle()} />;
+    }
     return <PublicHome authError={authError} onLaunch={() => void signInWithGoogle()} signedOut={signedOut} />;
   }
 
