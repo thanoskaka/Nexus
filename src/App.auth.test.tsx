@@ -52,27 +52,19 @@ vi.mock('./components/GettingStartedChecklist', () => ({ GettingStartedChecklist
 import App from './App';
 
 describe('App authentication flow', () => {
-  function mockSavedOwnership(uid = 'test-uid') {
-    Object.defineProperty(window, 'localStorage', {
-      value: {
-        getItem: vi.fn((key: string) => {
-          if (key === `nexus.workspaceOwnership.v1:${uid}`) {
-            return JSON.stringify({ mode: 'hosted', savedAt: Date.now() });
-          }
-          return null;
-        }),
-        setItem: vi.fn(),
-      },
-      configurable: true,
-    });
-  }
+  let store: Record<string, string>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    store = {};
     Object.defineProperty(window, 'localStorage', {
       value: {
-        getItem: vi.fn(() => null),
-        setItem: vi.fn(),
+        getItem: vi.fn((key: string) => store[key] ?? null),
+        setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+        removeItem: vi.fn((key: string) => { delete store[key]; }),
+        clear: vi.fn(() => { Object.keys(store).forEach((k) => delete store[k]); }),
+        key: vi.fn((i: number) => Object.keys(store)[i] ?? null),
+        get length() { return Object.keys(store).length; },
       },
       configurable: true,
     });
@@ -81,6 +73,10 @@ describe('App authentication flow', () => {
       configurable: true,
     });
   });
+
+  function storeOwnership(uid: string, mode: 'hosted' | 'selfOwned') {
+    store[`nexus.workspaceOwnership.v1:${uid}`] = JSON.stringify({ mode, savedAt: Date.now() });
+  }
 
   it('renders public home when user is null and not loading', () => {
     mockUseAuth.mockReturnValue({
@@ -137,7 +133,7 @@ describe('App authentication flow', () => {
   });
 
   it('renders loading state when user exists but portfolio is loading', () => {
-    mockSavedOwnership();
+    storeOwnership('test-uid', 'hosted');
     mockUseAuth.mockReturnValue({
       user: { uid: 'test-uid', email: 'test@example.com' },
       loading: false,
@@ -157,7 +153,7 @@ describe('App authentication flow', () => {
   });
 
   it('renders preparing portfolio when user exists but no access', () => {
-    mockSavedOwnership();
+    storeOwnership('test-uid', 'hosted');
     mockUseAuth.mockReturnValue({
       user: { uid: 'test-uid', email: 'test@example.com' },
       loading: false,
@@ -197,7 +193,7 @@ describe('App authentication flow', () => {
       assets: [],
     });
 
-    mockSavedOwnership(uid);
+    storeOwnership(uid, 'hosted');
 
     render(<App />);
 
@@ -223,5 +219,94 @@ describe('App authentication flow', () => {
     expect(screen.getByText('Welcome to Nexus Portfolio')).toBeInTheDocument();
     expect(screen.getAllByText('Use Nexus Hosted').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Bring Your Own Firebase').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('migrates global ownership to uid-scoped for returning user', () => {
+    store['nexus.workspaceOwnership.v1'] = JSON.stringify({ mode: 'hosted', savedAt: Date.now() });
+
+    mockUseAuth.mockReturnValue({
+      user: { uid: 'test-uid', email: 'test@example.com' },
+      loading: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+    mockUsePortfolio.mockReturnValue({
+      isPortfolioLoading: false,
+      hasAccess: true,
+      accessError: null,
+      refreshPrices: vi.fn(),
+      isRefreshing: false,
+      portfolios: [],
+      activePortfolioId: null,
+      setActivePortfolioId: vi.fn(),
+      assets: [],
+    });
+
+    render(<App />);
+
+    expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(2);
+    expect(store['nexus.workspaceOwnership.v1:test-uid']).toBeDefined();
+    expect(store['nexus.workspaceOwnership.v1']).toBeUndefined();
+  });
+
+  it('switching from user A to user B does not reuse A ownership', () => {
+    storeOwnership('user-a', 'hosted');
+
+    mockUseAuth.mockReturnValue({
+      user: { uid: 'user-a', email: 'a@example.com' },
+      loading: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+    mockUsePortfolio.mockReturnValue({
+      isPortfolioLoading: false,
+      hasAccess: true,
+      accessError: null,
+      refreshPrices: vi.fn(),
+      isRefreshing: false,
+      portfolios: [],
+      activePortfolioId: null,
+      setActivePortfolioId: vi.fn(),
+      assets: [],
+    });
+
+    const { rerender } = render(<App />);
+
+    expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(2);
+
+    mockUseAuth.mockReturnValue({
+      user: { uid: 'user-b', email: 'b@example.com' },
+      loading: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    rerender(<App />);
+
+    expect(screen.getByText('Welcome to Nexus Portfolio')).toBeInTheDocument();
+  });
+
+  it('does not crash on corrupt global localStorage ownership', () => {
+    store['nexus.workspaceOwnership.v1'] = 'not-json-at-all';
+
+    mockUseAuth.mockReturnValue({
+      user: { uid: 'test-uid', email: 'test@example.com' },
+      loading: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+    mockUsePortfolio.mockReturnValue({
+      isPortfolioLoading: true,
+      hasAccess: false,
+      accessError: null,
+    });
+
+    render(<App />);
+
+    expect(screen.getByText('Welcome to Nexus Portfolio')).toBeInTheDocument();
   });
 });

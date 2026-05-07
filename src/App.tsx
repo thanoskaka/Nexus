@@ -359,6 +359,12 @@ function AuthenticatedApp() {
     if (prevUserRef.current && !user) {
       setSignedOut(true);
     }
+    if (prevUserRef.current && user && prevUserRef.current.uid !== user.uid) {
+      setOwnershipChoice(null);
+      setSelfOwnedConfig(undefined);
+      setSelfOwnedSignInDone(false);
+      setOwnershipChecked(false);
+    }
     prevUserRef.current = user;
   }, [user]);
 
@@ -370,7 +376,7 @@ function AuthenticatedApp() {
       setSelfOwnedConfig(existing.mode === 'selfOwned' ? existing.firebaseConfig : undefined);
     }
     setOwnershipChecked(true);
-  }, [user]);
+  }, [user?.uid]);
 
   const handleOwnershipChoice = useCallback((mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
     saveWorkspaceOwnership(mode, firebaseConfig, user?.uid);
