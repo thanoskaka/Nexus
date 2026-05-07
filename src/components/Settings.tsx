@@ -288,7 +288,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
   }, [userBrokerConnections]);
 
   React.useEffect(() => {
-    setWorkspaceForm(workspacePreferences);
+    setWorkspaceForm(workspacePreferences ?? DEFAULT_WORKSPACE_PREFERENCES);
   }, [workspacePreferences]);
 
   React.useEffect(() => {
