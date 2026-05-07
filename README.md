@@ -1,187 +1,207 @@
 # Nexus Portfolio
 
-Nexus Portfolio is a shared wealth tracker for families managing money across Canada and India.
+![Nexus demo](docs/assets/nexus-demo-placeholder.gif)
 
-It combines market-linked investments, manual assets, liabilities, and read-only connected broker snapshots in one cloud-backed workspace.
+Nexus Portfolio is an open-source family wealth tracker for multi-country, multi-asset households.
 
-## Product Direction
+It combines market-linked investments, manual assets, liabilities, and read-only connected broker snapshots in one cloud-backed workspace — designed for families with money across Canada, India, and the US.
 
-See [North Star and Strategy](docs/north-star-strategy.md) for the product baseline, hosted vs self-hosted direction, setup principles, docs/service plan, onboarding goals, mobile path, and sibling-app boundary.
+---
 
-## Documentation
+## Why Nexus
 
-- [Docs Index](docs/README.md) -- strategy, setup modes, capability matrix, diagnostics
-- [Setup Modes](docs/setup-modes.md) -- local dev, self-hosted, and hosted env requirements
-- [Capability & Cost Posture](docs/capability-cost-posture.md) -- what each feature needs and costs
-- [Setup Diagnostics Blueprint](docs/setup-diagnostics.md) -- `/api/setup/status` endpoint design
-- [Backend Capabilities Helper](docs/backend-setup-capabilities.md) -- `getSetupCapabilities()` design
+- **Open source and auditable** — every line is visible. No black boxes.
+- **Self-host or use hosted** — bring your own Firebase or use the managed instance.
+- **Multi-country by design** — CAD, USD, INR in one portfolio with FX-aware views.
+- **Family workspace** — shared access with Google sign-in, per-asset ownership.
+- **BYOK AI** — bring your own API key for Gemini, DeepSeek, OpenAI, or Anthropic. Encrypted at rest.
+- **No data mining** — no telemetry, no tracking scripts, no third-party data sale.
 
-## Connected Accounts (Phase 1)
+---
 
-Nexus now includes a reusable **Connected Accounts** foundation with normalized cloud storage:
+## Features
 
-- `external_connections`
-- `external_accounts`
-- `external_holdings`
-- `external_sync_runs`
-- `external_asset_overrides`
+| Area | What's included |
+|---|---|
+| Dashboard | Net worth, allocation, returns, FX-aware views across currencies |
+| Assets & Liabilities | Manual entry for any asset class: stocks, ETFs, mutual funds, gold, bank balances, PF/PPF/NPS/FD, real estate, credit cards, loans |
+| CSV Import/Export | Bulk add and export assets with currency, owner, and category mapping |
+| Screenshot Import | Snap a portfolio screenshot; AI extracts and matches assets (`src/components/ScreenshotImportModal.tsx`) |
+| Sample Mode | Pre-populated demo portfolio — run `npm run dev:mock` and explore |
+| Upstox | Read-only connected holdings for India stocks. Quantity, price, value sourced from Upstox snapshots; metadata overridable (label, owner, category, notes, hide toggle) |
+| Splitwise | Shared expense/debt tracking as a portfolio liability line |
+| AI Assistant | Portfolio Q&A and screenshot OCR. Providers: Gemini, DeepSeek (UI), OpenAI, Anthropic (server). User API keys encrypted with AES-256-GCM at rest; env fallback `GEMINI_API_KEY` / `GOOGLE_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` |
+| Self-Owned Firebase | Use your own Firebase project. Client config stored in localStorage; all data goes to your Firestore, not Nexus servers |
+| Hosted Mode | Managed deployment at [nexus-phi-inky.vercel.app](https://nexus-phi-inky.vercel.app) — Google sign-in, preconfigured server |
 
-### Live provider in this build
+---
 
-- **Upstox**: enabled (read-only)
+## Quick Start
 
-### Intentionally deferred in this build
-
-- **Groww**: not enabled (`requires paid Groww Trading API`)
-- **Canada aggregation**: not enabled (`no live free production-safe aggregator in this build`)
-- **Plaid**: intentionally not included
-
-### Read-only behavior
-
-Connected holdings are **source-managed**:
-
-- quantity, cost, price, value, and currency come from Upstox snapshots
-- those numeric fields are not freely editable in Nexus
-- Nexus-only metadata stays editable via overrides:
-  - custom label
-  - owner assignment
-  - category override
-  - notes
-  - hidden-from-dashboard toggle
-
-Manual assets still work and are not auto-overwritten or auto-merged.
-
-## What It Covers
-
-- Canada and India holdings in one app
-- Multiple family members in one shared portfolio
-- Stocks, ETFs, mutual funds, gold, bank balances, PF/PPF/NPS/FD, real estate, and liabilities
-- Live-priced and manual-priced assets side by side
-- Cloud-backed connected holdings snapshots (Upstox)
-
-## Core Features
-
-- Shared portfolio access with Google sign-in
-- Dashboard for total wealth, allocation, returns, and FX-aware views
-- Assets ledger with filters, sorting, subtotals, and bulk refresh
-- Import/export flows for Canada holdings, India holdings, and asset classes
-- Integrations tab with Splitwise + Connected Accounts
-
-## Local Development
-
-### Option A — Mock Mode (no Firebase required)
-
-Quick-start with realistic demo data. No Firebase account needed.
+### Mock demo (no Firebase, no setup)
 
 ```bash
 npm install
 npm run dev:mock
 ```
 
-Open `http://localhost:6868` — pre-authenticated with a demo portfolio.
+Open `http://localhost:6868` — pre-authenticated with a sample portfolio.
 
-### Option B — Real Firebase
-
-1. Install dependencies:
+### Real Firebase (local dev)
 
 ```bash
 npm install
-```
-
-2. Copy envs:
-
-```bash
 cp .env.example .env.local
 ```
 
-3. Fill in `.env.local` values (see [docs/setup.md](docs/setup.md)).
-
-4. Start app + API server:
+Fill in `NEXT_PUBLIC_FIREBASE_*` values from your Firebase project (Authentication + Firestore enabled), then:
 
 ```bash
 npm run dev
 ```
 
-## Upstox Setup (Connected Accounts)
+### Docker
 
-1. Create an app in Upstox Developer Console.
-2. Configure redirect URI:
-   - local: `http://localhost:6868/api/connections/upstox/callback`
-   - production: `https://nexus-phi-inky.vercel.app/api/connections/upstox/callback`
-3. Set server env vars:
+Not yet available. A Dockerfile and docker-compose.yml are planned for the launch preparation. For now, use `npm run dev` or `npm run dev:mock`.
 
-```bash
-UPSTOX_CLIENT_ID="..."
-UPSTOX_CLIENT_SECRET="..."
-UPSTOX_REDIRECT_URI="http://localhost:6868/api/connections/upstox/callback"
-CONNECTED_ACCOUNTS_ENCRYPTION_KEY="long-random-secret"
-CONNECTED_ACCOUNTS_STATE_SECRET="long-random-secret"
-APP_BASE_URL="http://localhost:6868"
+---
+
+## Self-Host Setup
+
+The current self-hosting path uses **your own Firebase project**:
+
+1. Create a Firebase project, enable Google Authentication and Firestore.
+2. Copy `.env.example` to `.env.local` and fill in your `NEXT_PUBLIC_FIREBASE_*` values.
+3. For server-side features (Upstox, Splitwise, AI credentials, screenshot import), generate a Firebase Admin private key and set `FIREBASE_ADMIN_*` env vars.
+4. Deploy to any Node.js host (Vercel, Railway, Fly.io, etc.) or run locally.
+
+See [docs/setup-modes.md](docs/setup-modes.md) and [docs/provider-guides.md](docs/provider-guides.md) for detailed env requirements.
+
+Docker-based self-hosting is coming in launch preparation.
+
+---
+
+## BYOK (Bring Your Own Keys)
+
+Nexus never bundles paid API keys. You bring your own for the features you want.
+
+### AI Providers
+
+| Provider | UI | Server | Env fallback |
+|---|---|---|---|
+| Gemini | Yes | Yes | `GEMINI_API_KEY` / `GOOGLE_API_KEY` |
+| DeepSeek | Yes | Yes | — |
+| OpenAI | Planned for UI | Yes | `OPENAI_API_KEY` |
+| Anthropic | Planned for UI | Yes | `ANTHROPIC_API_KEY` |
+
+User-provided AI keys are encrypted at rest with AES-256-GCM (`src/server/security/encryption.ts`).
+
+### Pricing Data
+
+| Key | Purpose | Optional? |
+|---|---|---|
+| `MASSIVE_API_KEY` | US equity pricing provider | Yes (Yahoo Finance fallback) |
+| `ALPHA_VANTAGE_API_KEY` | US equity pricing fallback | Yes |
+
+### Upstox
+
+```
+UPSTOX_CLIENT_ID
+UPSTOX_CLIENT_SECRET
+UPSTOX_REDIRECT_URI
+CONNECTED_ACCOUNTS_ENCRYPTION_KEY
+CONNECTED_ACCOUNTS_STATE_SECRET
 ```
 
-4. Open Nexus, go to `Settings -> Integrations -> Connected Accounts`, then click **Connect Upstox**.
+See [docs/provider-guides.md](docs/provider-guides.md) for full setup.
 
-## Firebase Admin Setup (required for server auth)
+### Splitwise
 
-Server-side connected-account endpoints verify Firebase ID tokens with `firebase-admin`.
-
-Set:
-
-```bash
-FIREBASE_ADMIN_PROJECT_ID="..."
-FIREBASE_ADMIN_CLIENT_EMAIL="..."
-FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+SPLITWISE_CLIENT_ID
+SPLITWISE_CLIENT_SECRET
+SPLITWISE_REDIRECT_URI
+SPLITWISE_STATE_SECRET
+INTEGRATION_TOKEN_ENCRYPTION_KEY
 ```
 
-If running on GCP with workload identity, default credentials can be used instead.
+### Plaid
 
-## Pricing Model (existing)
+Plaid is **not implemented today**. It is under evaluation for a future BYOK-connected-accounts option.
 
-Nexus pricing routes remain provider-aware for manual/market-linked assets:
+---
 
-- India mutual funds: `AMFI`
-- India stocks: `Upstox` system route when configured
-- U.S. equities: `Massive`
-- Canada equities: close-based route with caching and queue handling
-- Gold: system gold pricing
-- Manual assets: no market refresh
+## Self-Host vs Hosted
 
-## Useful Scripts
+| | Self-Host | Hosted |
+|---|---|---|
+| Setup effort | Create Firebase project, configure env vars, deploy | Google sign-in, start tracking |
+| Data storage | Your Firestore, your rules | Nexus-managed Firebase |
+| Server features | Requires Firebase Admin credentials | Preconfigured |
+| AI | Your API key | Your API key |
+| Upstox / Splitwise | Your OAuth app credentials | Your OAuth app credentials |
+| Cost to use | Self-host free forever | Hosted for the cost of a coffee |
+| Control | Full — env, infra, keys, backups | Less — managed by operator |
+
+---
+
+## Privacy & Security
+
+- **No tracking scripts.** No Google Analytics, no telemetry, no third-party beacons.
+- **Server-only secrets.** `FIREBASE_ADMIN_*`, `UPSTOX_CLIENT_SECRET`, `SPLITWISE_CLIENT_SECRET`, `CONNECTED_ACCOUNTS_ENCRYPTION_KEY` and similar env vars are never exposed to the browser. `VITE_*` and `NEXT_PUBLIC_*` are browser-visible by design — keep them client-safe.
+- **Encrypted user AI keys.** API keys are encrypted at rest with AES-256-GCM via `src/server/security/encryption.ts`. The encryption key is a server-only env var, never the user's key.
+- **Firebase Admin token verification.** Server routes for connected accounts, Splitwise, AI credentials, and screenshot import verify Firebase ID tokens before serving requests.
+- **Self-owned mode.** In self-owned Firebase mode, all data goes to your Firestore. The app's server never sees your data. The Firebase config is stored in your browser's localStorage, never sent to Nexus servers.
+- **Secrets never committed.** `.env.local` is gitignored. `.env.example` contains placeholder values only.
+
+See [docs/security-privacy.md](docs/security-privacy.md) for detailed credential handling.
+
+---
+
+## Scripts
 
 ```bash
-npm run dev          # Development with Firebase
-npm run dev:mock     # Development with mock data (no Firebase)
+npm run dev           # Development with Firebase
+npm run dev:mock      # Mock mode (no Firebase)
 npm run build
-npm run lint
-npm run test:run
+npm run lint          # TypeScript type-check
+npm run test:run      # Run tests
 ```
 
-## Environment Notes
+---
 
-- `NEXT_PUBLIC_*` values are browser-visible and should stay client-safe.
-- Keep provider secrets and encryption keys server-only.
-- Never commit real credentials.
+## Documentation
 
-## Deployment
+- [Docs Index](docs/README.md)
+- [Getting Started Guide](docs/getting-started.md)
+- [Setup Modes](docs/setup-modes.md) — local dev, self-hosted, hosted
+- [Hosted vs Self-Hosted](docs/hosted-vs-self-hosted.md)
+- [Provider Guides](docs/provider-guides.md) — Firebase, Upstox, Splitwise, AI, pricing
+- [Capability & Cost Posture](docs/capability-cost-posture.md)
+- [Setup Diagnostics](docs/setup-diagnostics.md)
+- [Security & Privacy](docs/security-privacy.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Product Strategy](docs/north-star-strategy.md)
+- [Environment Template](.env.example)
 
-Production is currently deployed on Vercel.
+---
 
-Live app:
+## Roadmap
 
-- [https://nexus-phi-inky.vercel.app](https://nexus-phi-inky.vercel.app)
+- **Docker hardening** — root Dockerfile + docker-compose for one-command self-host
+- **Demo video / GIF** — replace placeholder with a real walkthrough
+- **Plaid BYOK evaluation** — connected accounts for US/CAD financial institutions
+- **Postgres / SQLite storage adapter** — first-class alternative to Firebase for self-hosters
+- **Hosted billing / waitlist** — managed tier with minimal friction to support development
 
-Latest production release:
+---
 
-- Date: `2026-04-18`
-- Alias: [https://nexus-phi-inky.vercel.app](https://nexus-phi-inky.vercel.app)
-- Inspect: [https://vercel.com/thanoskakas-projects/nexus/4msi9GbDcu2eiu8LuxzTMXcQDYSi](https://vercel.com/thanoskakas-projects/nexus/4msi9GbDcu2eiu8LuxzTMXcQDYSi)
+## Contributing
 
-Deploy command:
+Contributing guidelines are coming soon.
 
-```bash
-npx vercel --prod --yes
-```
+---
 
-Compatibility note:
+## License
 
-- Vercel rewrites `/api/integrations/splitwise/*` to `/api/splitwise/*` via `vercel.json`.
+**License: TBD** — No LICENSE file is present in this repository. A decision on the open-source license is needed before the first public release.
