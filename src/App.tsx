@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { PortfolioProvider, usePortfolio } from './store/PortfolioContext';
 import { AuthProvider, useAuth } from './store/AuthContext';
-import { Asset } from './store/db';
+import { Asset, saveSetting } from './store/db';
 import { Dashboard } from './components/Dashboard';
 import { Ledger } from './components/Ledger';
 import { AddAssetModal } from './components/AddAssetModal';
@@ -21,14 +21,17 @@ import { getAiCredentials } from './lib/aiCredentialsApi';
 import { Docs } from './components/Docs';
 import { SetupWizard } from './components/SetupWizard';
 import { WorkspaceOwnershipSetup } from './components/WorkspaceOwnershipSetup';
+import { OnboardingWizard } from './components/OnboardingWizard';
 import { getWorkspaceOwnership, saveWorkspaceOwnership, resetWorkspaceOwnership } from './store/workspaceOwnership';
 import type { FirebaseClientConfig, WorkspaceMode } from './store/workspaceOwnership';
 import { getServerWorkspaceOwnership, saveServerWorkspaceOwnership } from './lib/workspaceOwnershipApi';
+import { getOnboardingState } from './lib/onboardingApi';
 import { SampleModeProvider, useSampleMode } from './lib/samplePortfolio';
 import { WorkspaceProvider } from './lib/WorkspaceContext';
 import { createSelfOwnedRuntime, destroySelfOwnedRuntime, getHostedRuntime } from './lib/firebaseRuntime';
 import type { FirebaseRuntime } from './lib/firebaseRuntime';
 import { setWorkspaceMode } from './lib/workspaceGuard';
+import { getWorkspacePreferencesKey, type WorkspacePreferences } from './store/userPreferences';
 
 type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
 
@@ -358,6 +361,10 @@ function AuthenticatedApp() {
   const [selfOwnedConfig, setSelfOwnedConfig] = useState<FirebaseClientConfig | undefined>(undefined);
   const [selfOwnedSignInDone, setSelfOwnedSignInDone] = useState(false);
 
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+
   useEffect(() => {
     if (prevUserRef.current && !user) {
       setSignedOut(true);
@@ -416,6 +423,48 @@ function AuthenticatedApp() {
     };
   }, [user?.uid]);
 
+  const ownershipReady = ownershipChecked && ownershipCheckedUid === user?.uid;
+
+  useEffect(() => {
+    if (!ownershipReady || !ownershipChoice || onboardingChecked) return;
+    let cancelled = false;
+    const uid = user?.uid;
+    if (!uid) return;
+
+    void getOnboardingState()
+      .then((state) => {
+        if (cancelled) return;
+        setOnboardingComplete(state?.status === 'completed');
+        setOnboardingChecked(true);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setOnboardingError(err instanceof Error ? err.message : 'Onboarding check failed');
+        setOnboardingChecked(true);
+      });
+
+    return () => { cancelled = true; };
+  }, [ownershipReady, ownershipChoice, onboardingChecked, user?.uid]);
+
+  const handleOnboardingComplete = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const state = await getOnboardingState();
+      if (state && state.status === 'completed') {
+        const prefs: WorkspacePreferences = {
+          workspaceName: '',
+          baseCurrency: (state.primaryCurrency as WorkspacePreferences['baseCurrency']) || 'CAD',
+          primaryRegion: state.primaryCountry || '',
+          householdLabel: '',
+          defaultMarketPreference: (state.primaryCountry === 'IN' ? 'India' : state.primaryCountry === 'CA' ? 'Canada' : 'US') as WorkspacePreferences['defaultMarketPreference'],
+        };
+        await saveSetting(getWorkspacePreferencesKey(user.uid), prefs);
+      }
+    } catch {
+    }
+    setOnboardingComplete(true);
+  }, [user?.uid]);
+
   const handleOwnershipChoice = useCallback(async (mode: WorkspaceMode, firebaseConfig?: FirebaseClientConfig) => {
     if (!user?.uid) return;
     setOwnershipError(null);
@@ -449,8 +498,6 @@ function AuthenticatedApp() {
     return <PublicHome authError={authError} onLaunch={() => void signInWithGoogle()} signedOut={signedOut} />;
   }
 
-  const ownershipReady = ownershipChecked && ownershipCheckedUid === user.uid;
-
   if (ownershipReady && ownershipError && !ownershipChoice) {
     return (
       <CenteredState
@@ -479,6 +526,33 @@ function AuthenticatedApp() {
 
   if (!ownershipReady) {
     return null;
+  }
+
+  if (ownershipReady && !onboardingChecked) {
+    if (onboardingError) {
+      return (
+        <CenteredState
+          title="Setup check"
+          description={onboardingError}
+          action={(
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Try again
+            </Button>
+          )}
+        />
+      );
+    }
+    return (
+      <CenteredState title="Loading portfolio" description="Checking your setup progress..." />
+    );
+  }
+
+  if (ownershipReady && onboardingChecked && !onboardingComplete) {
+    return (
+      <OnboardingWizard
+        onComplete={() => void handleOnboardingComplete()}
+      />
+    );
   }
 
   const shouldUseSelfOwned = ownershipChoice === 'selfOwned' && selfOwnedConfig && selfOwnedSignInDone;

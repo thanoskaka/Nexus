@@ -43,7 +43,7 @@ describe('deleteUserData', () => {
   it('deletes user-scoped documents across all collections', async () => {
     const mockDb = {
       collection: vi.fn((name: string) => {
-        if (name === 'user_ai_credentials' || name === 'splitwise_connections' || name === 'splitwise_oauth_states') {
+        if (name === 'user_ai_credentials' || name === 'splitwise_connections' || name === 'splitwise_oauth_states' || name === 'user_workspace_ownership' || name === 'user_onboarding') {
           return { doc: vi.fn(() => makeMockDoc(true)) };
         }
         if (name === 'portfolios') {
@@ -73,6 +73,8 @@ describe('deleteUserData', () => {
     expect(result.deleted.aiCredentials).toBe(1);
     expect(result.deleted.splitwiseConnections).toBe(1);
     expect(result.deleted.splitwiseOAuthStates).toBe(1);
+    expect(result.deleted.workspaceOwnership).toBe(1);
+    expect(result.deleted.onboarding).toBe(1);
     expect(result.deleted.externalConnections).toBe(0);
     expect(result.deleted.externalAccounts).toBe(0);
     expect(result.deleted.externalHoldings).toBe(0);

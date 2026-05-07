@@ -11,6 +11,7 @@ const AI_CREDENTIALS_COLLECTION = 'user_ai_credentials';
 const SPLITWISE_CONNECTIONS_COLLECTION = 'splitwise_connections';
 const SPLITWISE_OAUTH_STATES_COLLECTION = 'splitwise_oauth_states';
 const WORKSPACE_OWNERSHIP_COLLECTION = 'user_workspace_ownership';
+const ONBOARDING_COLLECTION = 'user_onboarding';
 
 interface PortfolioMember {
   email: string;
@@ -72,7 +73,7 @@ async function deleteDocIfExists(db: FirebaseFirestore.Firestore, collectionName
 
 export async function deleteUserData(uid: string, email?: string): Promise<{ deleted: Record<string, number> }> {
   const db = getFirebaseAdminFirestore();
-  const deleted: Record<string, number> = {
+  const   deleted: Record<string, number> = {
     externalConnections: 0,
     externalAccounts: 0,
     externalHoldings: 0,
@@ -82,6 +83,7 @@ export async function deleteUserData(uid: string, email?: string): Promise<{ del
     splitwiseConnections: 0,
     splitwiseOAuthStates: 0,
     workspaceOwnership: 0,
+    onboarding: 0,
     personalPortfolio: 0,
     sharedPortfolios: 0,
   };
@@ -103,6 +105,9 @@ export async function deleteUserData(uid: string, email?: string): Promise<{ del
   }
   if (await deleteDocIfExists(db, WORKSPACE_OWNERSHIP_COLLECTION, uid)) {
     deleted.workspaceOwnership = 1;
+  }
+  if (await deleteDocIfExists(db, ONBOARDING_COLLECTION, uid)) {
+    deleted.onboarding = 1;
   }
 
   const personalPortfolioId = getPersonalPortfolioId(uid);
