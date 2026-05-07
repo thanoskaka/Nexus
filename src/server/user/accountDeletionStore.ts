@@ -10,6 +10,7 @@ const EXTERNAL_SYNC_RUNS_COLLECTION = 'external_sync_runs';
 const AI_CREDENTIALS_COLLECTION = 'user_ai_credentials';
 const SPLITWISE_CONNECTIONS_COLLECTION = 'splitwise_connections';
 const SPLITWISE_OAUTH_STATES_COLLECTION = 'splitwise_oauth_states';
+const WORKSPACE_OWNERSHIP_COLLECTION = 'user_workspace_ownership';
 
 interface PortfolioMember {
   email: string;
@@ -80,6 +81,7 @@ export async function deleteUserData(uid: string, email?: string): Promise<{ del
     aiCredentials: 0,
     splitwiseConnections: 0,
     splitwiseOAuthStates: 0,
+    workspaceOwnership: 0,
     personalPortfolio: 0,
     sharedPortfolios: 0,
   };
@@ -98,6 +100,9 @@ export async function deleteUserData(uid: string, email?: string): Promise<{ del
   }
   if (await deleteDocIfExists(db, SPLITWISE_OAUTH_STATES_COLLECTION, uid)) {
     deleted.splitwiseOAuthStates = 1;
+  }
+  if (await deleteDocIfExists(db, WORKSPACE_OWNERSHIP_COLLECTION, uid)) {
+    deleted.workspaceOwnership = 1;
   }
 
   const personalPortfolioId = getPersonalPortfolioId(uid);

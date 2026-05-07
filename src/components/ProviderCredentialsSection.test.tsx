@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderCredentialsSection } from './ProviderCredentialsSection';
+import type { SetupStatusResponse } from '../lib/setupStatusApi';
 
 vi.mock('../lib/setupStatusApi', () => ({ fetchSetupStatus: vi.fn() }));
 vi.mock('../lib/aiCredentialsApi', () => ({ getAiCredentials: vi.fn() }));
@@ -20,7 +21,7 @@ function createMockStorage() {
   };
 }
 
-const baseSetupStatus = {
+const baseSetupStatus: SetupStatusResponse = {
   mode: 'self-hosted', app: { baseUrl: 'http://localhost:6868' },
   firebase: { configured: true, projectId: 'test' },
   firebaseAdmin: { configured: true, hasProjectId: true, hasClientEmail: true, hasPrivateKey: true },
