@@ -49,8 +49,44 @@
   ],
   "rewrites": [
     {
+      "source": "/api/finance",
+      "destination": "/api/finance.ts"
+    },
+    {
+      "source": "/api/setup/status",
+      "destination": "/api/setup/status.ts"
+    },
+    {
+      "source": "/api/user/(.*)",
+      "destination": "/api/user/[...route].ts"
+    },
+    {
+      "source": "/api/ai/(.*)",
+      "destination": "/api/ai/[...route].ts"
+    },
+    {
+      "source": "/api/splitwise/(.*)",
+      "destination": "/api/splitwise/[...route].ts"
+    },
+    {
       "source": "/api/integrations/splitwise/(.*)",
-      "destination": "/api/splitwise/$1"
+      "destination": "/api/splitwise/[...route].ts"
+    },
+    {
+      "source": "/api/integrations/(.*)",
+      "destination": "/api/integrations/[...route].ts"
+    },
+    {
+      "source": "/api/connections/upstox/(.*)",
+      "destination": "/api/connections/upstox/[...route].ts"
+    },
+    {
+      "source": "/api/connections/screenshot/(.*)",
+      "destination": "/api/connections/screenshot/[...route].ts"
+    },
+    {
+      "source": "/api/connections/cas/(.*)",
+      "destination": "/api/connections/cas/[...route].ts"
     },
     {
       "source": "/docs",
