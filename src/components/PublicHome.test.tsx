@@ -7,31 +7,68 @@ import '@testing-library/jest-dom/vitest';
 import { PublicHome } from './PublicHome';
 
 describe('PublicHome', () => {
-  it('renders the headline and value props', () => {
+  it('renders brand name and hero tagline', () => {
     render(<PublicHome authError={null} onLaunch={vi.fn()} />);
 
     expect(screen.getByText('Nexus Portfolio')).toBeInTheDocument();
-    expect(screen.getByText(/one portfolio home for families/i)).toBeInTheDocument();
-    expect(screen.getByText('Family wealth tracking')).toBeInTheDocument();
-    expect(screen.getByText('Canada + India + US')).toBeInTheDocument();
-    expect(screen.getByText('Manual + connected')).toBeInTheDocument();
-    expect(screen.getByText('Bring your own keys')).toBeInTheDocument();
+    expect(screen.getByText(/your family's wealth/i)).toBeInTheDocument();
+    expect(screen.getByText(/your server\. your rules/i)).toBeInTheDocument();
   });
 
-  it('renders hosted, self-host, and docs path cards', () => {
+  it('renders the secondary tagline', () => {
     render(<PublicHome authError={null} onLaunch={vi.fn()} />);
 
-    expect(screen.getByText('Hosted (cloud)')).toBeInTheDocument();
-    expect(screen.getByText('Self-host / open-source')).toBeInTheDocument();
-    expect(screen.getByText('Documentation')).toBeInTheDocument();
+    expect(screen.getByText(/don't trust black boxes/i)).toBeInTheDocument();
   });
 
-  it('renders Get Started CTAs', () => {
+  it('renders primary CTAs', () => {
     render(<PublicHome authError={null} onLaunch={vi.fn()} />);
 
-    const ctaButtons = screen.getAllByText('Get Started');
-    expect(ctaButtons.length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('Create a Nexus account, then choose hosted or self-owned setup')).toBeInTheDocument();
+    const hostedCtas = screen.getAllByText('Use hosted Nexus');
+    expect(hostedCtas.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('View GitHub')).toBeInTheDocument();
+    expect(screen.getByText('Read self-host guide')).toBeInTheDocument();
+  });
+
+  it('renders how it works steps', () => {
+    render(<PublicHome authError={null} onLaunch={vi.fn()} />);
+
+    expect(screen.getByText('Add your assets')).toBeInTheDocument();
+    expect(screen.getByText('Family workspace')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard & AI insights')).toBeInTheDocument();
+  });
+
+  it('renders privacy proof section', () => {
+    render(<PublicHome authError={null} onLaunch={vi.fn()} />);
+
+    expect(screen.getByText('Privacy by design')).toBeInTheDocument();
+    expect(screen.getByText(/self-owned mode keeps portfolio data in your Firebase project/i)).toBeInTheDocument();
+  });
+
+  it('renders multi-country section with Canada, India, and United States', () => {
+    render(<PublicHome authError={null} onLaunch={vi.fn()} />);
+
+    expect(screen.getByText('Built for global families')).toBeInTheDocument();
+    expect(screen.getByText('Canada')).toBeInTheDocument();
+    expect(screen.getByText('India')).toBeInTheDocument();
+    expect(screen.getByText('United States')).toBeInTheDocument();
+  });
+
+  it('renders self-host vs hosted comparison', () => {
+    render(<PublicHome authError={null} onLaunch={vi.fn()} />);
+
+    expect(screen.getByText('Self-host vs Hosted')).toBeInTheDocument();
+    expect(screen.getByText('Data location')).toBeInTheDocument();
+    expect(screen.getByText('Setup time')).toBeInTheDocument();
+    expect(screen.getByText('Monthly cost')).toBeInTheDocument();
+  });
+
+  it('renders pricing section with Free and ~$6', () => {
+    render(<PublicHome authError={null} onLaunch={vi.fn()} />);
+
+    expect(screen.getAllByText('Pricing').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Free').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/~\$6/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows auth error when provided', () => {
@@ -58,13 +95,13 @@ describe('PublicHome', () => {
     expect(screen.queryByText(/Signed out/)).not.toBeInTheDocument();
   });
 
-  it('calls onLaunch when a Get Started button is clicked', async () => {
+  it('calls onLaunch when a hosted CTA is clicked', async () => {
     const user = userEvent.setup();
     const onLaunch = vi.fn();
 
     render(<PublicHome authError={null} onLaunch={onLaunch} />);
 
-    const ctaButtons = screen.getAllByText('Get Started');
+    const ctaButtons = screen.getAllByText('Use hosted Nexus');
     await user.click(ctaButtons[0]);
 
     expect(onLaunch).toHaveBeenCalledTimes(1);
@@ -75,6 +112,15 @@ describe('PublicHome', () => {
 
     const githubLinks = screen.getAllByRole('link', { name: /github/i });
     expect(githubLinks.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders navigation links in header', () => {
+    render(<PublicHome authError={null} onLaunch={vi.fn()} />);
+
+    const docsLinks = screen.getAllByRole('link', { name: /docs/i });
+    expect(docsLinks.length).toBeGreaterThanOrEqual(1);
+    const pricingLinks = screen.getAllByRole('link', { name: /pricing/i });
+    expect(pricingLinks.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders footer with MIT license', () => {
