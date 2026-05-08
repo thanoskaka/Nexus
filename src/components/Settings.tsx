@@ -44,15 +44,15 @@ import { SetupHistoryPanel } from './SetupHistoryPanel';
 import { recordEvent, getSetupHistory, clearSetupHistory, type SetupEvent } from '../store/setupHistory';
 
 export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
-type SettingsTab = 'access' | 'pricing' | 'structure' | 'data' | 'integrations' | 'credentials' | 'workspace';
+type SettingsTab = 'providers' | 'structure' | 'data' | 'integrations' | 'workspace';
 
 function getTabForSection(section?: SettingsSection): SettingsTab {
   switch (section) {
     case 'manage-members':
-      return 'access';
+      return 'workspace';
     case 'price-providers':
     case 'price-updates':
-      return 'pricing';
+      return 'providers';
     case 'asset-classes-overview':
       return 'structure';
     case 'data-management':
@@ -63,7 +63,7 @@ function getTabForSection(section?: SettingsSection): SettingsTab {
     case 'integrations':
       return 'integrations';
     default:
-      return 'pricing';
+      return 'providers';
   }
 }
 
@@ -1374,13 +1374,11 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
   ];
 
   const tabItems: Array<{ id: SettingsTab; label: string; description: string }> = [
-    { id: 'access', label: 'Access', description: 'Members and roles' },
-    { id: 'pricing', label: 'Pricing', description: 'Providers and brokers' },
+    { id: 'providers', label: 'Providers', description: 'Price sources & API keys' },
     { id: 'structure', label: 'Structure', description: 'Classes and organization' },
     { id: 'data', label: 'Data', description: 'Imports, sync, migration' },
     { id: 'integrations', label: 'Integrations', description: 'Connected accounts' },
     { id: 'workspace', label: 'Workspace', description: 'Portfolio identity and region' },
-    { id: 'credentials', label: 'Credentials', description: 'Provider API keys' },
   ];
 
   return (
@@ -1460,7 +1458,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
         )}
 
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-7">
+          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-5">
             {tabItems.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -1487,102 +1485,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
         </div>
       </div>
 
-      {activeTab === 'access' && (
-        <>
-      <Card id="manage-members" className="border-none shadow-sm rounded-2xl mb-6">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-slate-700 dark:text-slate-300" />
-            <CardTitle>Family Members</CardTitle>
-          </div>
-          <CardDescription>The portfolio owners tracked in this app</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            {owners.length > 0 ? owners.map(owner => (
-              <div key={owner} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 rounded-xl border border-slate-100 dark:border-slate-800">
-                <div className="w-8 h-8 rounded-full bg-[#00875A] flex items-center justify-center text-white font-bold">
-                  {owner.charAt(0).toUpperCase()}
-                </div>
-                <span className="font-medium text-slate-700 dark:text-slate-200">{owner}</span>
-              </div>
-            )) : (
-              <p className="text-sm text-slate-500">No family members found. Import assets to see them here.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card id="member-access" className="border-none shadow-sm rounded-2xl mb-6">
-        <CardHeader className="flex flex-row items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-slate-700 dark:text-slate-300" />
-              <CardTitle>Manage Members</CardTitle>
-            </div>
-            <CardDescription>Authorized Google accounts that can access and edit this shared Firebase portfolio.</CardDescription>
-          </div>
-          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-600">
-            Your role: {currentUserRole || 'viewer'}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="space-y-3">
-            {members.length > 0 ? members.map((member) => (
-              <div key={member.email} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between dark:border-slate-800 dark:bg-slate-950">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-white">{member.email}</div>
-                  <div className="text-sm text-slate-500">Role: {member.role}</div>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => void removeMember(member.email)}
-                  disabled={currentUserRole !== 'owner'}
-                  className="rounded-full"
-                >
-                  <UserX className="mr-2 h-4 w-4" />
-                  Remove
-                </Button>
-              </div>
-            )) : (
-              <p className="text-sm text-slate-500">No authorized members yet.</p>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-              <UserPlus className="h-4 w-4" />
-              Invite by Email
-            </div>
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-              <Input
-                value={inviteEmail}
-                onChange={(event) => setInviteEmail(event.target.value)}
-                placeholder="partner@example.com"
-                disabled={currentUserRole !== 'owner'}
-              />
-              <Select
-                value={inviteRole}
-                onChange={(event) => setInviteRole(event.target.value as 'owner' | 'partner')}
-                disabled={currentUserRole !== 'owner'}
-              >
-                <option value="partner">Partner</option>
-                <option value="owner">Owner</option>
-              </Select>
-              <Button onClick={() => void handleInvite()} disabled={currentUserRole !== 'owner' || !inviteEmail.trim()} className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]">
-                Add Member
-              </Button>
-            </div>
-            {currentUserRole !== 'owner' && (
-              <p className="mt-3 text-sm text-slate-500">Only portfolio owners can change the member list.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-        </>
-      )}
-
-      {activeTab === 'pricing' && (
+      {activeTab === 'providers' && (
         <>
       <Card id="price-providers" className="border-none shadow-sm rounded-2xl mb-6">
         <CardHeader>
@@ -1948,6 +1851,8 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
           <p className="text-sm text-slate-500">Ticker format: use `EXCHANGE:TICKER` where needed (e.g., `NASDAQ:AAPL`, `NSE:RELIANCE`).</p>
         </CardContent>
       </Card>
+
+      <ProviderCredentialsSection />
         </>
       )}
 
@@ -2507,6 +2412,134 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
       )}
 
       {activeTab === 'workspace' && (<>
+        {workspaceMode && (
+          <Card className="border-none shadow-sm rounded-2xl mb-4">
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 ${
+                    workspaceMode === 'hosted'
+                      ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400'
+                  }`}>
+                    {workspaceMode === 'hosted' ? <Globe2 className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                      Workspace Mode: {workspaceMode === 'hosted' ? 'Nexus Hosted' : 'Self-Owned Firebase'}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {workspaceMode === 'hosted'
+                        ? 'Your portfolio data is stored in Nexus-hosted infrastructure.'
+                        : 'Signed into Nexus. Portfolio data source: your Firebase project. Self-owned data routing requires additional configuration.'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleResetWorkspace}
+                  disabled={workspaceResetBusy}
+                  className="shrink-0 rounded-full"
+                >
+                  <RotateCw className="h-4 w-4 mr-1.5" />
+                  Reset / Change Mode
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+      <Card id="manage-members" className="border-none shadow-sm rounded-2xl mb-6">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+            <CardTitle>Family Members</CardTitle>
+          </div>
+          <CardDescription>The portfolio owners tracked in this app</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            {owners.length > 0 ? owners.map(owner => (
+              <div key={owner} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div className="w-8 h-8 rounded-full bg-[#00875A] flex items-center justify-center text-white font-bold">
+                  {owner.charAt(0).toUpperCase()}
+                </div>
+                <span className="font-medium text-slate-700 dark:text-slate-200">{owner}</span>
+              </div>
+            )) : (
+              <p className="text-sm text-slate-500">No family members found. Import assets to see them here.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card id="member-access" className="border-none shadow-sm rounded-2xl mb-6">
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+              <CardTitle>Manage Members</CardTitle>
+            </div>
+            <CardDescription>Authorized Google accounts that can access and edit this shared Firebase portfolio.</CardDescription>
+          </div>
+          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-600">
+            Your role: {currentUserRole || 'viewer'}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-3">
+            {members.length > 0 ? members.map((member) => (
+              <div key={member.email} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between dark:border-slate-800 dark:bg-slate-950">
+                <div>
+                  <div className="font-medium text-slate-900 dark:text-white">{member.email}</div>
+                  <div className="text-sm text-slate-500">Role: {member.role}</div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => void removeMember(member.email)}
+                  disabled={currentUserRole !== 'owner'}
+                  className="rounded-full"
+                >
+                  <UserX className="mr-2 h-4 w-4" />
+                  Remove
+                </Button>
+              </div>
+            )) : (
+              <p className="text-sm text-slate-500">No authorized members yet.</p>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+              <UserPlus className="h-4 w-4" />
+              Invite by Email
+            </div>
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+              <Input
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+                placeholder="partner@example.com"
+                disabled={currentUserRole !== 'owner'}
+              />
+              <Select
+                value={inviteRole}
+                onChange={(event) => setInviteRole(event.target.value as 'owner' | 'partner')}
+                disabled={currentUserRole !== 'owner'}
+              >
+                <option value="partner">Partner</option>
+                <option value="owner">Owner</option>
+              </Select>
+              <Button onClick={() => void handleInvite()} disabled={currentUserRole !== 'owner' || !inviteEmail.trim()} className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]">
+                Add Member
+              </Button>
+            </div>
+            {currentUserRole !== 'owner' && (
+              <p className="mt-3 text-sm text-slate-500">Only portfolio owners can change the member list.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
         <Card id="workspace" className="border-none shadow-sm rounded-2xl mb-6">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -3203,10 +3236,6 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
             onClear={() => { clearSetupHistory(); refreshSetupHistory(); }}
           />
         </div>
-      )}
-
-      {activeTab === 'credentials' && (
-        <ProviderCredentialsSection />
       )}
 
       <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>

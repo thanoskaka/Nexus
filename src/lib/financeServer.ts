@@ -1073,3 +1073,144 @@ const AMFI_STOPWORDS = new Set([
   'bonus',
   'income',
 ]);
+
+export interface InstrumentSuggestion {
+  displayName: string;
+  ticker: string;
+  exchange: string;
+  instrumentType: string;
+  currency: string;
+  source: 'yahoo' | 'upstox' | 'amfi';
+  confidence: number;
+}
+
+async function searchYahooInstruments(query: string): Promise<InstrumentSuggestion[]> {
+  if (!query.trim()) return [];
+  try {
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query.trim())}&lang=en-US&region=US`;
+    const response = await fetch(url, { headers: YAHOO_HEADERS });
+    const data: any = await safeJson(response);
+    const quotes = Array.isArray(data?.quotes) ? data.quotes : [];
+    return quotes
+      .filter((q: any) => q?.symbol && q?.shortname)
+      .map((q: any) => ({
+        displayName: q.shortname || q.longname || q.symbol,
+        ticker: q.symbol,
+        exchange: (q.exchange || '').toUpperCase(),
+        instrumentType: q.quoteType === 'ETF' ? 'ETF' : q.quoteType === 'MUTUALFUND' ? 'MUTUAL_FUND' : 'STOCK',
+        currency: (q.currency || 'USD').toUpperCase(),
+        source: 'yahoo' as const,
+        confidence: 0.8,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+async function searchUpstoxInstruments(query: string): Promise<InstrumentSuggestion[]> {
+  const accessToken = process.env.UPSTOX_ACCESS_TOKEN?.trim();
+  if (!accessToken || !query.trim()) return [];
+
+  try {
+    const searchUrl = new URL('https://api.upstox.com/v1/instruments/search');
+    searchUrl.searchParams.set('query', query.trim().toUpperCase());
+    searchUrl.searchParams.set('segment', 'EQ');
+
+    const response = await fetch(searchUrl.toString(), { headers: getUpstoxHeaders(accessToken) });
+    if (response.status === 401) return [];
+    const data: any = await safeJson(response);
+    const results = extractUpstoxSearchResults(data);
+    return results
+      .filter((r: any) => r.trading_symbol || r.tradingsymbol)
+      .map((r: any) => ({
+        displayName: r.short_name || r.trading_symbol || r.tradingsymbol,
+        ticker: `NSE:${r.trading_symbol || r.tradingsymbol}`,
+        exchange: String(r.exchange || 'NSE').toUpperCase(),
+        instrumentType: 'STOCK',
+        currency: 'INR',
+        source: 'upstox' as const,
+        confidence: 0.85,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+async function searchAmfiInstruments(query: string): Promise<InstrumentSuggestion[]> {
+  if (!query.trim()) return [];
+  try {
+    const entries = await getAmfiNavEntries();
+    const q = query.trim().toLowerCase();
+    const qTokens = tokenizeFundName(q);
+    const scored: Array<InstrumentSuggestion & { score: number }> = [];
+
+    for (const entry of entries) {
+      const entryTokens = tokenizeFundName(entry.schemeName);
+      const common = countCommonTokens(qTokens, entryTokens);
+      if (common === 0) continue;
+      const nameContains = normalizeFundName(entry.schemeName).includes(normalizeFundName(q));
+      const totalTokens = Math.max(qTokens.length, entryTokens.length);
+      const score = totalTokens > 0 ? common / totalTokens : 0;
+
+      if (score >= 0.3 || nameContains) {
+        scored.push({
+          displayName: entry.schemeName,
+          ticker: entry.schemeCode,
+          exchange: 'AMFI',
+          instrumentType: 'MUTUAL_FUND',
+          currency: 'INR',
+          source: 'amfi',
+          confidence: nameContains ? 0.92 : Math.min(0.5 + score * 0.5, 0.85),
+          score: nameContains ? 1 : score,
+        });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 15).map(({ score: _s, ...rest }) => rest);
+  } catch {
+    return [];
+  }
+}
+
+export async function searchInstruments(params: {
+  q: string;
+  country?: string;
+  assetClass?: string;
+}): Promise<InstrumentSuggestion[]> {
+  const q = params.q?.trim() || '';
+  if (!q || q.length < 2) return [];
+
+  const country = (params.country || '').trim().toLowerCase();
+  const assetClass = (params.assetClass || '').trim().toLowerCase();
+
+  const all: InstrumentSuggestion[] = [];
+  const sources = new Set<string>();
+
+  if (country === 'india' && (assetClass.includes('mutual') || assetClass.includes('fund') || assetClass === '')) {
+    const amfi = await searchAmfiInstruments(q);
+    for (const s of amfi) {
+      const key = `${s.source}:${s.ticker}`;
+      if (!sources.has(key)) { sources.add(key); all.push(s); }
+    }
+  }
+
+  if (country === 'india' && (assetClass === 'stocks' || assetClass === '')) {
+    const upstox = await searchUpstoxInstruments(q);
+    for (const s of upstox) {
+      const key = `${s.source}:${s.ticker}`;
+      if (!sources.has(key)) { sources.add(key); all.push(s); }
+    }
+  }
+
+  if (country !== 'india' || assetClass === '') {
+    const yahoo = await searchYahooInstruments(q);
+    for (const s of yahoo) {
+      const key = `${s.source}:${s.ticker}`;
+      if (!sources.has(key)) { sources.add(key); all.push(s); }
+    }
+  }
+
+  all.sort((a, b) => b.confidence - a.confidence);
+  return all.slice(0, 20);
+}
