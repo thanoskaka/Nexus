@@ -9,7 +9,7 @@ import { Settings, type SettingsSection } from './components/Settings';
 import { ImportProgressOverlay } from './components/ImportProgressOverlay';
 import { Button } from './components/ui/button';
 import { Select } from './components/ui/select';
-import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut, BookOpen } from 'lucide-react';
+import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut, BookOpen, Rocket } from 'lucide-react';
 import { SplitwiseProvider, useSplitwise } from './store/SplitwiseContext';
 import { ConnectedAccountsProvider, useConnectedAccounts } from './store/ConnectedAccountsContext';
 import { parseInitialViewFromQuery } from './lib/appNavigation';
@@ -33,8 +33,9 @@ import { createSelfOwnedRuntime, destroySelfOwnedRuntime, getHostedRuntime } fro
 import type { FirebaseRuntime } from './lib/firebaseRuntime';
 import { setWorkspaceMode } from './lib/workspaceGuard';
 import { getWorkspacePreferencesKey, type WorkspacePreferences } from './store/userPreferences';
+import { useSetupTabVisibility } from './lib/useSetupTabVisibility';
 
-type AppView = 'dashboard' | 'assets' | 'settings' | 'docs';
+type AppView = 'dashboard' | 'assets' | 'settings' | 'docs' | 'setup';
 
 function MainApp() {
   const { user, logout } = useAuth();
@@ -88,13 +89,29 @@ function MainApp() {
     setCurrentView('docs');
   }, []);
 
+  const upstoxConnected = upstox?.status === 'connected';
+  const splitwiseConnected = splitwiseStatus === 'connected';
+
+  const { visible: setupTabVisible } = useSetupTabVisibility({
+    assetsCount: assets.length,
+    upstoxConnected,
+    splitwiseConnected,
+    aiKeyConfigured,
+    userUid: user?.uid,
+  });
+
+  const prevSetupVisible = useRef(setupTabVisible);
+  useEffect(() => {
+    if (!setupTabVisible && currentView === 'setup') {
+      setCurrentView('dashboard');
+    }
+    prevSetupVisible.current = setupTabVisible;
+  }, [setupTabVisible, currentView]);
+
   const handleEditAsset = useCallback((asset: Asset) => {
     setEditingAsset(asset);
     setIsAddModalOpen(true);
   }, []);
-
-  const upstoxConnected = upstox?.status === 'connected';
-  const splitwiseConnected = splitwiseStatus === 'connected';
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-slate-900 dark:bg-slate-900 dark:text-slate-50 transition-colors duration-200 font-sans">
@@ -125,6 +142,15 @@ function MainApp() {
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Assets</span>
             </button>
+            {setupTabVisible && (
+              <button
+                onClick={() => setCurrentView('setup')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${currentView === 'setup' ? 'bg-[#00875A] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+              >
+                <Rocket className="h-4 w-4" />
+                <span className="hidden sm:inline">Setup</span>
+              </button>
+            )}
             <button
               data-nav-settings
               onClick={() => setCurrentView('settings')}
@@ -193,6 +219,12 @@ function MainApp() {
 
       <main className="container mx-auto px-4 py-8">
         {currentView === 'dashboard' && (
+          <Dashboard onAddAsset={() => {
+            if (isSampleMode) disableSampleMode();
+            setIsAddModalOpen(true);
+          }} />
+        )}
+        {currentView === 'setup' && (
           <>
             <GettingStartedChecklist
               assetsCount={assets.length}
@@ -213,10 +245,6 @@ function MainApp() {
               onNavigateToDocs={navigateToDocs}
               onAddAsset={() => setIsAddModalOpen(true)}
             />
-            <Dashboard onAddAsset={() => {
-              if (isSampleMode) disableSampleMode();
-              setIsAddModalOpen(true);
-            }} />
           </>
         )}
         {currentView === 'assets' && <Ledger onEditAsset={handleEditAsset} onAddAsset={() => {
