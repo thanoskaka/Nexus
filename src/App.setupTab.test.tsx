@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
 const mockUseAuth = vi.hoisted(() => vi.fn());
 const mockUsePortfolio = vi.hoisted(() => vi.fn());
+const mockUseSetupTabVisibility = vi.hoisted(() => vi.fn());
 const mockGetServerWorkspaceOwnership = vi.hoisted(() => vi.fn(async () => null));
 const mockGetOnboardingState = vi.hoisted(() => vi.fn());
 
@@ -29,10 +31,12 @@ vi.mock('./store/ConnectedAccountsContext', () => ({
   ConnectedAccountsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('./lib/useSetupTabVisibility', () => ({
+  useSetupTabVisibility: mockUseSetupTabVisibility,
+}));
+
 vi.mock('./lib/onboardingApi', () => ({
   getOnboardingState: (...args: unknown[]) => mockGetOnboardingState(...args),
-  saveOnboardingStep: vi.fn(async () => ({})),
-  completeOnboarding: vi.fn(async () => ({ status: 'completed' })),
 }));
 
 vi.mock('./lib/firebaseRuntime', () => ({
@@ -65,17 +69,18 @@ vi.mock('./components/NextActionPanel', () => ({ NextActionPanel: () => <div>Nex
 vi.mock('./components/SetupWizard', () => ({ SetupWizard: () => null }));
 vi.mock('./components/CenteredState', () => ({ CenteredState: ({ title }: { title: string }) => <div>{title}</div> }));
 vi.mock('./components/WorkspaceOwnershipSetup', () => ({ WorkspaceOwnershipSetup: () => null }));
-vi.mock('./components/OnboardingWizard', () => ({ OnboardingWizard: ({ onComplete }: { onComplete: () => void }) => <div><button onClick={onComplete}>Finish Setup</button></div> }));
+vi.mock('./components/OnboardingWizard', () => ({ OnboardingWizard: () => null }));
 
 import App from './App';
 
-describe('App onboarding gating flow', () => {
+describe('App setup tab', () => {
   let store: Record<string, string>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetServerWorkspaceOwnership.mockResolvedValue(null);
-    mockGetOnboardingState.mockResolvedValue(null);
+    mockGetOnboardingState.mockResolvedValue({ uid: 'test-uid', status: 'completed' });
+    mockUseSetupTabVisibility.mockReturnValue({ visible: true });
     store = {};
     Object.defineProperty(window, 'localStorage', {
       value: {
@@ -112,7 +117,6 @@ describe('App onboarding gating flow', () => {
       portfolios: [],
       activePortfolioId: null,
       setActivePortfolioId: vi.fn(),
-      upstox: null,
     });
   }
 
@@ -120,58 +124,10 @@ describe('App onboarding gating flow', () => {
     store[`nexus.workspaceOwnership.v1:${uid}`] = JSON.stringify({ mode, savedAt: Date.now() });
   }
 
-  it('shows onboarding wizard when onboarding not started', async () => {
+  it('dashboard does not show getting started or next action content', async () => {
     setupAuthUser();
     storeOwnership('test-uid', 'hosted');
-    mockGetOnboardingState.mockResolvedValue(null);
-
-    render(<App />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Finish Setup')).toBeInTheDocument();
-    });
-  });
-
-  it('shows onboarding wizard when onboarding is in_progress', async () => {
-    setupAuthUser();
-    storeOwnership('test-uid', 'hosted');
-    mockGetOnboardingState.mockResolvedValue({
-      uid: 'test-uid',
-      status: 'in_progress',
-      currentStep: 1,
-      primaryCountry: 'US',
-      primaryCurrency: 'USD',
-      secondaryCountry: null,
-      secondaryCurrency: null,
-      selectedAssetClasses: ['us-stocks'],
-      providerSelections: [],
-      integrationSelections: [],
-      members: [],
-    });
-
-    render(<App />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Finish Setup')).toBeInTheDocument();
-    });
-  });
-
-  it('renders dashboard without checklist when onboarding is completed', async () => {
-    setupAuthUser();
-    storeOwnership('test-uid', 'hosted');
-    mockGetOnboardingState.mockResolvedValue({
-      uid: 'test-uid',
-      status: 'completed',
-      currentStep: 6,
-      primaryCountry: 'US',
-      primaryCurrency: 'USD',
-      secondaryCountry: null,
-      secondaryCurrency: null,
-      selectedAssetClasses: ['us-stocks'],
-      providerSelections: [{ providerId: 'yahoo', enabled: true }],
-      integrationSelections: [],
-      members: [],
-    });
+    mockUseSetupTabVisibility.mockReturnValue({ visible: true });
 
     render(<App />);
 
@@ -180,27 +136,104 @@ describe('App onboarding gating flow', () => {
     });
     expect(screen.queryByText('GettingStartedChecklist')).not.toBeInTheDocument();
     expect(screen.queryByText('NextActionPanel')).not.toBeInTheDocument();
-    expect(screen.getByText('Setup')).toBeInTheDocument();
   });
 
-  it('does not show wizard briefly before onboarding check resolves', async () => {
+  it('shows Setup nav button when tab is visible', async () => {
     setupAuthUser();
     storeOwnership('test-uid', 'hosted');
-
-    let resolveOnboarding: (value: unknown) => void;
-    const onboardingPromise = new Promise((resolve) => {
-      resolveOnboarding = resolve;
-    });
-    mockGetOnboardingState.mockReturnValue(onboardingPromise);
+    mockUseSetupTabVisibility.mockReturnValue({ visible: true });
 
     render(<App />);
 
-    expect(screen.queryByText('Finish Setup')).not.toBeInTheDocument();
-    expect(screen.queryByText('GettingStartedChecklist')).not.toBeInTheDocument();
-
-    resolveOnboarding!(null);
     await waitFor(() => {
-      expect(screen.getByText('Finish Setup')).toBeInTheDocument();
+      expect(screen.getByText('Setup')).toBeInTheDocument();
     });
+  });
+
+  it('hides Setup nav button when tab is hidden by hook', async () => {
+    setupAuthUser();
+    storeOwnership('test-uid', 'hosted');
+    mockUseSetupTabVisibility.mockReturnValue({ visible: false });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(1);
+    });
+    expect(screen.queryByText('Setup')).not.toBeInTheDocument();
+  });
+
+  it('renders GettingStartedChecklist and NextActionPanel on the setup tab', async () => {
+    const user = userEvent.setup();
+    setupAuthUser();
+    storeOwnership('test-uid', 'hosted');
+    mockUseSetupTabVisibility.mockReturnValue({ visible: true });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Setup')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Setup'));
+
+    expect(screen.getByText('GettingStartedChecklist')).toBeInTheDocument();
+    expect(screen.getByText('NextActionPanel')).toBeInTheDocument();
+  });
+
+  it('falls back to dashboard when tab becomes hidden while on setup view', async () => {
+    setupAuthUser();
+    storeOwnership('test-uid', 'hosted');
+    mockUseSetupTabVisibility.mockReturnValue({ visible: true });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Setup')).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText('Setup'));
+
+    expect(screen.getByText('GettingStartedChecklist')).toBeInTheDocument();
+
+    mockUseSetupTabVisibility.mockReturnValue({ visible: false });
+    await user.click(screen.getByText('Dashboard'));
+
+    const { rerender } = render(<App />);
+    rerender(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(1);
+    });
+    expect(screen.queryByText('GettingStartedChecklist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Setup')).not.toBeInTheDocument();
+  });
+
+  it('does not redirect from dashboard to setup when app loads', async () => {
+    setupAuthUser();
+    storeOwnership('test-uid', 'hosted');
+    mockUseSetupTabVisibility.mockReturnValue({ visible: true });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(1);
+    });
+    expect(screen.queryByText('GettingStartedChecklist')).not.toBeInTheDocument();
+  });
+
+  it('initial view from query param works for setup', async () => {
+    window.history.pushState({}, '', '/?view=setup');
+    setupAuthUser();
+    storeOwnership('test-uid', 'hosted');
+    mockUseSetupTabVisibility.mockReturnValue({ visible: true });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('GettingStartedChecklist')).toBeInTheDocument();
+    });
+    window.history.pushState({}, '', '/');
   });
 });
