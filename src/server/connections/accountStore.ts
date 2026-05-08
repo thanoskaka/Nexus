@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getFirebaseAdminFirestore } from '../firebaseAdmin.js';
+import { getStorageAdapter } from '../storage/index.js';
 import type { ExternalAccount } from '../providers/types.js';
 
 const COLLECTION = 'external_accounts';
@@ -14,25 +14,18 @@ function makeId(connectionId: string, remoteAccountId: string) {
 }
 
 export async function listExternalAccounts(uid: string, connectionId: string) {
-  const snapshot = await getFirebaseAdminFirestore()
-    .collection(COLLECTION)
-    .where('uid', '==', uid)
-    .get();
-
-  return snapshot.docs
-    .map((doc) => doc.data() as ExternalAccount)
-    .filter((account) => account.connectionId === connectionId);
+  const docs = await getStorageAdapter().queryWhere<ExternalAccount>(COLLECTION, 'uid', '==', uid);
+  return docs.filter((account) => account.connectionId === connectionId);
 }
 
 export async function upsertExternalAccounts(accounts: Array<Omit<ExternalAccount, 'id'>>) {
   if (accounts.length === 0) return 0;
 
-  const db = getFirebaseAdminFirestore();
-  const batch = db.batch();
+  const batch = getStorageAdapter().batch();
 
   for (const account of accounts) {
     const id = makeId(account.connectionId, account.remoteAccountId);
-    batch.set(db.collection(COLLECTION).doc(id), { ...account, id, syncedAt: now() }, { merge: true });
+    batch.set(COLLECTION, id, { ...account, id, syncedAt: now() } as unknown as Record<string, unknown>);
   }
 
   await batch.commit();
@@ -50,16 +43,12 @@ export async function deactivateMissingExternalAccounts(
 
   if (toDeactivate.length === 0) return 0;
 
-  const db = getFirebaseAdminFirestore();
-  const batch = db.batch();
+  const batch = getStorageAdapter().batch();
   for (const account of toDeactivate) {
     batch.set(
-      db.collection(COLLECTION).doc(account.id),
-      {
-        isActive: false,
-        syncedAt: now(),
-      },
-      { merge: true },
+      COLLECTION,
+      account.id,
+      { isActive: false, syncedAt: now() } as unknown as Record<string, unknown>,
     );
   }
 

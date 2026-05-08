@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer as createViteServer, loadEnv } from 'vite';
 import path from 'path';
 import { fetchAutoMatchedPrice } from './src/lib/financeServer';
+import { getStorageAdapterAsync } from './src/server/storage/index.js';
 import { createSplitwiseRouter } from './src/server/splitwise/splitwiseRoutes';
 import { createUpstoxRouter } from './src/server/providers/upstox/upstoxRoutes';
 import { createSharedIntegrationsRouter } from './src/server/integrations/sharedRoutes';
@@ -112,6 +113,12 @@ export async function startServer() {
     if (value && !process.env[key]) {
       process.env[key] = value;
     }
+  }
+
+  try {
+    await getStorageAdapterAsync();
+  } catch (err) {
+    console.warn('Storage adapter init:', err);
   }
 
   const app = createApp();

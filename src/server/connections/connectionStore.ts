@@ -1,5 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { getFirebaseAdminFirestore } from '../firebaseAdmin.js';
+import { getStorageAdapter } from '../storage/index.js';
 import type { ExternalConnection, ExternalConnectionStatus, ExternalProvider } from '../providers/types.js';
 
 const COLLECTION = 'external_connections';
@@ -19,9 +18,8 @@ function toConnectionId(uid: string, provider: ExternalProvider) {
 
 export async function getExternalConnection(uid: string, provider: ExternalProvider) {
   const id = toConnectionId(uid, provider);
-  const snapshot = await getFirebaseAdminFirestore().collection(COLLECTION).doc(id).get();
-  if (!snapshot.exists) return null;
-  return snapshot.data() as ExternalConnection;
+  const doc = await getStorageAdapter().getDoc<ExternalConnection>(COLLECTION, id);
+  return doc || null;
 }
 
 export async function upsertExternalConnection(
@@ -34,7 +32,7 @@ export async function upsertExternalConnection(
     updatedAt: now(),
   }) as ExternalConnection;
 
-  await getFirebaseAdminFirestore().collection(COLLECTION).doc(id).set(payload, { merge: true });
+  await getStorageAdapter().setDoc(COLLECTION, id, payload as unknown as Record<string, unknown>, true);
   return payload;
 }
 
@@ -54,24 +52,23 @@ export async function updateExternalConnectionStatus(
     ...(patch || {}),
   });
 
-  await getFirebaseAdminFirestore().collection(COLLECTION).doc(id).set(
-    payload,
-    { merge: true },
-  );
+  await getStorageAdapter().setDoc(COLLECTION, id, payload as unknown as Record<string, unknown>, true);
 }
 
 export async function clearExternalConnectionToken(uid: string, provider: ExternalProvider) {
   const id = toConnectionId(uid, provider);
-  await getFirebaseAdminFirestore().collection(COLLECTION).doc(id).set(
+  await getStorageAdapter().setDoc(
+    COLLECTION,
+    id,
     {
       uid,
       provider,
       id,
-      tokenBlob: FieldValue.delete(),
-      scopes: FieldValue.delete(),
+      tokenBlob: getStorageAdapter().deleteFieldSentinel(),
+      scopes: getStorageAdapter().deleteFieldSentinel(),
       updatedAt: now(),
-    },
-    { merge: true },
+    } as unknown as Record<string, unknown>,
+    true,
   );
 }
 

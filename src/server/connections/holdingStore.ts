@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getFirebaseAdminFirestore } from '../firebaseAdmin.js';
+import { getStorageAdapter } from '../storage/index.js';
 import type { ExternalAssetOverride, ExternalHolding } from '../providers/types.js';
 
 const HOLDINGS_COLLECTION = 'external_holdings';
@@ -24,14 +24,8 @@ function makeOverrideId(uid: string, holdingId: string) {
 }
 
 export async function listExternalHoldings(uid: string, connectionId: string) {
-  const snapshot = await getFirebaseAdminFirestore()
-    .collection(HOLDINGS_COLLECTION)
-    .where('uid', '==', uid)
-    .get();
-
-  return snapshot.docs
-    .map((doc) => doc.data() as ExternalHolding)
-    .filter((holding) => holding.connectionId === connectionId);
+  const docs = await getStorageAdapter().queryWhere<ExternalHolding>(HOLDINGS_COLLECTION, 'uid', '==', uid);
+  return docs.filter((holding) => holding.connectionId === connectionId);
 }
 
 export async function listActiveExternalHoldings(uid: string, connectionId: string) {
@@ -42,12 +36,11 @@ export async function listActiveExternalHoldings(uid: string, connectionId: stri
 export async function upsertExternalHoldings(holdings: Array<Omit<ExternalHolding, 'id'>>) {
   if (holdings.length === 0) return 0;
 
-  const db = getFirebaseAdminFirestore();
-  const batch = db.batch();
+  const batch = getStorageAdapter().batch();
 
   for (const holding of holdings) {
     const id = makeHoldingId(holding.connectionId, holding.sourceFingerprint);
-    batch.set(db.collection(HOLDINGS_COLLECTION).doc(id), { ...holding, id, syncedAt: now() }, { merge: true });
+    batch.set(HOLDINGS_COLLECTION, id, { ...holding, id, syncedAt: now() } as unknown as Record<string, unknown>);
   }
 
   await batch.commit();
@@ -65,16 +58,12 @@ export async function deactivateMissingExternalHoldings(
 
   if (toDeactivate.length === 0) return 0;
 
-  const db = getFirebaseAdminFirestore();
-  const batch = db.batch();
+  const batch = getStorageAdapter().batch();
   for (const holding of toDeactivate) {
     batch.set(
-      db.collection(HOLDINGS_COLLECTION).doc(holding.id),
-      {
-        isActive: false,
-        syncedAt: now(),
-      },
-      { merge: true },
+      HOLDINGS_COLLECTION,
+      holding.id,
+      { isActive: false, syncedAt: now() } as unknown as Record<string, unknown>,
     );
   }
 
@@ -87,44 +76,35 @@ export async function deactivateAllExternalHoldings(uid: string, connectionId: s
   const toDeactivate = holdings.filter((holding) => holding.isActive);
   if (toDeactivate.length === 0) return 0;
 
-  const db = getFirebaseAdminFirestore();
-  const batch = db.batch();
+  const batch = getStorageAdapter().batch();
   for (const holding of toDeactivate) {
     batch.set(
-      db.collection(HOLDINGS_COLLECTION).doc(holding.id),
-      {
-        isActive: false,
-        syncedAt: now(),
-      },
-      { merge: true },
+      HOLDINGS_COLLECTION,
+      holding.id,
+      { isActive: false, syncedAt: now() } as unknown as Record<string, unknown>,
     );
   }
+
   await batch.commit();
   return toDeactivate.length;
 }
 
 export async function getExternalAssetOverride(uid: string, holdingId: string) {
-  const snapshot = await getFirebaseAdminFirestore()
-    .collection(OVERRIDES_COLLECTION)
-    .doc(makeOverrideId(uid, holdingId))
-    .get();
-
-  if (!snapshot.exists) return null;
-  return snapshot.data() as ExternalAssetOverride;
+  const doc = await getStorageAdapter().getDoc<ExternalAssetOverride>(OVERRIDES_COLLECTION, makeOverrideId(uid, holdingId));
+  return doc || null;
 }
 
 export async function listExternalAssetOverrides(uid: string, holdingIds: string[]) {
   if (holdingIds.length === 0) return [] as ExternalAssetOverride[];
 
   const uniqueHoldingIds = Array.from(new Set(holdingIds));
-  const db = getFirebaseAdminFirestore();
   const docs = await Promise.all(
-    uniqueHoldingIds.map((holdingId) => db.collection(OVERRIDES_COLLECTION).doc(makeOverrideId(uid, holdingId)).get()),
+    uniqueHoldingIds.map((holdingId) =>
+      getStorageAdapter().getDoc<ExternalAssetOverride>(OVERRIDES_COLLECTION, makeOverrideId(uid, holdingId)),
+    ),
   );
 
-  return docs
-    .filter((snapshot) => snapshot.exists)
-    .map((snapshot) => snapshot.data() as ExternalAssetOverride);
+  return docs.filter((doc): doc is ExternalAssetOverride => doc !== null);
 }
 
 export async function upsertExternalAssetOverride(
@@ -143,10 +123,6 @@ export async function upsertExternalAssetOverride(
     notes: patch.notes,
   }) as ExternalAssetOverride;
 
-  await getFirebaseAdminFirestore()
-    .collection(OVERRIDES_COLLECTION)
-    .doc(makeOverrideId(uid, holdingId))
-    .set(payload, { merge: true });
-
+  await getStorageAdapter().setDoc(OVERRIDES_COLLECTION, makeOverrideId(uid, holdingId), payload as unknown as Record<string, unknown>, true);
   return payload;
 }

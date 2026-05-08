@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getFirebaseAdminFirestore } from '../firebaseAdmin.js';
+import { getStorageAdapter } from '../storage/index.js';
 import type { ExternalProvider, ExternalSyncRun } from '../providers/types.js';
 
 const COLLECTION = 'external_sync_runs';
@@ -33,7 +33,7 @@ export async function startExternalSyncRun(input: {
     },
   };
 
-  await getFirebaseAdminFirestore().collection(COLLECTION).doc(id).set(run);
+  await getStorageAdapter().setDoc(COLLECTION, id, run as unknown as Record<string, unknown>);
   return run;
 }
 
@@ -48,20 +48,12 @@ export async function finishExternalSyncRun(
     finishedAt: now(),
   });
 
-  await getFirebaseAdminFirestore().collection(COLLECTION).doc(id).set(
-    payload,
-    { merge: true },
-  );
+  await getStorageAdapter().setDoc(COLLECTION, id, payload as unknown as Record<string, unknown>, true);
 }
 
 export async function listLatestSyncRuns(uid: string, provider: ExternalProvider, limit = 5) {
-  const snapshot = await getFirebaseAdminFirestore()
-    .collection(COLLECTION)
-    .where('uid', '==', uid)
-    .get();
-
-  return snapshot.docs
-    .map((doc) => doc.data() as ExternalSyncRun)
+  const docs = await getStorageAdapter().queryWhere<ExternalSyncRun>(COLLECTION, 'uid', '==', uid);
+  return docs
     .filter((run) => run.provider === provider)
     .sort((left, right) => (right.startedAt || 0) - (left.startedAt || 0))
     .slice(0, limit);
