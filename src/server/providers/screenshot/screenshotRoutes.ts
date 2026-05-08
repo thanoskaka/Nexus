@@ -5,6 +5,7 @@ import { requireFirebaseUser } from '../../auth/requireFirebaseUser.js';
 import { resolveAiApiKey } from '../../user/aiCredentialsStore.js';
 import type { AiProviderConfig } from '../../ai/geminiClient.js';
 import type { AiProvider } from '../../user/aiCredentialsTypes.js';
+import { isVisionCapable } from '../../user/aiCredentialsTypes.js';
 
 export type ExtractedAsset = {
   name: string;
@@ -59,7 +60,7 @@ function buildExtractionPrompt(): string {
   ].join('\n');
 }
 
-type AiOcrResponse = {
+type GeminiOcrResponse = {
   candidates?: Array<{
     content?: {
       parts?: Array<{ text?: string }>;
@@ -68,14 +69,21 @@ type AiOcrResponse = {
   error?: { message?: string };
 };
 
-type DeepSeekOcrResponse = {
+type OpenAiOcrResponse = {
   choices?: Array<{
     message?: { content?: string };
   }>;
   error?: { message?: string };
 };
 
-function extractTextFromGeminiResponse(response: AiOcrResponse): string {
+type AnthropicOcrResponse = {
+  content?: Array<{
+    text?: string;
+  }>;
+  error?: { message?: string; error?: { message: string } };
+};
+
+function extractTextFromGeminiResponse(response: GeminiOcrResponse): string {
   const candidates = Array.isArray(response.candidates) ? response.candidates : [];
   for (const candidate of candidates) {
     const parts = candidate?.content?.parts;
@@ -125,7 +133,7 @@ async function callGeminiOcr(
       throw new Error(text.slice(0, 300) || `Gemini OCR request failed with status ${response.status}`);
     }
 
-    const payload = await response.json() as AiOcrResponse;
+    const payload = await response.json() as GeminiOcrResponse;
     if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
 
     const text = extractTextFromGeminiResponse(payload);
@@ -176,12 +184,116 @@ async function callDeepSeekOcr(
       throw new Error(text.slice(0, 300) || `DeepSeek OCR request failed with status ${response.status}`);
     }
 
-    const payload = await response.json() as DeepSeekOcrResponse;
+    const payload = await response.json() as OpenAiOcrResponse;
     if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
 
     const text = payload.choices?.[0]?.message?.content?.trim();
     if (!text) throw new Error('DeepSeek returned an empty response.');
     return text;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function callOpenAiOcr(
+  config: AiProviderConfig,
+  imageBase64: string,
+  mimeType: string,
+  prompt: string,
+): Promise<string> {
+  const { model, apiKey } = config;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.05,
+        max_tokens: 8192,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            ],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(text.slice(0, 300) || `OpenAI OCR request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json() as OpenAiOcrResponse;
+    if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
+
+    const text = payload.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error('OpenAI returned an empty response.');
+    return text;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function callAnthropicOcr(
+  config: AiProviderConfig,
+  imageBase64: string,
+  mimeType: string,
+  prompt: string,
+): Promise<string> {
+  const { model, apiKey } = config;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 8192,
+        temperature: 0.05,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(text.slice(0, 300) || `Anthropic OCR request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json() as AnthropicOcrResponse;
+    if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
+    if (payload.error?.error?.message) throw new Error(payload.error.error.message.slice(0, 300));
+
+    const textContents = payload.content?.filter((c) => c.text).map((c) => c.text).join('').trim();
+    if (!textContents) throw new Error('Anthropic returned an empty response.');
+    return textContents;
   } finally {
     clearTimeout(timeout);
   }
@@ -194,9 +306,21 @@ async function callAiOcr(
 ): Promise<ExtractedAsset[]> {
   const prompt = buildExtractionPrompt();
 
+  if (!isVisionCapable(config.provider as AiProvider, config.model)) {
+    throw new Error(
+      `The selected model (${config.model}) may not support vision/OCR. ` +
+      `For screenshot import, choose a vision-capable model. ` +
+      `Gemini models are recommended for OCR.`
+    );
+  }
+
   let rawText: string;
   if (config.provider === 'deepseek') {
     rawText = await callDeepSeekOcr(config, imageBase64, mimeType, prompt);
+  } else if (config.provider === 'openai') {
+    rawText = await callOpenAiOcr(config, imageBase64, mimeType, prompt);
+  } else if (config.provider === 'anthropic') {
+    rawText = await callAnthropicOcr(config, imageBase64, mimeType, prompt);
   } else {
     rawText = await callGeminiOcr(config, imageBase64, mimeType, prompt);
   }
@@ -296,7 +420,7 @@ export function createScreenshotRouter() {
       if (!aiConfig) {
         return res.status(500).json({
           candidates: [],
-          errors: ['AI API key is not configured. Set one in Settings → Pricing → AI Provider & API Key, or add GEMINI_API_KEY to .env.local.'],
+          errors: ['AI API key is not configured. Set one in Settings, or add an API key environment variable (e.g. GEMINI_API_KEY, OPENAI_API_KEY).'],
         });
       }
 

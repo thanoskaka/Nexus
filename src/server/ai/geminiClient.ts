@@ -7,6 +7,7 @@ export type AiProviderConfig = {
   provider: AiProvider;
   model: string;
   apiKey: string;
+  source?: 'user' | 'server-default';
 };
 
 type GeminiResponse = {
@@ -29,6 +30,29 @@ type DeepSeekResponse = {
     total_tokens?: number;
   };
   error?: { message?: string };
+};
+
+type OpenAIResponse = {
+  choices?: Array<{
+    message?: { content?: string };
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+  error?: { message?: string };
+};
+
+type AnthropicResponse = {
+  content?: Array<{
+    text?: string;
+  }>;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+  error?: { message?: string; error?: { message: string } };
 };
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -165,6 +189,107 @@ async function callDeepSeekChat(
   };
 }
 
+async function callOpenAiChat(
+  config: AiProviderConfig,
+  systemPrompt: string,
+  userMessage: string,
+  abortController?: AbortController,
+) {
+  const { model, apiKey } = config;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+    }),
+    signal: abortController?.signal,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text.slice(0, 300) || `OpenAI request failed with status ${response.status}`);
+  }
+
+  const payload = await response.json() as OpenAIResponse;
+  if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
+
+  const answer = payload.choices?.[0]?.message?.content?.trim();
+  if (!answer) throw new Error('AI returned an empty response.');
+
+  return {
+    answer,
+    model,
+    usage: payload.usage
+      ? {
+          promptTokenCount: payload.usage.prompt_tokens,
+          candidatesTokenCount: payload.usage.completion_tokens,
+          totalTokenCount: payload.usage.total_tokens,
+        }
+      : undefined,
+  };
+}
+
+async function callAnthropicChat(
+  config: AiProviderConfig,
+  systemPrompt: string,
+  userMessage: string,
+  abortController?: AbortController,
+) {
+  const { model, apiKey } = config;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      temperature: 0.2,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userMessage },
+      ],
+    }),
+    signal: abortController?.signal,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text.slice(0, 300) || `Anthropic request failed with status ${response.status}`);
+  }
+
+  const payload = await response.json() as AnthropicResponse;
+  if (payload.error?.message) throw new Error(payload.error.message.slice(0, 300));
+  if (payload.error?.error?.message) throw new Error(payload.error.error.message.slice(0, 300));
+
+  const textContents = payload.content?.filter((c) => c.text).map((c) => c.text).join('').trim();
+  if (!textContents) throw new Error('AI returned an empty response.');
+
+  return {
+    answer: textContents,
+    model,
+    usage: payload.usage
+      ? {
+          promptTokenCount: payload.usage.input_tokens,
+          candidatesTokenCount: payload.usage.output_tokens,
+          totalTokenCount: (payload.usage.input_tokens || 0) + (payload.usage.output_tokens || 0),
+        }
+      : undefined,
+  };
+}
+
 export async function callAiChat(
   config: AiProviderConfig,
   systemPrompt: string,
@@ -178,6 +303,12 @@ export async function callAiChat(
   try {
     if (config.provider === 'deepseek') {
       return await callDeepSeekChat(config, systemPrompt, userMessage, controller);
+    }
+    if (config.provider === 'openai') {
+      return await callOpenAiChat(config, systemPrompt, userMessage, controller);
+    }
+    if (config.provider === 'anthropic') {
+      return await callAnthropicChat(config, systemPrompt, userMessage, controller);
     }
     return await callGeminiChat(config, systemPrompt, userMessage, controller);
   } finally {

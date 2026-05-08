@@ -5,11 +5,11 @@ import {
   getAiCredentials,
   upsertAiCredentials,
   deleteAiCredentials,
+  resolveAiCredentialsResponse,
 } from './aiCredentialsStore.js';
 import {
   type AiProvider,
   type AiCredentialsPutRequest,
-  type AiCredentialsResponse,
   isAiProvider,
   validateApiKey,
   AI_PROVIDER_DEFAULT_MODEL,
@@ -21,17 +21,16 @@ function safeError(error: unknown): string {
   return 'Unknown error';
 }
 
+const PROVIDERS_LIST = 'gemini, deepseek, openai, anthropic';
+
 export function createAiCredentialsRouter() {
   const router = Router();
 
   router.get('/', requireFirebaseUser, async (req: Request, res: Response) => {
     const user = req.user!;
     try {
-      const creds = await getAiCredentials(user.uid);
-      if (!creds) {
-        return res.json({ provider: null, model: null, apiKeyLast4: null });
-      }
-      return res.json(creds);
+      const response = await resolveAiCredentialsResponse(user.uid);
+      return res.json(response);
     } catch (error) {
       return res.status(500).json({ error: safeError(error) });
     }
@@ -42,7 +41,7 @@ export function createAiCredentialsRouter() {
     const body = req.body as AiCredentialsPutRequest;
 
     if (!body.provider || !isAiProvider(body.provider)) {
-      return res.status(400).json({ error: 'Invalid or missing provider. Supported: gemini, deepseek.' });
+      return res.status(400).json({ error: `Invalid or missing provider. Supported: ${PROVIDERS_LIST}.` });
     }
 
     const provider: AiProvider = body.provider;
@@ -82,7 +81,7 @@ export function createAiCredentialsRouter() {
       if (!resolved) {
         return res.status(400).json({
           success: false,
-          error: 'No AI credentials configured. Set an API key in Settings or configure GEMINI_API_KEY in the server environment.',
+          error: `No AI credentials configured. Set an API key in Settings or configure an environment variable (e.g. GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY).`,
         });
       }
 
@@ -120,6 +119,57 @@ export function createAiCredentialsRouter() {
             model,
             messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
             max_tokens: 10,
+          }),
+        });
+
+        if (!testResponse.ok) {
+          const text = await testResponse.text().catch(() => '');
+          return res.status(400).json({
+            success: false,
+            error: `${AI_PROVIDER_LABELS[provider]} test failed: ${text.slice(0, 200) || `HTTP ${testResponse.status}`}`,
+          });
+        }
+
+        return res.json({ success: true, provider, model, message: `${AI_PROVIDER_LABELS[provider]} connection successful.` });
+      }
+
+      if (provider === 'openai') {
+        const testResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
+            max_tokens: 10,
+          }),
+        });
+
+        if (!testResponse.ok) {
+          const text = await testResponse.text().catch(() => '');
+          return res.status(400).json({
+            success: false,
+            error: `${AI_PROVIDER_LABELS[provider]} test failed: ${text.slice(0, 200) || `HTTP ${testResponse.status}`}`,
+          });
+        }
+
+        return res.json({ success: true, provider, model, message: `${AI_PROVIDER_LABELS[provider]} connection successful.` });
+      }
+
+      if (provider === 'anthropic') {
+        const testResponse = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 10,
+            messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
           }),
         });
 
