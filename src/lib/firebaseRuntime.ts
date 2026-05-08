@@ -23,7 +23,7 @@ function createApp(name: string, config: Record<string, string>): FirebaseApp {
 
 function enablePersistence(db: Firestore): void {
   if (typeof window === 'undefined') return;
-  enableIndexedDbPersistence(db).catch((err: unknown) => {
+  const handleError = (err: unknown) => {
     const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: string }).code) : '';
     if (code === 'failed-precondition') {
       console.warn('Persistence failed: multiple tabs open');
@@ -34,7 +34,12 @@ function enablePersistence(db: Firestore): void {
       return;
     }
     console.warn('Persistence setup failed', err);
-  });
+  };
+  try {
+    void enableIndexedDbPersistence(db).catch(handleError);
+  } catch (err) {
+    handleError(err);
+  }
 }
 
 export function getHostedRuntime(): FirebaseRuntime {

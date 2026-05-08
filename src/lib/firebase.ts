@@ -22,19 +22,25 @@ export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 export const firebaseDataNamespace = resolveFirebaseDataNamespace();
 
-if (typeof window !== 'undefined') {
-  void enableIndexedDbPersistence(db).catch((err: unknown) => {
-    const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: string }).code) : '';
-    if (code === 'failed-precondition') {
-      console.warn('Persistence failed: multiple tabs open');
-      return;
-    }
-    if (code === 'unimplemented') {
-      console.warn('Persistence not supported in this browser');
-      return;
-    }
-    console.warn('Persistence setup failed', err);
-  });
+function handlePersistenceError(err: unknown): void {
+  const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: string }).code) : '';
+  if (code === 'failed-precondition') {
+    console.warn('Persistence failed: multiple tabs open');
+    return;
+  }
+  if (code === 'unimplemented') {
+    console.warn('Persistence not supported in this browser');
+    return;
+  }
+  console.warn('Persistence setup failed', err);
+}
+
+if (typeof window !== 'undefined' && !isMockMode()) {
+  try {
+    void enableIndexedDbPersistence(db).catch(handlePersistenceError);
+  } catch (err) {
+    handlePersistenceError(err);
+  }
 }
 
 googleProvider.setCustomParameters({
