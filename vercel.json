@@ -43,19 +43,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": "api/user/account/[...route].ts",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/user/ai-credentials/[...route].ts",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/user/workspace-ownership/[...route].ts",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/user/onboarding/[...route].ts",
+      "src": "api/user/[...route].ts",
       "use": "@vercel/node"
     }
   ],
