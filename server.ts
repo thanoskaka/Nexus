@@ -1,7 +1,7 @@
 import express from 'express';
 import { createServer as createViteServer, loadEnv } from 'vite';
 import path from 'path';
-import { fetchAutoMatchedPrice } from './src/lib/financeServer';
+import { fetchAutoMatchedPrice, searchInstruments } from './src/lib/financeServer';
 import { getStorageAdapterAsync } from './src/server/storage/index.js';
 import { createSplitwiseRouter } from './src/server/splitwise/splitwiseRoutes';
 import { createUpstoxRouter } from './src/server/providers/upstox/upstoxRoutes';
@@ -102,6 +102,25 @@ export function createApp() {
   app.use('/api/user/onboarding', createOnboardingRouter());
   app.use('/api/setup', createSetupStatusRouter());
   app.use('/api/user/account', createAccountDeletionRouter());
+
+  app.get('/api/instruments/search', async (req, res) => {
+    const q = (req.query.q as string || '').trim();
+    if (!q || q.length < 2) {
+      return res.json({ suggestions: [] });
+    }
+
+    try {
+      const suggestions = await searchInstruments({
+        q,
+        country: req.query.country as string | undefined,
+        assetClass: req.query.assetClass as string | undefined,
+      });
+      return res.json({ suggestions });
+    } catch (error) {
+      console.error('Error in instrument search:', error);
+      return res.status(500).json({ error: 'Instrument search failed', suggestions: [] });
+    }
+  });
 
   return app;
 }
