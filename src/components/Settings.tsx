@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { usePortfolio } from '../store/PortfolioContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Download, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson, FlaskConical, Wand2, AlertTriangle } from 'lucide-react';
+import { Cloud, Download, Edit3, Upload, Trash2, Users, PieChart, TrendingUp, Plus, RefreshCw, UserPlus, Shield, UserX, Link2, Unlink2, ScanLine, Camera, Globe2, RotateCw, FileJson, FlaskConical, Wand2, AlertTriangle } from 'lucide-react';
 import {
   buildExportPayload,
   computeImportResult,
@@ -32,6 +32,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES, DEFAULT_WORKSPACE_PREFERENCES, type BrokerConnectionConfig, type UserBrokerConnections, type UserProviderOverrides, type WorkspacePreferences } from '../store/userPreferences';
 import { useSplitwise } from '../store/SplitwiseContext';
 import { useConnectedAccounts } from '../store/ConnectedAccountsContext';
+import { ConnectedHoldingOverrideModal } from './ConnectedHoldingOverrideModal';
+import type { ConnectedHolding } from '../lib/connectedAccountsApi';
 import type { CurrencyAmount } from '../lib/splitwiseTypes';
 import { useAuth } from '../store/AuthContext';
 import { SetupHealthCard } from './SetupHealthCard';
@@ -118,11 +120,13 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
   } = useSplitwise();
   const {
     upstox,
+    upstoxHoldings,
     loading: connectedAccountsLoading,
     error: connectedAccountsError,
     connectUpstox,
     refreshUpstox,
     disconnectUpstox,
+    saveUpstoxOverride,
   } = useConnectedAccounts();
   const { isSampleMode, sampleData, disableSampleMode } = useSampleMode();
   const displayAssets = isSampleMode ? sampleData.assets : assets;
@@ -144,6 +148,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
   const [isAssetClassModalOpen, setIsAssetClassModalOpen] = React.useState(false);
   const [isScreenshotModalOpen, setIsScreenshotModalOpen] = React.useState(false);
   const [classToEdit, setClassToEdit] = React.useState<AssetClassDef | null>(null);
+  const [overrideModal, setOverrideModal] = React.useState<{ open: boolean; holdingId: string | null; holdingName: string; currentLabel?: string; currentOwner?: string; currentAssetClass?: string; currentNotes?: string }>({ open: false, holdingId: null, holdingName: '' });
   const [sharedProviderForm, setSharedProviderForm] = React.useState<PriceProviderSettings>(DEFAULT_PRICE_PROVIDER_SETTINGS);
   const [overrideForm, setOverrideForm] = React.useState<UserProviderOverrides>(DEFAULT_USER_PROVIDER_OVERRIDES);
   const [brokerForm, setBrokerForm] = React.useState<UserBrokerConnections>(DEFAULT_BROKER_CONNECTIONS);
@@ -2735,9 +2740,9 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
             <CardContent className="space-y-5">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
                         upstox?.status === 'connected'
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200'
                           : upstox?.status === 'syncing' || upstox?.status === 'connecting'
@@ -2748,8 +2753,15 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                                 ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200'
                                 : 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300'
                       }`}>
+                        <Cloud className={`h-3 w-3 ${upstox?.status === 'connected' ? 'text-emerald-600' : ''}`} />
                         {upstox?.status || 'disconnected'}
                       </span>
+                      {upstox?.status === 'connected' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
+                          <Cloud className="h-3 w-3" />
+                          Cloud-connected
+                        </span>
+                      )}
                       <span className="text-xs text-slate-500 dark:text-slate-400">
                         Last synced: {formatTimestamp(upstox?.lastSyncAt)}
                       </span>
@@ -2759,13 +2771,23 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                       <div className="text-sm font-semibold text-slate-900 dark:text-white">Upstox</div>
                       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                         {upstox?.status === 'connected'
-                          ? `${upstox.displayName || 'Upstox account'} is connected. Holdings and positions are synced as read-only snapshots.`
+                          ? `${upstox.displayName || 'Upstox account'} is connected. Holdings and positions are synced as read-only cloud snapshots.`
                           : 'Connect Upstox to sync holdings and positions into your cloud-backed Nexus account. Nexus redirects you to Upstox for secure login/consent.'}
                       </p>
                     </div>
 
+                    {upstox?.status === 'connected' && (
+                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <Shield className="h-3.5 w-3.5 text-emerald-500" />
+                        Source-managed data — prices and values are synced from Upstox; metadata is overridable
+                      </div>
+                    )}
+
                     {connectedAccountsError ? (
-                      <p className="text-sm text-rose-700 dark:text-rose-300">{connectedAccountsError}</p>
+                      <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{connectedAccountsError}</span>
+                      </div>
                     ) : null}
                   </div>
 
@@ -2784,6 +2806,23 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                         </Button>
                         <Button variant="outline" onClick={connectUpstox} disabled={connectedAccountsLoading} className="rounded-full">
                           Reconnect
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={() => upstoxHoldings.length > 0 && setOverrideModal({
+                            open: true,
+                            holdingId: upstoxHoldings[0].id,
+                            holdingName: upstoxHoldings[0].securityName,
+                            currentLabel: upstoxHoldings[0].override?.customLabel,
+                            currentOwner: upstoxHoldings[0].override?.ownerOverride,
+                            currentAssetClass: upstoxHoldings[0].override?.assetClassOverride,
+                            currentNotes: upstoxHoldings[0].override?.notes,
+                          })}
+                          disabled={upstoxHoldings.length === 0}
+                        >
+                          <Edit3 className="mr-2 h-4 w-4" />
+                          Override
                         </Button>
                         <Button variant="outline" onClick={() => void disconnectUpstox()} disabled={connectedAccountsLoading} className="rounded-full">
                           <Unlink2 className="mr-2 h-4 w-4" />
@@ -3000,8 +3039,8 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
               <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
                         splitwiseStatus === 'connected'
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200'
                           : splitwiseStatus === 'reconnect_needed'
@@ -3012,8 +3051,15 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                               ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200'
                               : 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300'
                       }`}>
+                        <Cloud className={`h-3 w-3 ${splitwiseStatus === 'connected' ? 'text-emerald-600' : ''}`} />
                         {splitwiseStatus}
                       </span>
+                      {splitwiseStatus === 'connected' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">
+                          <Cloud className="h-3 w-3" />
+                          Cloud-connected
+                        </span>
+                      )}
                       {splitwiseSummary?.lastSyncAt ? (
                         <span className="text-xs text-slate-500 dark:text-slate-400">
                           Last synced: {formatTimestamp(splitwiseSummary.lastSyncAt)}
@@ -3047,8 +3093,18 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                       </p>
                     )}
 
+                    {splitwiseStatus === 'connected' && (
+                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <Shield className="h-3.5 w-3.5 text-emerald-500" />
+                        Source-managed expense data — balances are synced from Splitwise; metadata is overridable
+                      </div>
+                    )}
+
                     {splitwiseError ? (
-                      <p className="text-sm text-rose-700 dark:text-rose-300">{splitwiseError}</p>
+                      <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{splitwiseError}</span>
+                      </div>
                     ) : null}
 
                     {splitwiseStatus === 'connecting' ? (
@@ -3282,6 +3338,17 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
       <ScreenshotImportModal
         open={isScreenshotModalOpen}
         onOpenChange={setIsScreenshotModalOpen}
+      />
+      <ConnectedHoldingOverrideModal
+        open={overrideModal.open}
+        onOpenChange={(open) => setOverrideModal((prev) => ({ ...prev, open }))}
+        holdingId={overrideModal.holdingId}
+        holdingName={overrideModal.holdingName}
+        currentLabel={overrideModal.currentLabel}
+        currentOwner={overrideModal.currentOwner}
+        currentAssetClass={overrideModal.currentAssetClass}
+        currentNotes={overrideModal.currentNotes}
+        onSaved={() => void refreshUpstox()}
       />
     </div>
   );

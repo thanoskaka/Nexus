@@ -228,7 +228,7 @@ describe('SetupHealthCard', () => {
       expect(screen.getByText('local')).toBeTruthy();
     });
 
-    const missingBadges = screen.getAllByText('missing');
+    const missingBadges = screen.getAllByText('Not Available');
     expect(missingBadges.length).toBeGreaterThanOrEqual(7);
   });
 
@@ -238,7 +238,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('Network error')).toBeTruthy();
+      expect(screen.getByText('Diagnostics Unavailable')).toBeTruthy();
     });
 
     const retryButton = screen.getByText('Retry');
@@ -383,7 +383,7 @@ describe('SetupHealthCard', () => {
     await user.click(testButtons[0]);
 
     await waitFor(() => {
-      const fixThisElements = screen.getAllByText('Fix this');
+      const fixThisElements = screen.getAllByText(/Verification failed/);
       expect(fixThisElements.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -419,7 +419,7 @@ describe('SetupHealthCard', () => {
     expect(screen.getByText('Re-test')).toBeTruthy();
   });
 
-  it('shows View setup button for configured items', async () => {
+  it('shows View details button for trusted items', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => fullStatus,
@@ -428,7 +428,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('View setup').length).toBeGreaterThanOrEqual(6);
+      expect(screen.getAllByText('View details').length).toBeGreaterThanOrEqual(6);
     });
   });
 

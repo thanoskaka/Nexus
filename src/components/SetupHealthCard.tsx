@@ -6,7 +6,7 @@ import { Loader2, CheckCircle, XCircle, AlertCircle, RefreshCw, Server, Activity
 import { fetchSetupStatus, verifyCapability, verifyAllCapabilities, type SetupStatusResponse } from '../lib/setupStatusApi';
 import { loadVerificationResults, saveVerificationResult, saveVerificationResults, type ClientVerificationResult } from '../lib/verificationStore';
 
-type HealthItemStatus = 'configured' | 'partial' | 'missing';
+type HealthItemStatus = 'trusted' | 'needs-attention' | 'unavailable';
 type FeatureImportance = 'required' | 'recommended' | 'optional';
 
 type HealthItem = {
@@ -272,7 +272,7 @@ function getImportance(item: HealthItem): FeatureImportance {
 }
 
 function toStatus(configured: boolean): HealthItemStatus {
-  return configured ? 'configured' : 'missing';
+  return configured ? 'trusted' : 'unavailable';
 }
 
 function buildItems(data: SetupStatusResponse): HealthItem[] {
@@ -375,15 +375,15 @@ function buildItems(data: SetupStatusResponse): HealthItem[] {
 }
 
 function upstoxStatus(data: SetupStatusResponse): HealthItemStatus {
-  if (data.features.upstoxConnectedAccounts) return 'configured';
-  if (data.integrations.upstox.clientConfigured) return 'partial';
-  return 'missing';
+  if (data.features.upstoxConnectedAccounts) return 'trusted';
+  if (data.integrations.upstox.clientConfigured) return 'needs-attention';
+  return 'unavailable';
 }
 
 function splitwiseStatus(data: SetupStatusResponse): HealthItemStatus {
-  if (data.features.splitwise) return 'configured';
-  if (data.integrations.splitwise.clientConfigured) return 'partial';
-  return 'missing';
+  if (data.features.splitwise) return 'trusted';
+  if (data.integrations.splitwise.clientConfigured) return 'needs-attention';
+  return 'unavailable';
 }
 
 function upstoxHint(data: SetupStatusResponse): string {
@@ -446,24 +446,30 @@ function ModeBadge({ mode }: { mode: SetupStatusResponse['mode'] }) {
 
 function StatusIcon({ status }: { status: HealthItemStatus }) {
   switch (status) {
-    case 'configured':
+    case 'trusted':
       return <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />;
-    case 'partial':
+    case 'needs-attention':
       return <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />;
-    case 'missing':
+    case 'unavailable':
       return <XCircle className="h-4 w-4 text-slate-300 dark:text-slate-600 shrink-0 mt-0.5" />;
   }
 }
 
+const STATUS_LABELS: Record<HealthItemStatus, string> = {
+  trusted: 'Ready',
+  'needs-attention': 'Needs Setup',
+  unavailable: 'Not Available',
+};
+
 function StatusBadge({ status }: { status: HealthItemStatus }) {
   const styles: Record<HealthItemStatus, string> = {
-    configured: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
-    partial: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-    missing: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+    trusted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+    'needs-attention': 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    unavailable: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
   };
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}>
-      {status}
+      {STATUS_LABELS[status]}
     </span>
   );
 }
@@ -715,7 +721,7 @@ export function SetupHealthCard() {
     return testingCapabilities.has(verifyKey);
   }, [testingCapabilities]);
 
-  const hasConfiguredItems = data && buildItems(data).some((item) => item.status === 'configured' || item.status === 'partial');
+  const hasConfiguredItems = data && buildItems(data).some((item) => item.status === 'trusted' || item.status === 'needs-attention');
 
   return (
     <Card className="border-none shadow-sm rounded-2xl">
@@ -757,10 +763,16 @@ export function SetupHealthCard() {
         )}
 
         {error && (
-          <div className="flex flex-col items-center gap-3 py-4">
-            <div className="flex items-center gap-2 text-sm text-rose-600 dark:text-rose-400">
-              <XCircle className="h-4 w-4" />
-              <span>{error}</span>
+          <div className="flex flex-col items-center gap-4 py-6">
+            <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 dark:border-rose-900/40 dark:bg-rose-950/20">
+              <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-500" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-rose-800 dark:text-rose-200">Diagnostics Unavailable</p>
+                <p className="text-sm text-rose-700 dark:text-rose-300">{error}</p>
+                <p className="text-xs text-rose-600 dark:text-rose-400">
+                  Setup health diagnostics could not be loaded. The status endpoint may be unreachable or the server environment is still initializing.
+                </p>
+              </div>
             </div>
             <Button variant="outline" size="sm" onClick={load} className="rounded-full">
               <RefreshCw className="mr-2 h-3 w-3" />
@@ -772,11 +784,11 @@ export function SetupHealthCard() {
         {data && !loading && (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {buildItems(data).map((item) => {
-              const isUnconfigured = item.status !== 'configured';
+              const isNotReady = item.status !== 'trusted';
               const isOptional = item.importance === 'optional';
               const result = getResult(item.key);
               const testing = isTesting(item.key);
-              const canTest = item.status === 'configured' || item.status === 'partial';
+              const canTest = item.status === 'trusted' || item.status === 'needs-attention';
 
               return (
                 <div
@@ -791,10 +803,10 @@ export function SetupHealthCard() {
                           {item.label}
                         </span>
                         <StatusBadge status={item.status} />
-                        {isUnconfigured && <ImportanceBadge importance={item.importance} />}
-                        {result && !isUnconfigured && <VerificationBadge status={result.status} />}
+                        {isNotReady && <ImportanceBadge importance={item.importance} />}
+                        {result && !isNotReady && <VerificationBadge status={result.status} />}
                       </div>
-                      {result && !isUnconfigured && result.checkedAt && (
+                      {result && !isNotReady && result.checkedAt && (
                         <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
                           Last tested: {formatTimeAgo(result.checkedAt)}
                         </p>
@@ -808,19 +820,26 @@ export function SetupHealthCard() {
                   {result?.status === 'failed' && result.errorMessage && (
                     <div className="flex items-start gap-2 pl-7">
                       <div className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300 flex-1">
-                        <p className="font-medium mb-0.5">Fix this</p>
+                        <p className="font-semibold mb-1">Verification failed — action needed</p>
                         <p>{result.errorMessage}</p>
                         {result.guidance.missingEnvKeys.length > 0 && (
-                          <p className="mt-1 text-rose-600 dark:text-rose-400">
-                            Missing: {result.guidance.missingEnvKeys.join(', ')}
-                          </p>
+                          <div className="mt-2 space-y-1">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-rose-600 dark:text-rose-400">Missing environment variables</p>
+                            <div className="flex flex-wrap gap-1">
+                              {result.guidance.missingEnvKeys.map((key) => (
+                                <code key={key} className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-mono text-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
+                                  {key}
+                                </code>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
                   )}
 
                   <div className="flex items-center gap-2 pl-7 flex-wrap">
-                    {item.status === 'configured' ? (
+                    {item.status === 'trusted' ? (
                       <Button
                         variant="ghost"
                         size="sm"
