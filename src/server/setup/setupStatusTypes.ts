@@ -1,4 +1,4 @@
-export type RuntimeMode = 'local' | 'self-hosted' | 'hosted';
+export type RuntimeMode = 'development' | 'self-hosted' | 'hosted';
 
 export type EnvCheck = {
   configured: boolean;

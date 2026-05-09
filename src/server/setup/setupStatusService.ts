@@ -55,7 +55,7 @@ function detectMode(env: Record<string, string | undefined>, explicit?: RuntimeM
   if (explicit) return explicit;
   if (env.VERCEL_ENV === 'production') return 'hosted';
   if (env.NODE_ENV === 'production') return 'self-hosted';
-  return 'local';
+  return 'development';
 }
 
 export function getSetupCapabilities(input: SetupCapabilitiesInput): SetupStatusResponse {

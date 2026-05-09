@@ -58,17 +58,17 @@ describe('Docs', () => {
   });
 
   it('renders vercel section', () => {
-    render(<Docs initialSection="vercel" />);
+    render(<Docs initialSection="production" />);
     expect(screen.getByText('Preview vs Production Safety')).toBeInTheDocument();
   });
 
   it('renders localhost section', () => {
-    render(<Docs initialSection="localhost" />);
-    expect(screen.getByText('Local Real Firebase Mode')).toBeInTheDocument();
+    render(<Docs initialSection="development" />);
+    expect(screen.getByText('Development Mode with Firebase')).toBeInTheDocument();
   });
 
   it('shows ENV table in localhost section', () => {
-    render(<Docs initialSection="localhost" />);
+    render(<Docs initialSection="development" />);
     expect(screen.getByText('Full .env.local Reference')).toBeInTheDocument();
     expect(screen.getByText('NEXT_PUBLIC_FIREBASE_API_KEY')).toBeInTheDocument();
     expect(screen.getByText('APP_BASE_URL')).toBeInTheDocument();

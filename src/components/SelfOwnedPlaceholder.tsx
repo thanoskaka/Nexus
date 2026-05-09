@@ -63,7 +63,7 @@ export function SelfOwnedPlaceholder({ firebaseConfig, onSwitchToHosted }: SelfO
                   </p>
                   <p className="mt-1 text-sm text-sky-700 dark:text-sky-300">
                     To fully activate self-owned data routing, you need to configure Firebase Admin credentials on the server. See the{' '}
-                    <a href="/docs/localhost" className="underline font-medium">
+                    <a href="/docs/development" className="underline font-medium">
                       setup documentation
                     </a>{' '}
                     for instructions.

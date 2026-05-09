@@ -432,14 +432,19 @@ function formatTimeAgo(isoString: string | null): string {
 
 function ModeBadge({ mode }: { mode: SetupStatusResponse['mode'] }) {
   const colors: Record<string, string> = {
-    local: 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200',
+    development: 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200',
     'self-hosted': 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
     hosted: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200',
+  };
+  const labels: Record<string, string> = {
+    development: 'Development',
+    'self-hosted': 'Self-Hosted',
+    hosted: 'Hosted',
   };
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${colors[mode] || ''}`}>
       <Server className="h-3 w-3" />
-      {mode}
+      {labels[mode] || mode}
     </span>
   );
 }
@@ -741,7 +746,11 @@ export function SetupHealthCard() {
           </div>
         </div>
         <CardDescription>
-          Environment diagnostics and feature availability
+          {data?.mode === 'hosted'
+            ? 'Hosted Mode — curated provider defaults available. Add your own keys to override.'
+            : data?.mode === 'self-hosted'
+            ? 'Self-Hosted Mode — configure your own providers. Free tiers recommended for pricing, logos, and AI.'
+            : 'Development Mode — configure providers via .env.local or enter keys below.'}
         </CardDescription>
       </CardHeader>
       <CardContent>

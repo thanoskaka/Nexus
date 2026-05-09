@@ -82,14 +82,30 @@ export function ProviderCredentialsSection() {
     );
   }
 
-  return React.createElement(Card, { className: "border-none shadow-sm rounded-2xl" },
-    React.createElement(CardHeader, null,
-      React.createElement("div", { className: "flex items-center gap-2" },
-        React.createElement(Key, { className: "h-5 w-5 text-slate-700 dark:text-slate-300" }),
-        React.createElement(CardTitle, null, "Provider Credentials")
+    const modeLabel = setupStatus?.mode === 'hosted' ? 'Hosted Mode' : setupStatus?.mode === 'self-hosted' ? 'Self-Hosted Mode' : 'Development Mode';
+
+  const modeGuidance = setupStatus?.mode === 'hosted'
+    ? 'Nexus Hosted provides pre-configured defaults for some providers. You can override with your own keys at any time.'
+    : setupStatus?.mode === 'self-hosted'
+    ? 'Self-hosted instances require your own provider keys. Free tiers are available for Massive, Alpha Vantage, and Logo.dev.'
+    : 'In development, configure provider keys via .env.local for server providers, or enter keys below for local-only providers.';
+
+  return React.createElement(React.Fragment, null,
+    React.createElement("div", { className: "mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300" },
+      React.createElement("div", { className: "flex items-center gap-2 mb-1" },
+        React.createElement(Key, { className: "h-4 w-4 shrink-0" }),
+        React.createElement("span", { className: "font-medium" }, modeLabel)
       ),
-      React.createElement(CardDescription, null, "Configure your own API keys for each provider, or use Nexus-hosted defaults when available.")
+      React.createElement("p", null, modeGuidance)
     ),
+    React.createElement(Card, { className: "border-none shadow-sm rounded-2xl" },
+      React.createElement(CardHeader, null,
+        React.createElement("div", { className: "flex items-center gap-2" },
+          React.createElement(Key, { className: "h-5 w-5 text-slate-700 dark:text-slate-300" }),
+          React.createElement(CardTitle, null, "Provider Credentials")
+        ),
+        React.createElement(CardDescription, null, "Configure your own API keys for each provider, or use Nexus-hosted defaults when available.")
+      ),
     React.createElement(CardContent, { className: "space-y-4" },
       statusMessage.type ? React.createElement("div", { className: "rounded-xl border px-3 py-2 text-sm " + (statusMessage.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200' : statusMessage.type === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300' : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300') },
         React.createElement("div", { className: "flex items-center gap-2" },
@@ -154,5 +170,6 @@ export function ProviderCredentialsSection() {
         )
       )
     )
-  );
+  )
+);
 }

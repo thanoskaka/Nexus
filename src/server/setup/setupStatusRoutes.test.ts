@@ -5,7 +5,7 @@ import { createSetupStatusRouter } from './setupStatusRoutes.js';
 
 vi.mock('./setupStatusService.js', () => ({
   getSetupCapabilities: vi.fn(() => ({
-    mode: 'local',
+    mode: 'development',
     app: { baseUrl: '' },
     firebase: { configured: false, projectId: null },
     firebaseAdmin: {
