@@ -264,6 +264,14 @@ export function AiSettingsCard() {
               </div>
             )}
 
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500">
+              <div className="flex items-center gap-2 mb-1">
+                <Info className="h-4 w-4 shrink-0" />
+                <span className="font-medium">Hosted AI billing</span>
+              </div>
+              <p>Charging AI usage to your Nexus Hosted subscription is in development. For now, bring your own API key or use the server default key if configured.</p>
+            </div>
+
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Your key — used for your AI requests, encrypted at rest, never shown again after save.
             </p>

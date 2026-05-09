@@ -32,7 +32,7 @@ const REGION_FEATURES = [
 const COMPARISON_ROWS = [
   { feature: 'Data location', self: 'Your infrastructure', hosted: 'Nexus Cloud (Firebase)' },
   { feature: 'Setup time', self: '~30 min (Docker)', hosted: 'Instant (Google sign-in)' },
-  { feature: 'Monthly cost', self: 'Free', hosted: '~$6/mo (planned)' },
+  { feature: 'Monthly cost', self: 'Free', hosted: '$1.99/mo' },
   { feature: 'AI provider', self: 'BYOK (Gemini, DeepSeek)', hosted: 'BYOK (Gemini, DeepSeek)' },
   { feature: 'Price sync', self: 'Included', hosted: 'Included' },
   { feature: 'Data export', self: 'Full DB access', hosted: 'CSV export' },
@@ -78,7 +78,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
               Pricing
             </a>
             <Button onClick={onLaunch} className="rounded-full bg-[#00875A] px-5 text-white hover:bg-[#007A51]">
-              Use hosted Nexus
+              Get Started
             </Button>
           </nav>
           <Button onClick={onLaunch} className="rounded-full bg-[#00875A] px-4 text-white hover:bg-[#007A51] md:hidden">
@@ -112,7 +112,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button onClick={onLaunch} className="h-12 rounded-full bg-[#00875A] px-7 text-base text-white hover:bg-[#007A51]">
-                Use hosted Nexus
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <a
@@ -275,10 +275,10 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
                   <h3 className="text-lg font-semibold text-slate-900">Hosted</h3>
                 </div>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-slate-900">~$6</span>
+                  <span className="text-4xl font-bold text-slate-900">$1.99</span>
                   <span className="text-sm text-slate-500">/month</span>
                 </div>
-                <p className="mt-2 text-sm text-slate-600">Managed. Planned pricing \u2014 not final.</p>
+                <p className="mt-2 text-sm text-slate-600">Cancel anytime \u2014 export and delete your data.</p>
                 <ul className="mt-6 space-y-2.5">
                   {['Google sign-in', 'Automatic price sync', 'Family sharing', 'BYOK AI (Gemini, DeepSeek)'].map((item) => (
                     <li key={item} className="flex items-center gap-2 text-sm text-slate-700">
@@ -302,7 +302,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
               </p>
               <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                 <Button onClick={onLaunch} className="h-12 rounded-full bg-[#00875A] px-7 text-base text-white hover:bg-[#007A51]">
-                  Use hosted Nexus
+                  Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <a
