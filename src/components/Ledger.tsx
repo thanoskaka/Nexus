@@ -18,12 +18,14 @@ import { Button } from './ui/button';
 import { TickerRepairModal } from './TickerRepairModal';
 import { useSampleMode } from '../lib/samplePortfolio';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { AlertTriangle, Building2, Check, ChevronDown, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from 'lucide-react';
+import { AlertTriangle, Building2, Check, ChevronDown, ChevronRight, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from 'lucide-react';
 import { convertAmount, formatCurrency, formatPercent, getAssetXirr, getCurrentPrice, getCurrentTotal, getGrowthTotal, getInvestmentPrice, getInvestmentTotal, isDebtAssetClass } from '../lib/portfolioMetrics';
 import { getTickerRecommendation } from '../lib/api';
 import { Select } from './ui/select';
 import { AssetClassLogo } from '../lib/assetClassBranding';
 import { AssetMarketLogo } from '../lib/assetLogos';
+import { MemberAvatar } from './MemberAvatar';
+import { CountryFlag } from './CountryFlag';
 
 type LedgerCurrency = 'CAD' | 'INR' | 'USD' | 'ORIGINAL';
 type FilterColumnId = 'name' | 'assetClass' | 'position' | 'currentPrice' | 'marketValue' | 'performance' | 'notes';
@@ -333,19 +335,26 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
               </div>
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white dark:bg-slate-100 dark:text-slate-900">
-                    {getOwnerInitials(asset.owner)}
-                  </span>
+                  <MemberAvatar name={asset.owner} />
                   {asset.owner}
                 </span>
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${toneClasses.chip}`}>
                   {asset.holdingPlatform || getCanonicalAssetClass(asset.assetClass)}
                 </span>
                 {asset.sourceManaged ? (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                    {asset.connectedProvider === 'splitwise' ? 'Via Splitwise' : 'Source-managed'}
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                    asset.connectedProvider === 'splitwise'
+                      ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200'
+                      : 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200'
+                  }`}>
+                    <Cloud className="h-3 w-3" />
+                    {asset.connectedProvider === 'splitwise' ? 'Via Splitwise' : 'Cloud-synced'}
                   </span>
-                ) : null}
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                    Manual entry
+                  </span>
+                )}
               </div>
               {supportsTickerPricing ? (
                 <div className="space-y-1">
@@ -384,7 +393,10 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         cell: (info) => (
           <div className="space-y-1">
             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{info.getValue()}</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">{info.row.original.country}</div>
+            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <CountryFlag country={info.row.original.country} />
+              {info.row.original.country}
+            </div>
           </div>
         ),
       }),
