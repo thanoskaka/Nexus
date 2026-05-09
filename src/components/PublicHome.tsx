@@ -78,7 +78,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
               Pricing
             </a>
             <Button onClick={onLaunch} className="rounded-full bg-[#00875A] px-5 text-white hover:bg-[#007A51]">
-              Use hosted Nexus
+              Get Started
             </Button>
           </nav>
           <Button onClick={onLaunch} className="rounded-full bg-[#00875A] px-4 text-white hover:bg-[#007A51] md:hidden">
@@ -112,7 +112,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button onClick={onLaunch} className="h-12 rounded-full bg-[#00875A] px-7 text-base text-white hover:bg-[#007A51]">
-                Use hosted Nexus
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <a
@@ -302,7 +302,7 @@ export function PublicHome({ authError, onLaunch, signedOut }: PublicHomeProps) 
               </p>
               <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                 <Button onClick={onLaunch} className="h-12 rounded-full bg-[#00875A] px-7 text-base text-white hover:bg-[#007A51]">
-                  Use hosted Nexus
+                  Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <a
