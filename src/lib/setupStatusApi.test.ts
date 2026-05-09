@@ -4,7 +4,7 @@ import { fetchSetupStatus } from './setupStatusApi';
 const mockFetch = vi.fn();
 
 const mockResponse = {
-  mode: 'local',
+  mode: 'development',
   app: { baseUrl: 'http://localhost:6868' },
   firebase: { configured: true, projectId: 'test-project' },
   firebaseAdmin: {
@@ -86,7 +86,7 @@ describe('fetchSetupStatus', () => {
     });
 
     const result = await fetchSetupStatus();
-    expect(result.mode).toBe('local');
+    expect(result.mode).toBe('development');
     expect(result.features.manualAssets).toBe(true);
     expect(result.firebase.projectId).toBe('test-project');
   });

@@ -5,8 +5,8 @@ type DocSection =
   | 'getting-started'
   | 'firebase'
   | 'bring-firebase'
-  | 'localhost'
-  | 'vercel'
+  | 'development'
+  | 'production'
   | 'api-keys'
   | 'integrations'
   | 'user-guide'
@@ -22,8 +22,8 @@ const NAV_ITEMS: DocNavItem[] = [
   { id: 'getting-started', label: 'Getting Started' },
   { id: 'firebase', label: 'Firebase Setup' },
   { id: 'bring-firebase', label: 'Bring Your Own Firebase' },
-  { id: 'localhost', label: 'Local Development' },
-  { id: 'vercel', label: 'Vercel Deployment' },
+  { id: 'development', label: 'Development Setup' },
+  { id: 'production', label: 'Production Deployment' },
   { id: 'api-keys', label: 'AI Assistant Keys' },
   { id: 'integrations', label: 'Integrations' },
   { id: 'user-guide', label: 'User Guide' },
@@ -546,14 +546,14 @@ service cloud.firestore {
     ),
   },
 
-  'localhost': {
-    title: 'Local Development',
+  'development': {
+    title: 'Development Setup',
     content: (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Local Real Firebase Mode</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Development Mode with Firebase</h2>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-            To run Nexus with real Firebase integration locally, set up your Firebase credentials in <Code>.env.local</Code>.
+            To run Nexus with real Firebase integration in development, set up your Firebase credentials in <Code>.env.local</Code>.
           </p>
           <Checklist items={[
             <>Copy <Code>.env.example</Code> to <Code>.env.local</Code>.</>,
@@ -606,14 +606,14 @@ npm run test:run # Run tests once`}</CodeBlock>
     ),
   },
 
-  'vercel': {
-    title: 'Vercel Deployment',
+  'production': {
+    title: 'Production Deployment',
     content: (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Deploying to Vercel</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Production Deployment</h2>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-            Nexus is designed to deploy on Vercel. The app uses a Vite build with an Express API server
+            Nexus can be deployed on any Node.js host. The most common setup is on Vercel, using a Vite build with an Express API server
             running as a serverless function.
           </p>
           <Checklist items={[

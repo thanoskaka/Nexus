@@ -156,7 +156,7 @@ export function WorkspaceOwnershipSetup({ onChooseMode }: WorkspaceOwnershipSetu
 
           <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
             Need help? See the{' '}
-            <a href="/docs/localhost" className="text-sky-600 dark:text-sky-400 underline">
+            <a href="/docs/development" className="text-sky-600 dark:text-sky-400 underline">
               setup docs
             </a>{' '}
             for Firebase configuration instructions.
@@ -242,7 +242,7 @@ export function WorkspaceOwnershipSetup({ onChooseMode }: WorkspaceOwnershipSetu
         </div>
 
         <div className="mt-8 text-center">
-          <a href="/docs/localhost" className="inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400">
+          <a href="/docs/development" className="inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400">
             <ExternalLink className="h-3.5 w-3.5" />
             Learn more about setup modes in the docs
           </a>

@@ -15,9 +15,9 @@ function fullFirebasePublic() {
 
 describe('getSetupCapabilities', () => {
   it('returns all-false features for empty env', () => {
-    const result = getSetupCapabilities({ env: {}, publicEnv: {}, mode: 'local' });
+    const result = getSetupCapabilities({ env: {}, publicEnv: {}, mode: 'development' });
 
-    expect(result.mode).toBe('local');
+    expect(result.mode).toBe('development');
     expect(result.features.manualAssets).toBe(true);
     expect(result.features.dashboard).toBe(true);
     expect(result.features.priceRefresh).toBe(true);
@@ -36,7 +36,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: {},
       publicEnv: fullFirebasePublic(),
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.firebase.configured).toBe(true);
@@ -56,7 +56,7 @@ describe('getSetupCapabilities', () => {
         VITE_GOOGLE_CLIENT_ID: 'google-id',
         VITE_LOGO_DEV_PUBLISHABLE_KEY: 'logo-key',
       },
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.firebase.configured).toBe(true);
@@ -72,7 +72,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: {},
       publicEnv: partial,
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.firebase.configured).toBe(false);
@@ -144,7 +144,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: { GEMINI_API_KEY: 'super-secret-key' },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.ai.serverKey).toEqual({ configured: true, present: true });
@@ -155,7 +155,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: { GEMINI_API_KEY: 'server-key' },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.ai.serverKey.configured).toBe(true);
@@ -173,7 +173,7 @@ describe('getSetupCapabilities', () => {
         INTEGRATION_TOKEN_ENCRYPTION_KEY: 'encryption-key',
       },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.ai.userCredentialsSupported).toBe(true);
@@ -189,8 +189,8 @@ describe('getSetupCapabilities', () => {
     const selfResult = getSetupCapabilities({ env: {}, publicEnv: {}, mode: 'self-hosted' });
     expect(selfResult.mode).toBe('self-hosted');
 
-    const localResult = getSetupCapabilities({ env: {}, publicEnv: {}, mode: 'local' });
-    expect(localResult.mode).toBe('local');
+    const localResult = getSetupCapabilities({ env: {}, publicEnv: {}, mode: 'development' });
+    expect(localResult.mode).toBe('development');
   });
 
   it('detects hosted mode from VERCEL_ENV', () => {
@@ -207,7 +207,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: { SPLITWISE_CLIENT_ID: 'id' },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.features.splitwise).toBe(false);
@@ -224,7 +224,7 @@ describe('getSetupCapabilities', () => {
         CONNECTED_ACCOUNTS_ENCRYPTION_KEY: 'shared-encryption-key',
       },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.integrations.splitwise.encryptionConfigured).toBe(true);
@@ -244,7 +244,7 @@ describe('getSetupCapabilities', () => {
         SPLITWISE_STATE_SECRET: 'shared-state-secret',
       },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.integrations.upstox.stateSecretConfigured).toBe(true);
@@ -256,7 +256,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: { UPSTOX_CLIENT_ID: 'id' },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.features.upstoxConnectedAccounts).toBe(false);
@@ -270,7 +270,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: { CAS_PARSER_SERVICE_URL: 'http://localhost:8000' },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.casParser.configured).toBe(true);
@@ -285,7 +285,7 @@ describe('getSetupCapabilities', () => {
         CAS_PARSER_ALLOW_EXTERNAL_FALLBACK: 'true',
       },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.casParser.configured).toBe(true);
@@ -298,7 +298,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: {},
       publicEnv: { VITE_LOGO_DEV_PUBLISHABLE_KEY: 'pk-key' },
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.features.logoProvider).toBe(true);
@@ -308,7 +308,7 @@ describe('getSetupCapabilities', () => {
     const result = getSetupCapabilities({
       env: { LOGO_DEV_SECRET_KEY: 'sk-key' },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.features.logoProvider).toBe(true);
@@ -321,7 +321,7 @@ describe('getSetupCapabilities', () => {
         FIREBASE_ADMIN_CLIENT_EMAIL: 'email',
       },
       publicEnv: {},
-      mode: 'local',
+      mode: 'development',
     });
 
     expect(result.firebaseAdmin.configured).toBe(false);

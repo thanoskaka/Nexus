@@ -20,7 +20,7 @@ export type FirebaseAdminStatus = {
 };
 
 export type SetupStatusResponse = {
-  mode: 'local' | 'self-hosted' | 'hosted';
+  mode: 'development' | 'self-hosted' | 'hosted';
   app: { baseUrl: string };
   firebase: { configured: boolean; projectId: string | null };
   firebaseAdmin: FirebaseAdminStatus;
