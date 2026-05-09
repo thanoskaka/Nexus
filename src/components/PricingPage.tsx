@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Wallet, ArrowRight, CheckCircle2, Sparkles, ChevronDown, Github, BookOpen, ExternalLink, Server, Cloud, Building2 } from 'lucide-react';
+import { Wallet, ArrowRight, CheckCircle2, Sparkles, ChevronDown, Github, BookOpen, ExternalLink, Server, Cloud, Building2, Download, Shield } from 'lucide-react';
 import { Button } from './ui/button';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 
 interface PricingPageProps {
   onLaunch: () => void;
@@ -30,8 +31,8 @@ const TIERS = [
   {
     icon: Cloud,
     name: 'Nexus Cloud',
-    price: '~$6',
-    period: '/month (planned)',
+    price: '$1.99',
+    period: '/month',
     accent: 'emerald',
     popular: true,
     description: 'Hosted, encrypted, managed.',
@@ -40,7 +41,7 @@ const TIERS = [
       'Encrypted credential storage',
       'Google sign-in — no server setup',
       'Pricing near infrastructure cost',
-      'Billing not yet implemented',
+      'Cancel anytime — export your data, delete from server',
     ],
     cta: 'Start hosted',
     onClick: true,
@@ -88,7 +89,7 @@ const FAQS = [
   },
   {
     q: 'Is this freemium?',
-    a: 'No free tier limits, no artificial caps. Self-hosted is free forever with the full product. Nexus Cloud is a planned paid service priced near cost — no feature gating, no upsells.',
+    a: 'No free tier limits, no artificial caps. Self-hosted is free forever with the full product. Nexus Cloud is $1.99/month — no feature gating, no upsells, cancel anytime.',
   },
 ];
 
@@ -118,6 +119,8 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export function PricingPage({ onLaunch }: PricingPageProps) {
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50/80 via-white to-sky-50/40 text-slate-900">
       <header className="border-b border-slate-200/60 bg-white/70 backdrop-blur-md">
@@ -238,6 +241,16 @@ export function PricingPage({ onLaunch }: PricingPageProps) {
                       </a>
                     )}
                   </div>
+                  {tier.popular && (
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={() => setCancelDialogOpen(true)}
+                        className="text-xs font-medium text-slate-400 underline underline-offset-2 hover:text-slate-600 transition-colors"
+                      >
+                        Cancel anytime
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -298,6 +311,37 @@ export function PricingPage({ onLaunch }: PricingPageProps) {
           </div>
         </div>
       </footer>
+      
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <div className="mx-auto max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel your subscription</DialogTitle>
+            <DialogDescription>
+              Cancel anytime, take an export of your data and delete from Nexus server.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 space-y-3">
+              <div className="flex items-start gap-3">
+                <Download className="h-4 w-4 mt-0.5 text-slate-500 shrink-0" />
+                <span>Export your portfolio data (CSV) before cancelling so you have a copy of your records.</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <Shield className="h-4 w-4 mt-0.5 text-slate-500 shrink-0" />
+                <span>Once cancelled, your portfolio data, connected accounts, and API credentials are permanently deleted from Nexus servers.</span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCancelDialogOpen(false)} className="rounded-full">
+                Keep my account
+              </Button>
+              <Button className="rounded-full bg-red-600 text-white hover:bg-red-700">
+                Request cancellation
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
