@@ -95,7 +95,7 @@ export function ConnectedAccountsProvider({ children }: { children: React.ReactN
       setError(reloadError instanceof Error ? reloadError.message : 'Failed to load connected accounts.');
       setUpstox((current) => current || {
         provider: 'upstox',
-        status: 'error',
+        status: 'disconnected',
         displayName: 'Upstox',
         holdingsSummary: {
           totalHoldingsCount: 0,
