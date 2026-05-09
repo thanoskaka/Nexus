@@ -11,6 +11,9 @@ import { createAiCredentialsRouter } from './src/server/user/aiCredentialsRoutes
 import { createAccountDeletionRouter } from './src/server/user/accountDeletionRoutes.js';
 import { createWorkspaceOwnershipRouter } from './src/server/user/workspaceOwnershipRoutes.js';
 import { createOnboardingRouter } from './src/server/user/onboardingRoutes.js';
+import { createMigrationRouter } from './src/server/user/migrationRoutes.js';
+import { createHistoricalImportRouter } from './src/server/user/historicalImportRoutes.js';
+import { createProfileLinkingRouter } from './src/server/user/profileLinkingRoutes.js';
 import { createSetupStatusRouter } from './src/server/setup/setupStatusRoutes.js';
 
 function getNormalizedTicker(result: unknown) {
@@ -102,6 +105,9 @@ export function createApp() {
   app.use('/api/user/onboarding', createOnboardingRouter());
   app.use('/api/setup', createSetupStatusRouter());
   app.use('/api/user/account', createAccountDeletionRouter());
+  app.use('/api/user/migration', createMigrationRouter());
+  app.use('/api/user/history', createHistoricalImportRouter());
+  app.use('/api/user/members', createProfileLinkingRouter());
 
   app.get('/api/instruments/search', async (req, res) => {
     const q = (req.query.q as string || '').trim();

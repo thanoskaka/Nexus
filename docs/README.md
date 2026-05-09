@@ -20,6 +20,7 @@
 
 ## Operations
 
+- [Migration Guide](migration-guide.md) -- hosted to self-hosted migration flow (export, handoff, verification, deletion)
 - [Troubleshooting](troubleshooting.md) -- common issues and resolutions
 - [Security and Privacy](security-privacy.md) -- data handling, encryption, credential storage
 
