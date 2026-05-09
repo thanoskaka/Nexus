@@ -642,7 +642,12 @@ export function SetupHealthCard() {
       setData(result);
       setVerificationResults(stored);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load setup status');
+      const raw = err instanceof Error ? err.message : 'Failed to load setup status';
+      if (raw === 'Failed to fetch' || raw.includes('NetworkError') || raw.includes('network')) {
+        setError('Cannot connect to the server. Make sure the app is running and retry.');
+      } else {
+        setError(raw);
+      }
     } finally {
       setLoading(false);
     }

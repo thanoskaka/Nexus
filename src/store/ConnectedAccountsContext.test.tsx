@@ -77,6 +77,22 @@ describe('ConnectedAccountsContext', () => {
     expect(screen.getByTestId('status').textContent).toBe('connecting');
   });
 
+  it('shows disconnected fallback when fetch fails and no prior state', async () => {
+    const api = await import('../lib/connectedAccountsApi');
+    vi.mocked(api.getUpstoxConnectionStatus).mockRejectedValue(new Error('Failed to fetch'));
+    vi.mocked(api.getUpstoxHoldings).mockRejectedValue(new Error('Failed to fetch'));
+
+    render(
+      <ConnectedAccountsProvider>
+        <Harness />
+      </ConnectedAccountsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status').textContent).toBe('disconnected');
+    });
+  });
+
   it('supports reconnect refresh flow', async () => {
     const user = userEvent.setup();
     const api = await import('../lib/connectedAccountsApi');

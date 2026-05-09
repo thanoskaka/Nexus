@@ -245,6 +245,26 @@ describe('SetupHealthCard', () => {
     expect(retryButton).toBeTruthy();
   });
 
+  it('translates Failed to fetch to actionable message', async () => {
+    mockFetch.mockRejectedValue(new Error('Failed to fetch'));
+
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cannot connect to the server. Make sure the app is running and retry.')).toBeTruthy();
+    });
+  });
+
+  it('translates NetworkError to actionable message', async () => {
+    mockFetch.mockRejectedValue(new Error('NetworkError'));
+
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cannot connect to the server. Make sure the app is running and retry.')).toBeTruthy();
+    });
+  });
+
   it('retries on retry button click', async () => {
     mockFetch.mockRejectedValueOnce(new Error('First failure'));
     mockFetch.mockResolvedValueOnce({
@@ -412,7 +432,7 @@ describe('SetupHealthCard', () => {
     });
   });
 
-  it('shows Setup button and required badge for missing required item', async () => {
+  it('shows Setup button and required badge for unavailable required item', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => emptyStatus,
@@ -427,7 +447,7 @@ describe('SetupHealthCard', () => {
     expect(setupButtons.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('shows View steps for missing optional item', async () => {
+  it('shows View steps for unavailable optional item', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => emptyStatus,

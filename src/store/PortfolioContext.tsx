@@ -1823,6 +1823,9 @@ export function getBulkRefreshRowStatus(asset: Asset): BulkRefreshRowStatus {
   const message = (asset.priceFetchMessage || '').toLowerCase();
 
   if (!asset.autoUpdate) return 'manual';
+  if (asset.priceFetchStatus === 'failed') {
+    return 'failed_actionable';
+  }
   if (message.includes('queued for the next massive refresh window') || message.includes('queued for the next alpha vantage daily close window')) {
     return 'queued_next_window';
   }
@@ -1837,9 +1840,6 @@ export function getBulkRefreshRowStatus(asset: Asset): BulkRefreshRowStatus {
   }
   if (message.includes('daily close window') || message.includes('rate-limiting') || message.includes('temporarily unavailable')) {
     return asset.currentPrice != null ? 'blocked_provider_limit' : 'failed_actionable';
-  }
-  if (asset.priceFetchStatus === 'failed') {
-    return 'failed_actionable';
   }
   if (asset.priceFetchStatus === 'success') {
     if (asset.priceProvider === 'massive' || asset.priceProvider === 'alphavantage') return 'updated_close_today';
