@@ -118,7 +118,6 @@ describe('portfolioMetrics', () => {
       expect(validColors).toContain(result);
     });
   });
-
   describe('net worth regression', () => {
     it('standard asset contributes positively to net worth', () => {
       const asset = makeAsset({
