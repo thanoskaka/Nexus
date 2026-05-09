@@ -210,7 +210,7 @@ function mergeAccountMetrics(accounts: ExternalAccount[], holdings: ExternalHold
   });
 }
 
-function detectPossibleDuplicates(holdings: ExternalHolding[]) {
+export function detectPossibleDuplicates(holdings: ExternalHolding[]) {
   const seen = new Map<string, string>();
   return holdings.map((holding) => {
     const dedupeKey = `${holding.provider}:${holding.isin || holding.ticker || holding.securityName}`.toLowerCase();
