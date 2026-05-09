@@ -8,6 +8,7 @@ import {
   getDailyTotalChange,
   getInvestmentTotal,
   getOriginalDisplayCurrency,
+  getStableColor,
   isDebtAssetClass,
 } from './portfolioMetrics';
 import type { Asset } from '../store/db';
@@ -90,5 +91,29 @@ describe('portfolioMetrics', () => {
 
     expect(getDailyPriceChange(asset)).toBeNull();
     expect(getDailyTotalChange(asset)).toBeNull();
+  });
+
+  describe('getStableColor', () => {
+    it('returns a valid color from the palette', () => {
+      const result = getStableColor('Stocks');
+      const validColors = ['#00875A', '#00B8D9', '#FFAB00', '#FF5630', '#6554C0', '#36B37E', '#FF8B00', '#4C9AFF'];
+      expect(validColors).toContain(result);
+    });
+
+    it('returns the same color for the same input', () => {
+      expect(getStableColor('Stocks')).toBe(getStableColor('Stocks'));
+      expect(getStableColor('Mutual Funds')).toBe(getStableColor('Mutual Funds'));
+    });
+
+    it('returns different colors for different inputs', () => {
+      const colors = new Set(['Stocks', 'Mutual Funds', 'Fixed Deposit', 'Bonds', 'ETF'].map(getStableColor));
+      expect(colors.size).toBeGreaterThan(1);
+    });
+
+    it('handles empty string gracefully', () => {
+      const result = getStableColor('');
+      const validColors = ['#00875A', '#00B8D9', '#FFAB00', '#FF5630', '#6554C0', '#36B37E', '#FF8B00', '#4C9AFF'];
+      expect(validColors).toContain(result);
+    });
   });
 });

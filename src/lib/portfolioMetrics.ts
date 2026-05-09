@@ -142,3 +142,13 @@ export function formatPercent(value: number | null) {
   if (value == null || !Number.isFinite(value)) return '-';
   return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(2)}%`;
 }
+
+const STABLE_COLORS = ['#00875A', '#00B8D9', '#FFAB00', '#FF5630', '#6554C0', '#36B37E', '#FF8B00', '#4C9AFF'];
+
+export function getStableColor(key: string): string {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = key.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return STABLE_COLORS[Math.abs(hash) % STABLE_COLORS.length];
+}

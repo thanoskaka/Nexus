@@ -38,6 +38,7 @@ import {
   getInvestmentTotal,
   getOriginalDisplayCurrency,
   getRelevantConversionRates,
+  getStableColor,
 } from '../lib/portfolioMetrics';
 import { Asset } from '../store/db';
 import { fetchHistoricalExchangeRate } from '../lib/api';
@@ -82,6 +83,7 @@ type ChartAnalytics = {
   };
   memberContributionData: {
     classNames: string[];
+    classColors: Record<string, string>;
     rows: MemberContributionRow[];
   };
 };
@@ -389,11 +391,16 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         const classNames: string[] = Array.from(
           new Set(selectedAssets.map((asset) => String(asset.assetClass || 'Unknown'))),
         );
+        const classColors: Record<string, string> = {};
+        classNames.forEach((name) => {
+          classColors[name] = getStableColor(name);
+        });
         const owners: string[] = Array.from(
           new Set(selectedAssets.map((asset) => String(asset.owner)).filter(Boolean)),
         );
         const memberContributionData = {
           classNames,
+          classColors,
           rows: owners.map((owner) => {
             const ownerAssets = selectedAssets.filter((asset) => asset.owner === owner);
             const row: MemberContributionRow = { name: owner };
@@ -479,9 +486,21 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
 
   const renderCountryChart = (currency: DisplayCurrency, expanded = false) => {
     const analytics = chartDataByCurrency[currency];
-    return analytics.countryData.length === 0 ? (
-      <EmptyChartState message="No assets to summarize yet" />
-    ) : (
+    if (analytics.countryData.length === 0) {
+      return <EmptyChartState message="No assets to summarize yet" />;
+    }
+    if (analytics.countryData.length <= 1) {
+      return (
+        <div className="flex min-h-[160px] items-center justify-center rounded-2xl bg-slate-50 px-4 py-8 text-center dark:bg-slate-900">
+          <div>
+            <Globe className="mx-auto mb-2 h-6 w-6 text-slate-300 dark:text-slate-600" />
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">All assets are in {analytics.countryData[0].name}</p>
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">The By Country chart is hidden because all holdings are in a single country.</p>
+          </div>
+        </div>
+      );
+    }
+    return (
       <div className={`grid gap-4 ${expanded ? 'xl:grid-cols-[minmax(360px,1fr)_minmax(0,1fr)]' : 'md:grid-cols-[minmax(220px,0.9fr)_minmax(0,1fr)]'}`}>
         <div className={expanded ? 'h-[360px]' : 'h-[240px]'}>
           <ResponsiveContainer width="100%" height="100%">
@@ -608,16 +627,25 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         <CompactAttribution label="Deposits" value={analytics.performanceAttribution.steps[0].value} currency={currency} />
         <CompactAttribution label="Current Balance" value={analytics.performanceAttribution.currentBalance} currency={currency} />
       </div>
+      <div className="flex items-start gap-2 rounded-2xl bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <p>FX Impact measures gain or loss from exchange rate changes on foreign-currency holdings. Even if an asset price stays flat, currency movement between the original currency and your display currency affects total value.</p>
+      </div>
     </div>
   );
   };
 
   const renderMemberContributionChart = (currency: DisplayCurrency, expanded = false) => {
     const analytics = chartDataByCurrency[currency];
-    return analytics.memberContributionData.rows.length === 0 ? (
-      <EmptyChartState message="No member data available." />
-    ) : (
-      <div className={expanded ? 'h-[420px]' : 'h-[320px]'}>
+    if (analytics.memberContributionData.rows.length === 0) {
+      return <EmptyChartState message="No member data available." />;
+    }
+
+    const lastClassIndex = analytics.memberContributionData.classNames.length - 1;
+
+    return (
+      <div className="space-y-4">
+        <div className={expanded ? 'h-[360px]' : 'h-[280px]'}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={analytics.memberContributionData.rows} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
@@ -625,11 +653,17 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
             <YAxis tickFormatter={(value) => compactNumber(value)} tickLine={false} axisLine={false} width={56} />
             <Tooltip formatter={(value: number) => formatCurrency(value, currency)} />
             {analytics.memberContributionData.classNames.map((assetClass, index) => (
-              <Bar key={assetClass} dataKey={assetClass} stackId="members" fill={COLORS[index % COLORS.length]} radius={index === analytics.memberContributionData.classNames.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]} />
+              <Bar key={assetClass} dataKey={assetClass} stackId="members" fill={analytics.memberContributionData.classColors[assetClass]} radius={index === lastClassIndex ? [6, 6, 0, 0] : [0, 0, 0, 0]} />
             ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
+      <div className="flex flex-wrap gap-3">
+        {analytics.memberContributionData.classNames.map((assetClass) => (
+          <LegendRow key={assetClass} label={assetClass} value="" color={analytics.memberContributionData.classColors[assetClass]} />
+        ))}
+      </div>
+    </div>
     );
   };
 
@@ -786,9 +820,9 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border-none bg-gradient-to-r from-emerald-50 via-white to-cyan-50 shadow-sm dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+      <Card className="overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
         <CardContent className="space-y-5 p-6">
-          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
             <Filter className="h-4 w-4" />
             Dashboard Filters
           </div>
@@ -838,15 +872,15 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Currency</p>
               <Select value={currencySelection} onChange={(event) => setCurrencySelection(event.target.value as CurrencySelection)}>
-                <option value="ORIGINAL">Original</option>
-                <option value="USD">USD</option>
-                <option value="INR">INR</option>
-                <option value="CAD">CAD</option>
+                <option value="ORIGINAL">Original (per-country)</option>
+                <option value="USD">Unified — USD</option>
+                <option value="INR">Unified — INR</option>
+                <option value="CAD">Unified — CAD</option>
               </Select>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {currencySelection === 'ORIGINAL'
-                  ? 'Original keeps India holdings in INR and Canada holdings in CAD. Canada USD positions are converted into CAD first.'
-                  : `All values are shown in ${currencySelection}.`}
+                  ? 'Original shows India holdings in INR and Canada holdings in CAD — charts are duplicated per currency. Pick a single currency to see everything in one view.'
+                  : `Unified view: all values shown in ${currencySelection}. Charts appear once with converted totals.`}
               </p>
             </div>
           </div>
@@ -857,24 +891,22 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         <div className="space-y-6">
           <div className={`grid gap-4 ${summaryCards.length > 1 ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
             {summaryCards.map(({ currency, stats, cardTitle }) => (
-              <Card key={currency} className="overflow-hidden rounded-2xl border-none shadow-sm">
+              <Card key={currency} className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800">
                 <CardContent className="p-0">
-                  <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{currency}</p>
-                        <h3 className="truncate text-lg font-bold text-slate-900 dark:text-white">{cardTitle}</h3>
-                      </div>
-                      <div className="rounded-full bg-slate-100 p-2 dark:bg-slate-800">
-                        <Wallet className="h-4 w-4 text-slate-600 dark:text-slate-300" />
-                      </div>
+                  <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4 dark:from-slate-900/80 dark:to-slate-950">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{currency}</p>
+                      <h3 className="truncate text-base font-bold text-slate-900 dark:text-white">{cardTitle}</h3>
+                    </div>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#00875A]/10">
+                      <Wallet className="h-4 w-4 text-[#00875A]" />
                     </div>
                   </div>
                   <div className="grid gap-3 p-4 sm:grid-cols-2">
-                    <CompactMetricTile label="Invested" value={formatCurrency(stats.invested, currency)} icon={<Wallet className="h-4 w-4 text-slate-400" />} tone={stats.invested < 0 ? 'negative' : 'neutral'} />
-                    <CompactMetricTile label="Current" value={formatCurrency(stats.current, currency)} icon={<TrendingUp className="h-4 w-4 text-slate-400" />} tone={stats.current < 0 ? 'negative' : 'neutral'} />
-                    <CompactMetricTile label="Today's Change" value={formatCurrency(stats.todayChange, currency)} icon={<ArrowUpRight className="h-4 w-4 text-slate-400" />} tone={stats.todayChange >= 0 ? 'positive' : 'negative'} />
-                    <CompactMetricTile label="Returns" value={`${formatCurrency(stats.returns, currency)} · ${stats.retPct >= 0 ? '+' : ''}${stats.retPct.toFixed(2)}%`} icon={<TrendingUp className="h-4 w-4 text-slate-400" />} tone={stats.returns >= 0 ? 'positive' : 'negative'} />
+                    <CompactMetricTile label="Invested" value={formatCurrency(stats.invested, currency)} icon={<Wallet className="h-4 w-4" />} tone={stats.invested < 0 ? 'negative' : 'neutral'} />
+                    <CompactMetricTile label="Current" value={formatCurrency(stats.current, currency)} icon={<TrendingUp className="h-4 w-4" />} tone={stats.current < 0 ? 'negative' : 'neutral'} />
+                    <CompactMetricTile label="Today's Change" value={formatCurrency(stats.todayChange, currency)} icon={<ArrowUpRight className="h-4 w-4" />} tone={stats.todayChange >= 0 ? 'positive' : 'negative'} />
+                    <CompactMetricTile label="Returns" value={`${formatCurrency(stats.returns, currency)} · ${stats.retPct >= 0 ? '+' : ''}${stats.retPct.toFixed(2)}%`} icon={<TrendingUp className="h-4 w-4" />} tone={stats.returns >= 0 ? 'positive' : 'negative'} />
                   </div>
                 </CardContent>
               </Card>
@@ -883,6 +915,12 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
 
           {currencySelection === 'ORIGINAL' ? (
             <div className="space-y-6">
+              {chartCurrencies.length > 1 ? (
+                <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-200">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>Charts shown per currency because Original mode keeps INR and CAD separate. Switch to <strong>Unified — INR</strong> or <strong>Unified — CAD</strong> above to see a single combined view.</p>
+                </div>
+              ) : null}
               <div className={`grid gap-6 ${chartCurrencies.length > 1 ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
                 {chartCurrencies.map((currency) => {
                   const analytics = chartDataByCurrency[currency];
@@ -1003,32 +1041,32 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
 
           <div className="grid gap-6 md:grid-cols-2">
             {ownerStats.map((owner) => (
-              <Card key={owner.name} className="rounded-2xl border-none shadow-sm">
-                <CardContent className="p-6">
-                  <div className="mb-6 flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00875A] text-xl font-bold text-white">
+              <Card key={owner.name} className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800">
+                <CardContent className="p-0">
+                  <div className="flex items-center gap-4 border-b border-slate-50 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-slate-950">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00875A] text-sm font-bold text-white">
                       {owner.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-xl font-bold">{owner.name}</h3>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white">{owner.name}</h3>
                       <p className="text-sm text-slate-500">{owner.assetCount} assets</p>
                     </div>
-                    <Button type="button" variant="outline" size="icon" className="rounded-full" onClick={() => setMemberFilter(owner.name)} title={`View only ${owner.name}`}>
+                    <Button type="button" variant="outline" size="icon" className="shrink-0 rounded-full" onClick={() => setMemberFilter(owner.name)} title={`View only ${owner.name}`}>
                       <Eye className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3 p-5">
                     {owner.valuesByCurrency.map((stats) => (
-                      <div key={stats.currency} className="rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
+                      <div key={stats.currency} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
                         <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{stats.currency}</div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="mb-1 text-sm text-slate-500">Invested</p>
-                            <p className={`text-xl font-semibold ${stats.invested < 0 ? 'text-red-500' : ''}`}>{formatCurrency(stats.invested, stats.currency)}</p>
+                            <p className="mb-1 text-xs text-slate-500">Invested</p>
+                            <p className={`text-lg font-semibold ${stats.invested < 0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>{formatCurrency(stats.invested, stats.currency)}</p>
                           </div>
                           <div>
-                            <p className="mb-1 text-sm text-slate-500">Current</p>
-                            <p className={`text-xl font-semibold ${stats.current < 0 ? 'text-red-500' : ''}`}>{formatCurrency(stats.current, stats.currency)}</p>
+                            <p className="mb-1 text-xs text-slate-500">Current</p>
+                            <p className={`text-lg font-semibold ${stats.current < 0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>{formatCurrency(stats.current, stats.currency)}</p>
                           </div>
                         </div>
                       </div>
@@ -1041,13 +1079,13 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         </div>
 
         <div className="space-y-6">
-          <Card className="rounded-2xl border-none shadow-sm">
-            <CardContent className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Live FX Rates</div>
+          <Card className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm dark:border-slate-800">
+            <CardContent className="p-0">
+              <div className="flex items-center justify-between border-b border-slate-50 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-slate-950">
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Live FX Rates</div>
                 <Info className="h-4 w-4 text-slate-400" />
               </div>
-              <div className="space-y-3">
+              <div className="space-y-3 p-5">
                 {relevantRates.map((rate) => (
                   <div key={rate.label} className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900" title={fxTrendCopy[rate.label] || 'Loading 7-day trend...'}>
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{rate.label}</div>
@@ -1059,13 +1097,13 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-none shadow-sm">
-            <CardContent className="p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <Globe className="h-5 w-5 text-slate-600" />
-                <h3 className="text-lg font-semibold">Quick Geography</h3>
+          <Card className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm dark:border-slate-800">
+            <CardContent className="p-0">
+              <div className="flex items-center gap-2 border-b border-slate-50 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-slate-950">
+                <Globe className="h-4 w-4 text-slate-500" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Quick Geography</h3>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-3 p-5">
                 {chartCurrencies.map((currency) => (
                   <div key={`geo-${currency}`} className="space-y-3">
                     {chartCurrencies.length > 1 ? (
@@ -1091,18 +1129,22 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-none shadow-sm">
-            <CardContent className="p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-slate-600" />
-                <h3 className="text-lg font-semibold">Attribution Notes</h3>
+          <Card className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm dark:border-slate-800">
+            <CardContent className="p-0">
+              <div className="flex items-center gap-2 border-b border-slate-50 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-slate-950">
+                <TrendingUp className="h-4 w-4 text-slate-500" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Attribution Notes</h3>
               </div>
-              <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
+              <div className="space-y-3 p-5 text-sm text-slate-600 dark:text-slate-300">
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
                   Saving vs investing is separated in the performance attribution chart so you can see how much growth came from contributions versus market movement.
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                  FX impact is strongest on holdings that store both original currency and purchase exchange rate, especially cross-border Canada USD assets.
+                <div className="flex items-start gap-2 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <div>
+                    <p className="mb-1 font-medium text-slate-700 dark:text-slate-200">What is FX Impact?</p>
+                    <p className="text-slate-500 dark:text-slate-400">When you hold assets in a foreign currency (e.g. USD stocks in a CAD portfolio), exchange rate movements create gains or losses separate from the asset price. FX Impact = original investment × (current rate − purchase rate).</p>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -1188,20 +1230,20 @@ function ChartCard({
   onExpand?: () => void;
 }) {
   return (
-    <Card className="rounded-2xl border-none shadow-sm">
-      <CardContent className="p-5">
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+    <Card className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800">
+      <CardContent className="p-0">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-50 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-slate-950">
+          <div className="min-w-0">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">{title}</h3>
+            {subtitle && <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
           </div>
           {onExpand ? (
-            <Button type="button" variant="outline" size="icon" className="shrink-0 rounded-full" onClick={onExpand} title={`Expand ${title}`}>
+            <Button type="button" variant="ghost" size="icon" className="shrink-0 rounded-full" onClick={onExpand} title={`Expand ${title}`}>
               <Maximize2 className="h-4 w-4" />
             </Button>
           ) : null}
         </div>
-        {children}
+        <div className="p-5">{children}</div>
       </CardContent>
     </Card>
   );
@@ -1220,7 +1262,12 @@ function LegendRow({ label, value, color }: { label: string; value: string; colo
 }
 
 function EmptyChartState({ message }: { message: string }) {
-  return <div className="flex min-h-[220px] items-center justify-center text-center text-slate-500">{message}</div>;
+  return (
+    <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 text-center dark:border-slate-700 dark:bg-slate-900/50">
+      <BarChart3 className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+      <p className="text-sm text-slate-400 dark:text-slate-500">{message}</p>
+    </div>
+  );
 }
 
 function CompactAttribution({
