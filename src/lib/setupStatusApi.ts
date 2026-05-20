@@ -98,6 +98,13 @@ export async function fetchSetupStatus(): Promise<SetupStatusResponse> {
     const text = await response.text().catch(() => '');
     throw new Error(`Setup status request failed (${response.status}): ${text.slice(0, 200) || 'Unknown error'}`);
   }
+  const contentType = response.headers?.get?.('content-type') ?? '';
+  if (contentType && !contentType.toLowerCase().includes('application/json')) {
+    const text = await response.text().catch(() => '');
+    throw new Error(
+      `Setup diagnostics endpoint returned non-JSON response. Start API server and retry. ${text.slice(0, 120)}`,
+    );
+  }
   const data = await response.json() as SetupStatusResponse;
   return data;
 }

@@ -35,9 +35,9 @@ beforeEach(() => {
 describe('Ledger filters', () => {
   it('renders member chips', () => {
     render(<Ledger />);
-    expect(screen.getByText('Both')).toBeInTheDocument();
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('Bob')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Both' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bob' })).toBeInTheDocument();
   });
 
   it('shows no pricing filter section', () => {

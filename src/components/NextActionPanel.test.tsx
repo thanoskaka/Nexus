@@ -121,6 +121,7 @@ describe('NextActionPanel', () => {
   });
 
   it('shows add-ai-key when AI key is not configured', async () => {
+    window.localStorage.setItem('nexus.workspaceOwnership.v1', JSON.stringify({ mode: 'selfOwned', savedAt: Date.now() }));
     window.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => mockFetchStatus({
@@ -135,6 +136,7 @@ describe('NextActionPanel', () => {
   });
 
   it('shows setup-import when no imports are connected', async () => {
+    window.localStorage.setItem('nexus.workspaceOwnership.v1', JSON.stringify({ mode: 'selfOwned', savedAt: Date.now() }));
     window.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => mockFetchStatus({

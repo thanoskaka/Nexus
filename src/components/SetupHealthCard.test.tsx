@@ -204,7 +204,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     expect(screen.getByText('Firebase Auth')).toBeTruthy();
@@ -282,7 +282,7 @@ describe('SetupHealthCard', () => {
     await user.click(screen.getByText('Retry'));
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -297,7 +297,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     const testButtons = screen.getAllByText('Test');
@@ -343,7 +343,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     mockFetch.mockResolvedValueOnce({
@@ -371,7 +371,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     mockFetch.mockResolvedValueOnce({
@@ -401,7 +401,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     mockFetch.mockResolvedValueOnce({
@@ -428,7 +428,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('View details').length).toBeGreaterThanOrEqual(6);
+      expect(screen.getAllByText('View setup').length).toBeGreaterThanOrEqual(6);
     });
   });
 

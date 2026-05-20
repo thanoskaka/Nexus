@@ -44,6 +44,11 @@ type LedgerDisplayGroup = {
     currency: SubtotalCurrency;
   };
 };
+type MemberFilterOption = {
+  key: string;
+  label: string;
+  owners: string[];
+};
 
 const TABLE_COLUMN_WIDTHS = ['34%', '10%', '10%', '13%', '13%', '10%', '8%', '2%'] as const;
 const HIDDEN_LEDGER_COLUMNS = { defaultOrder: false } as const;
@@ -106,9 +111,37 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
     }
   }, [refreshAsset]);
 
-  const members = useMemo(
-    () => Array.from(new Set(assets.map((asset) => asset.owner).filter(Boolean))).map(String).sort(),
-    [assets],
+  const normalizedUserEmail = (user?.email || '').trim().toLowerCase();
+  const memberFilterOptions = useMemo<MemberFilterOption[]>(() => {
+    const ownerSetByKey = new Map<string, Set<string>>();
+    const labelByKey = new Map<string, string>();
+
+    for (const asset of assets) {
+      const rawOwner = String(asset.owner || '').trim();
+      if (!rawOwner) continue;
+      const ownerEmail = isEmailLike(rawOwner) ? rawOwner.toLowerCase() : '';
+      const isCurrentUser = Boolean(ownerEmail && ownerEmail === normalizedUserEmail);
+      const key = isCurrentUser ? `self:${normalizedUserEmail}` : `owner:${rawOwner.toLowerCase()}`;
+      const label = isCurrentUser
+        ? (user?.displayName?.trim() || findPreferredOwnerLabel(assets) || 'You')
+        : rawOwner;
+
+      if (!ownerSetByKey.has(key)) ownerSetByKey.set(key, new Set<string>());
+      ownerSetByKey.get(key)?.add(rawOwner);
+      labelByKey.set(key, label);
+    }
+
+    return Array.from(ownerSetByKey.entries())
+      .map(([key, owners]) => ({
+        key,
+        label: labelByKey.get(key) || key,
+        owners: Array.from(owners),
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [assets, normalizedUserEmail, user?.displayName]);
+  const memberOwnerSetByKey = useMemo(
+    () => new Map(memberFilterOptions.map((option) => [option.key, new Set(option.owners)])),
+    [memberFilterOptions],
   );
   const assetClassOptions = useMemo(
     () => Array.from(new Set(assets.map((asset) => buildAssetClassFilterValue(getAssetCountryForFilter(asset), getCanonicalAssetClass(asset.assetClass))).filter(Boolean))).map(String).sort(),
@@ -151,7 +184,7 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
 
   const baseFilteredAssets = useMemo(
     () => assets.filter((asset) => {
-      const matchesMember = memberFilter === 'ALL' || asset.owner === memberFilter;
+      const matchesMember = memberFilter === 'ALL' || (memberOwnerSetByKey.get(memberFilter)?.has(asset.owner) ?? false);
       const matchesClass = assetClassFilter === 'ALL' || buildAssetClassFilterValue(getAssetCountryForFilter(asset), getCanonicalAssetClass(asset.assetClass)) === assetClassFilter;
       const normalizedSearch = searchQuery.trim().toLowerCase();
       const matchesSearch =
@@ -162,14 +195,14 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
 
       return matchesMember && matchesClass && matchesSearch;
     }),
-    [assetClassFilter, assets, memberFilter, searchQuery],
+    [assetClassFilter, assets, memberFilter, memberOwnerSetByKey, searchQuery],
   );
 
   useEffect(() => {
-    if (memberFilter !== 'ALL' && !members.includes(memberFilter)) {
+    if (memberFilter !== 'ALL' && !memberOwnerSetByKey.has(memberFilter)) {
       setMemberFilter('ALL');
     }
-  }, [memberFilter, members]);
+  }, [memberFilter, memberOwnerSetByKey]);
 
   useEffect(() => {
     if (assetClassFilter !== 'ALL' && !assetClassOptions.includes(assetClassFilter)) {
@@ -343,8 +376,8 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
               </div>
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                  <MemberAvatar name={asset.owner} />
-                  {asset.owner}
+                  <MemberAvatar name={getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets)} />
+                  {getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets)}
                 </span>
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${toneClasses.chip}`}>
                   {asset.holdingPlatform || getCanonicalAssetClass(asset.assetClass)}
@@ -751,9 +784,9 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Members</p>
                 <div className="flex flex-wrap gap-2">
                   <FilterChip active={memberFilter === 'ALL'} onClick={() => setMemberFilter('ALL')}>Both</FilterChip>
-                  {members.map((member) => (
-                    <FilterChip key={member} active={memberFilter === member} onClick={() => setMemberFilter(member)}>
-                      {member}
+                  {memberFilterOptions.map((member) => (
+                    <FilterChip key={member.key} active={memberFilter === member.key} onClick={() => setMemberFilter(member.key)}>
+                      {member.label}
                     </FilterChip>
                   ))}
                 </div>
@@ -1626,6 +1659,14 @@ function CountryTableSection({
   clearColumnFilter: (columnId: FilterColumnId) => void;
 }) {
   const headerGroups = table.getHeaderGroups();
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (groupKey: string) => {
+    setCollapsedGroups((current) => ({
+      ...current,
+      [groupKey]: !current[groupKey],
+    }));
+  };
 
   return (
     <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -1646,7 +1687,7 @@ function CountryTableSection({
                 <TableHead
                   key={header.id}
                   style={{ width: TABLE_COLUMN_WIDTHS[index] }}
-                  className="min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
+                  className="sticky top-0 z-10 min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
                 >
                   {header.isPlaceholder ? null : (
                     <div className="relative">
@@ -1700,7 +1741,26 @@ function CountryTableSection({
         <TableBody>
           {displayGroups.length ? (
             displayGroups.flatMap((group) => {
+              const groupKey = `${title}:${group.assetClass}`;
+              const isCollapsed = Boolean(collapsedGroups[groupKey]);
               return [
+                <TableRow key={`group-header-${groupKey}`} className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60">
+                  <TableCell colSpan={columnsLength} className="px-4 py-2">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 text-left"
+                      onClick={() => toggleGroup(groupKey)}
+                    >
+                      <div className="inline-flex items-center gap-2">
+                        {isCollapsed ? <ChevronRight className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{group.assetClass}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{group.rows.length} holding{group.rows.length === 1 ? '' : 's'}</span>
+                      </div>
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{isCollapsed ? 'Expand' : 'Collapse'}</span>
+                    </button>
+                  </TableCell>
+                </TableRow>,
+                ...(!isCollapsed ? [
                 ...group.rows.map((row, index) => {
                   const toneClasses = getAssetToneClasses(row.original);
                   return (
@@ -1720,6 +1780,7 @@ function CountryTableSection({
                   );
                 }),
                 <ClassTotalRow key={`subtotal-${group.assetClass}-${group.metrics.currency}-${group.rows[0]?.id || 'group'}`} group={group} columnsLength={columnsLength} />,
+                ] : []),
               ];
             })
           ) : (
@@ -1742,6 +1803,26 @@ function getOwnerInitials(owner: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() || '')
     .join('') || 'NA';
+}
+
+function isEmailLike(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function findPreferredOwnerLabel(assets: Asset[]) {
+  const candidates = assets
+    .map((asset) => String(asset.owner || '').trim())
+    .filter((owner) => owner && !isEmailLike(owner));
+  if (candidates.length === 0) return null;
+  return candidates.sort((left, right) => right.length - left.length)[0] || null;
+}
+
+function getOwnerDisplayLabel(owner: string, normalizedUserEmail: string, userDisplayName: string | null | undefined, assets: Asset[]) {
+  const normalizedOwner = owner.trim().toLowerCase();
+  if (normalizedOwner && normalizedOwner === normalizedUserEmail) {
+    return userDisplayName?.trim() || findPreferredOwnerLabel(assets) || 'You';
+  }
+  return owner;
 }
 
 function getSortingForMode(sortMode: LedgerSortMode): SortingState {
