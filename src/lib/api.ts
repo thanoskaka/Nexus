@@ -632,7 +632,9 @@ function delay(ms: number) {
 
 function getStorage() {
   try {
-    return globalThis.localStorage;
+    const storage = globalThis.localStorage;
+    if (typeof storage?.getItem !== 'function') return null;
+    return storage;
   } catch {
     return null;
   }

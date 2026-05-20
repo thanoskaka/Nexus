@@ -12,6 +12,7 @@ import {
   deleteAiCredentials,
   testAiCredentials,
 } from '../lib/aiCredentialsApi';
+import type { SetupStatusResponse } from '../lib/setupStatusApi';
 
 const PROVIDER_LABELS: Record<AiProvider, string> = {
   gemini: 'Google Gemini',
@@ -163,6 +164,14 @@ export function AiSettingsCard() {
     }
   }, []);
 
+  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+
+  useEffect(() => {
+    void import('../lib/setupStatusApi').then(({ fetchSetupStatus }) =>
+      fetchSetupStatus().then(setSetupStatus).catch(() => {})
+    );
+  }, []);
+
   const isDirty = hasChanges;
   const hasSavedKey = Boolean(savedConfig?.provider && savedConfig?.apiKeyLast4);
   const source = savedConfig?.source;
@@ -263,6 +272,34 @@ export function AiSettingsCard() {
                 <p>Add your own API key below, or configure a server default key via environment variables to enable all AI features.</p>
               </div>
             )}
+
+            {setupStatus?.mode !== 'hosted' && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300">
+                <div className="flex items-center gap-2 mb-1">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span className="font-medium">Recommended: Gemini (Free Tier)</span>
+                </div>
+                <p>Gemini 2.5 Flash offers the best free tier for portfolio Q&amp;A and OCR. Get a key at Google AI Studio. DeepSeek is a paid alternative if you prefer their models.</p>
+              </div>
+            )}
+
+            {setupStatus?.mode === 'hosted' && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-700 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300">
+                <div className="flex items-center gap-2 mb-1">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span className="font-medium">Hosted AI options</span>
+                </div>
+                <p>Nexus Hosted provides a shared default key with a usage cap. For full control, bring your own Gemini or DeepSeek API key — encrypted at rest per user.</p>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500">
+              <div className="flex items-center gap-2 mb-1">
+                <Info className="h-4 w-4 shrink-0" />
+                <span className="font-medium">Hosted AI billing</span>
+              </div>
+              <p>Charging AI usage to your Nexus Hosted subscription is in development. For now, bring your own API key or use the server default key if configured.</p>
+            </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Your key — used for your AI requests, encrypted at rest, never shown again after save.

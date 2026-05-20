@@ -66,24 +66,30 @@ export function mapSplitwiseSummaryToAssets(
   const connectionSuffix = connectionKey === 'default' ? `${primaryCurrency}` : `${connectionKey}:${primaryCurrency}`;
   const holdingId = connectionKey === 'default' ? `splitwise-${primaryCurrency}` : `splitwise-${connectionKey}-${primaryCurrency}`;
 
+  const isLiability = converted < 0;
+  const nameLabel = isLiability ? `Splitwise - Debt (${primaryCurrency})` : `Splitwise - Cloud (${primaryCurrency})`;
+  const assetClass = isLiability ? 'Credit Card' : 'Splitwise Cloud';
+  const holdingPlatform = isLiability ? 'Splitwise Debt' : 'Splitwise Cloud';
+  const absValue = Math.abs(converted);
+
   return [{
     id: `connected:splitwise:${connectionSuffix}`,
-    name: `Splitwise - Cloud (${primaryCurrency})`,
+    name: nameLabel,
     quantity: 1,
-    costBasis: converted,
+    costBasis: absValue,
     currency: primaryCurrency,
     owner: ownerLabel,
     country: primaryCurrency === 'INR' ? 'India' : 'Canada',
-    assetClass: 'Splitwise Cloud',
+    assetClass,
     autoUpdate: false,
-    currentPrice: converted,
+    currentPrice: absValue,
     lastUpdated: summary.lastSyncAt,
     priceFetchStatus: uniqueMissingCurrencies.length > 0 ? 'failed' : 'success',
     priceFetchMessage: uniqueMissingCurrencies.length > 0
       ? 'Converted from Splitwise with partial FX coverage.'
       : 'Via Splitwise (read-only, converted to primary currency).',
     priceProvider: 'splitwise',
-    holdingPlatform: 'Splitwise Cloud',
+    holdingPlatform,
     comments: conversionNoteParts.join(' '),
     splitwiseOriginalBreakdown,
     splitwiseConvertedCurrency: primaryCurrency,

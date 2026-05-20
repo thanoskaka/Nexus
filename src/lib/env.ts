@@ -7,7 +7,7 @@ const REQUIRED_FIREBASE_KEYS = [
   'NEXT_PUBLIC_FIREBASE_APP_ID',
 ] as const;
 
-const SETUP_DOCS_URL = '/docs/localhost';
+const SETUP_DOCS_URL = '/docs/development';
 
 type EnvReader = (key: string) => string | undefined;
 

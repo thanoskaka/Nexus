@@ -78,7 +78,11 @@ export function ProviderCapabilityMatrix() {
           <CardTitle>Provider Capability Matrix</CardTitle>
         </div>
         <CardDescription>
-          Overview of every provider, its cost model, and current setup state in this deployment.
+          {data?.mode === 'hosted'
+            ? 'Hosted Mode — providers with "Yes" in Hosted Available are pre-configured. Self-hosted instances need their own keys.'
+            : data?.mode === 'self-hosted'
+            ? 'Self-Hosted Mode — each provider needs its own API key. Focus on free-tier options for pricing and logos.'
+            : 'Development Mode — configure providers via .env.local for server providers, or enter keys in the credentials panel.'}
         </CardDescription>
       </CardHeader>
       <CardContent>

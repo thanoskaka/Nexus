@@ -24,7 +24,7 @@ describe('PublicHome', () => {
   it('renders primary CTAs', () => {
     render(<PublicHome authError={null} onLaunch={vi.fn()} />);
 
-    const hostedCtas = screen.getAllByText('Use hosted Nexus');
+    const hostedCtas = screen.getAllByText('Get Started');
     expect(hostedCtas.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('View GitHub')).toBeInTheDocument();
     expect(screen.getByText('Read self-host guide')).toBeInTheDocument();
@@ -63,12 +63,12 @@ describe('PublicHome', () => {
     expect(screen.getByText('Monthly cost')).toBeInTheDocument();
   });
 
-  it('renders pricing section with Free and ~$6', () => {
+  it('renders pricing section with Free and $1.99', () => {
     render(<PublicHome authError={null} onLaunch={vi.fn()} />);
 
     expect(screen.getAllByText('Pricing').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Free').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/~\$6/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('$1.99').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows auth error when provided', () => {
@@ -101,7 +101,7 @@ describe('PublicHome', () => {
 
     render(<PublicHome authError={null} onLaunch={onLaunch} />);
 
-    const ctaButtons = screen.getAllByText('Use hosted Nexus');
+    const ctaButtons = screen.getAllByText('Get Started');
     await user.click(ctaButtons[0]);
 
     expect(onLaunch).toHaveBeenCalledTimes(1);

@@ -204,7 +204,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     expect(screen.getByText('Firebase Auth')).toBeTruthy();
@@ -228,7 +228,7 @@ describe('SetupHealthCard', () => {
       expect(screen.getByText('local')).toBeTruthy();
     });
 
-    const missingBadges = screen.getAllByText('missing');
+    const missingBadges = screen.getAllByText('Not Available');
     expect(missingBadges.length).toBeGreaterThanOrEqual(7);
   });
 
@@ -238,11 +238,31 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('Network error')).toBeTruthy();
+      expect(screen.getByText('Diagnostics Unavailable')).toBeTruthy();
     });
 
     const retryButton = screen.getByText('Retry');
     expect(retryButton).toBeTruthy();
+  });
+
+  it('translates Failed to fetch to actionable message', async () => {
+    mockFetch.mockRejectedValue(new Error('Failed to fetch'));
+
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cannot connect to the server. Make sure the app is running and retry.')).toBeTruthy();
+    });
+  });
+
+  it('translates NetworkError to actionable message', async () => {
+    mockFetch.mockRejectedValue(new Error('NetworkError'));
+
+    render(<SetupHealthCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cannot connect to the server. Make sure the app is running and retry.')).toBeTruthy();
+    });
   });
 
   it('retries on retry button click', async () => {
@@ -262,7 +282,7 @@ describe('SetupHealthCard', () => {
     await user.click(screen.getByText('Retry'));
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -277,7 +297,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     const testButtons = screen.getAllByText('Test');
@@ -323,7 +343,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     mockFetch.mockResolvedValueOnce({
@@ -351,7 +371,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     mockFetch.mockResolvedValueOnce({
@@ -363,7 +383,7 @@ describe('SetupHealthCard', () => {
     await user.click(testButtons[0]);
 
     await waitFor(() => {
-      const fixThisElements = screen.getAllByText('Fix this');
+      const fixThisElements = screen.getAllByText(/Verification failed/);
       expect(fixThisElements.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -381,7 +401,7 @@ describe('SetupHealthCard', () => {
     render(<SetupHealthCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('self-hosted')).toBeTruthy();
+      expect(screen.getByText('Self-Hosted')).toBeTruthy();
     });
 
     mockFetch.mockResolvedValueOnce({
@@ -399,7 +419,7 @@ describe('SetupHealthCard', () => {
     expect(screen.getByText('Re-test')).toBeTruthy();
   });
 
-  it('shows View setup button for configured items', async () => {
+  it('shows View details button for trusted items', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => fullStatus,
@@ -412,7 +432,7 @@ describe('SetupHealthCard', () => {
     });
   });
 
-  it('shows Setup button and required badge for missing required item', async () => {
+  it('shows Setup button and required badge for unavailable required item', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => emptyStatus,
@@ -427,7 +447,7 @@ describe('SetupHealthCard', () => {
     expect(setupButtons.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('shows View steps for missing optional item', async () => {
+  it('shows View steps for unavailable optional item', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => emptyStatus,

@@ -20,7 +20,7 @@ export type FirebaseAdminStatus = {
 };
 
 export type SetupStatusResponse = {
-  mode: 'local' | 'self-hosted' | 'hosted';
+  mode: 'development' | 'self-hosted' | 'hosted';
   app: { baseUrl: string };
   firebase: { configured: boolean; projectId: string | null };
   firebaseAdmin: FirebaseAdminStatus;
@@ -97,6 +97,13 @@ export async function fetchSetupStatus(): Promise<SetupStatusResponse> {
   if (!response.ok) {
     const text = await response.text().catch(() => '');
     throw new Error(`Setup status request failed (${response.status}): ${text.slice(0, 200) || 'Unknown error'}`);
+  }
+  const contentType = response.headers?.get?.('content-type') ?? '';
+  if (contentType && !contentType.toLowerCase().includes('application/json')) {
+    const text = await response.text().catch(() => '');
+    throw new Error(
+      `Setup diagnostics endpoint returned non-JSON response. Start API server and retry. ${text.slice(0, 120)}`,
+    );
   }
   const data = await response.json() as SetupStatusResponse;
   return data;

@@ -18,12 +18,14 @@ import { Button } from './ui/button';
 import { TickerRepairModal } from './TickerRepairModal';
 import { useSampleMode } from '../lib/samplePortfolio';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { AlertTriangle, Building2, Check, ChevronDown, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Building2, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, Database, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards, XCircle } from 'lucide-react';
 import { convertAmount, formatCurrency, formatPercent, getAssetXirr, getCurrentPrice, getCurrentTotal, getGrowthTotal, getInvestmentPrice, getInvestmentTotal, isDebtAssetClass } from '../lib/portfolioMetrics';
 import { getTickerRecommendation } from '../lib/api';
 import { Select } from './ui/select';
 import { AssetClassLogo } from '../lib/assetClassBranding';
 import { AssetMarketLogo } from '../lib/assetLogos';
+import { MemberAvatar } from './MemberAvatar';
+import { CountryFlag } from './CountryFlag';
 
 type LedgerCurrency = 'CAD' | 'INR' | 'USD' | 'ORIGINAL';
 type FilterColumnId = 'name' | 'assetClass' | 'position' | 'currentPrice' | 'marketValue' | 'performance' | 'notes';
@@ -41,6 +43,11 @@ type LedgerDisplayGroup = {
     xirr: number | null;
     currency: SubtotalCurrency;
   };
+};
+type MemberFilterOption = {
+  key: string;
+  label: string;
+  owners: string[];
 };
 
 const TABLE_COLUMN_WIDTHS = ['34%', '10%', '10%', '13%', '13%', '10%', '8%', '2%'] as const;
@@ -84,7 +91,6 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
   const [sortMode, setSortMode] = useState<LedgerSortMode>('default');
   const [memberFilter, setMemberFilter] = useState('ALL');
   const [assetClassFilter, setAssetClassFilter] = useState('ALL');
-  const [pricingFilter, setPricingFilter] = useState<'ALL' | 'AUTO' | 'MANUAL' | 'FAILED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [tickerRepairAsset, setTickerRepairAsset] = useState<Asset | undefined>(undefined);
   const [refreshingRowIds, setRefreshingRowIds] = useState<string[]>([]);
@@ -105,9 +111,37 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
     }
   }, [refreshAsset]);
 
-  const members = useMemo(
-    () => Array.from(new Set(assets.map((asset) => asset.owner).filter(Boolean))).map(String).sort(),
-    [assets],
+  const normalizedUserEmail = (user?.email || '').trim().toLowerCase();
+  const memberFilterOptions = useMemo<MemberFilterOption[]>(() => {
+    const ownerSetByKey = new Map<string, Set<string>>();
+    const labelByKey = new Map<string, string>();
+
+    for (const asset of assets) {
+      const rawOwner = String(asset.owner || '').trim();
+      if (!rawOwner) continue;
+      const ownerEmail = isEmailLike(rawOwner) ? rawOwner.toLowerCase() : '';
+      const isCurrentUser = Boolean(ownerEmail && ownerEmail === normalizedUserEmail);
+      const key = isCurrentUser ? `self:${normalizedUserEmail}` : `owner:${rawOwner.toLowerCase()}`;
+      const label = isCurrentUser
+        ? (user?.displayName?.trim() || findPreferredOwnerLabel(assets) || 'You')
+        : rawOwner;
+
+      if (!ownerSetByKey.has(key)) ownerSetByKey.set(key, new Set<string>());
+      ownerSetByKey.get(key)?.add(rawOwner);
+      labelByKey.set(key, label);
+    }
+
+    return Array.from(ownerSetByKey.entries())
+      .map(([key, owners]) => ({
+        key,
+        label: labelByKey.get(key) || key,
+        owners: Array.from(owners),
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [assets, normalizedUserEmail, user?.displayName]);
+  const memberOwnerSetByKey = useMemo(
+    () => new Map(memberFilterOptions.map((option) => [option.key, new Set(option.owners)])),
+    [memberFilterOptions],
   );
   const assetClassOptions = useMemo(
     () => Array.from(new Set(assets.map((asset) => buildAssetClassFilterValue(getAssetCountryForFilter(asset), getCanonicalAssetClass(asset.assetClass))).filter(Boolean))).map(String).sort(),
@@ -150,13 +184,8 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
 
   const baseFilteredAssets = useMemo(
     () => assets.filter((asset) => {
-      const matchesMember = memberFilter === 'ALL' || asset.owner === memberFilter;
+      const matchesMember = memberFilter === 'ALL' || (memberOwnerSetByKey.get(memberFilter)?.has(asset.owner) ?? false);
       const matchesClass = assetClassFilter === 'ALL' || buildAssetClassFilterValue(getAssetCountryForFilter(asset), getCanonicalAssetClass(asset.assetClass)) === assetClassFilter;
-      const matchesPricing =
-        pricingFilter === 'ALL' ||
-        (pricingFilter === 'AUTO' && isLivePricingAsset(asset) && !hasActionablePriceFailure(asset)) ||
-        (pricingFilter === 'MANUAL' && !isLivePricingAsset(asset)) ||
-        (pricingFilter === 'FAILED' && hasActionablePriceFailure(asset));
       const normalizedSearch = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !normalizedSearch ||
@@ -164,16 +193,16 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedSearch));
 
-      return matchesMember && matchesClass && matchesPricing && matchesSearch;
+      return matchesMember && matchesClass && matchesSearch;
     }),
-    [assetClassFilter, assets, memberFilter, pricingFilter, searchQuery],
+    [assetClassFilter, assets, memberFilter, memberOwnerSetByKey, searchQuery],
   );
 
   useEffect(() => {
-    if (memberFilter !== 'ALL' && !members.includes(memberFilter)) {
+    if (memberFilter !== 'ALL' && !memberOwnerSetByKey.has(memberFilter)) {
       setMemberFilter('ALL');
     }
-  }, [memberFilter, members]);
+  }, [memberFilter, memberOwnerSetByKey]);
 
   useEffect(() => {
     if (assetClassFilter !== 'ALL' && !assetClassOptions.includes(assetClassFilter)) {
@@ -299,6 +328,20 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
     }));
   }, []);
 
+  const hasActiveFilters = useMemo(() => {
+    if (memberFilter !== 'ALL') return true;
+    if (assetClassFilter !== 'ALL') return true;
+    if (searchQuery.trim() !== '') return true;
+    return (Object.values(columnFilters) as FilterState[keyof FilterState][]).some((filter) => filter.selected.length > 0 || filter.min.trim() !== '' || filter.max.trim() !== '');
+  }, [memberFilter, assetClassFilter, searchQuery, columnFilters]);
+
+  const clearAllFilters = React.useCallback(() => {
+    setMemberFilter('ALL');
+    setAssetClassFilter('ALL');
+    setSearchQuery('');
+    setColumnFilters(EMPTY_FILTER_STATE);
+  }, []);
+
   const columns = useMemo<ColumnDef<Asset, unknown>[]>(() => {
     const columnHelper = createColumnHelper<Asset>();
 
@@ -333,19 +376,26 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
               </div>
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white dark:bg-slate-100 dark:text-slate-900">
-                    {getOwnerInitials(asset.owner)}
-                  </span>
-                  {asset.owner}
+                  <MemberAvatar name={getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets)} />
+                  {getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets)}
                 </span>
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${toneClasses.chip}`}>
                   {asset.holdingPlatform || getCanonicalAssetClass(asset.assetClass)}
                 </span>
                 {asset.sourceManaged ? (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                    {asset.connectedProvider === 'splitwise' ? 'Via Splitwise' : 'Source-managed'}
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                    asset.connectedProvider === 'splitwise'
+                      ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200'
+                      : 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200'
+                  }`}>
+                    <Cloud className="h-3 w-3" />
+                    {asset.connectedProvider === 'splitwise' ? 'Via Splitwise' : 'Cloud-synced'}
                   </span>
-                ) : null}
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                    Manual entry
+                  </span>
+                )}
               </div>
               {supportsTickerPricing ? (
                 <div className="space-y-1">
@@ -384,7 +434,10 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         cell: (info) => (
           <div className="space-y-1">
             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{info.getValue()}</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">{info.row.original.country}</div>
+            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <CountryFlag country={info.row.original.country} />
+              {info.row.original.country}
+            </div>
           </div>
         ),
       }),
@@ -731,9 +784,9 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Members</p>
                 <div className="flex flex-wrap gap-2">
                   <FilterChip active={memberFilter === 'ALL'} onClick={() => setMemberFilter('ALL')}>Both</FilterChip>
-                  {members.map((member) => (
-                    <FilterChip key={member} active={memberFilter === member} onClick={() => setMemberFilter(member)}>
-                      {member}
+                  {memberFilterOptions.map((member) => (
+                    <FilterChip key={member.key} active={memberFilter === member.key} onClick={() => setMemberFilter(member.key)}>
+                      {member.label}
                     </FilterChip>
                   ))}
                 </div>
@@ -766,62 +819,68 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Pricing</p>
-                <div className="flex flex-wrap gap-2">
-                  <FilterChip active={pricingFilter === 'ALL'} onClick={() => setPricingFilter('ALL')}>All</FilterChip>
-                  <FilterChip active={pricingFilter === 'AUTO'} onClick={() => setPricingFilter('AUTO')}>Live Price</FilterChip>
-                  <FilterChip active={pricingFilter === 'MANUAL'} onClick={() => setPricingFilter('MANUAL')}>Manual</FilterChip>
-                  <FilterChip active={pricingFilter === 'FAILED'} onClick={() => setPricingFilter('FAILED')}>Needs Attention</FilterChip>
-                </div>
-              </div>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="3" y1="3" x2="13" y2="13" />
+                    <line x1="13" y1="3" x2="3" y2="13" />
+                  </svg>
+                  Clear all filters
+                </button>
+              )}
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Data Freshness</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                    safeBulkRefreshState.status === 'queued'
+                      ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
+                      : safeBulkRefreshState.status === 'partial'
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                        : safeBulkRefreshState.status === 'running'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                  }`}>
+                    {safeBulkRefreshState.status === 'running' && <RefreshCw className="h-3 w-3 animate-spin" />}
+                    {formatBulkRefreshStatusLabel(safeBulkRefreshState.status)}
+                  </span>
+                </div>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-3">
-                <StatPill label="Rows" value={String(assets.length)} onClick={() => setStatsModal({ type: 'rows', open: true })} />
-                <StatPill label="Needs Attention" value={String(globalFailedAssets.length)} onClick={() => setStatsModal({ type: 'failed', open: true })} />
-                <StatPill label="Manual" value={String(globalManualAssets.length)} onClick={() => setStatsModal({ type: 'manual', open: true })} />
+                <StatPill label="Total Assets" value={String(assets.length)} onClick={() => setStatsModal({ type: 'rows', open: true })} />
+                <StatPill label="Manual Entries" value={String(globalManualAssets.length)} onClick={() => setStatsModal({ type: 'manual', open: true })} />
+                <StatPill label="Needs Review" value={String(globalFailedAssets.length)} tone={globalFailedAssets.length > 0 ? 'warning' : 'neutral'} onClick={() => setStatsModal({ type: 'failed', open: true })} />
               </div>
 
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Refresh Status</p>
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        safeBulkRefreshState.status === 'queued'
-                          ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
-                          : safeBulkRefreshState.status === 'partial'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                            : safeBulkRefreshState.status === 'running'
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                              : 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300'
-                      }`}>
-                        {formatBulkRefreshStatusLabel(safeBulkRefreshState.status)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {safeBulkRefreshState.queues.length > 0
-                        ? buildCompactRefreshSummary(safeBulkRefreshState)
-                        : 'Bulk refresh covers all market-linked rows in the portfolio. Open details for queue, cached-close, and issue breakdowns.'}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" className="rounded-full" onClick={() => setRefreshCenterOpen(true)}>
-                    View Details
-                  </Button>
-                </div>
-
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <RefreshMetricCard label="Market-linked" value={String(globalMarketLinkedAssets.length)} tone="neutral" />
-                  <RefreshMetricCard label="Updated now" value={String(safeBulkRefreshState.counts.updatedNow)} tone="positive" />
-                  <RefreshMetricCard label="Queued" value={String(safeBulkRefreshState.counts.queued)} tone="info" />
-                  <RefreshMetricCard label="Needs attention" value={String(safeBulkRefreshState.counts.needsAttention)} tone="warning" />
-                </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <RefreshMetricCard label="Tracked Assets" value={String(globalMarketLinkedAssets.length)} tone="neutral" />
+                <RefreshMetricCard label="Fresh Data" value={String(safeBulkRefreshState.counts.updatedNow)} tone="positive" />
+                <RefreshMetricCard label="Queued" value={String(safeBulkRefreshState.counts.queued)} tone="info" />
+                <RefreshMetricCard label="Action Needed" value={String(safeBulkRefreshState.counts.needsAttention)} tone="warning" />
               </div>
 
-              <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                Canada assets appear first, followed by India. Use the header filter icons for Excel-style column filtering and quick value selection. {queuedAssets.length > 0 ? `${queuedAssets.length} filtered row${queuedAssets.length === 1 ? ' is' : 's are'} currently queued.` : ''}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {safeBulkRefreshState.queues.length > 0
+                    ? buildCompactRefreshSummary(safeBulkRefreshState)
+                    : 'All tracked assets are up to date. Use the control center for detailed queue and issue breakdowns.'}
+                  {queuedAssets.length > 0 && (
+                    <span className="ml-1 text-sky-600 dark:text-sky-400">{queuedAssets.length} row{queuedAssets.length === 1 ? '' : 's'} queued.</span>
+                  )}
+                </p>
+                <Button variant="outline" size="sm" className="rounded-full" onClick={() => setRefreshCenterOpen(true)}>
+                  Control Center
+                </Button>
               </div>
             </div>
           </div>
@@ -1041,77 +1100,98 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         <DialogHeader>
           <DialogTitle>Refresh Control Center</DialogTitle>
           <DialogDescription>
-            Bulk refresh covers all market-linked rows in the portfolio, not just the current filtered view.
+            Dashboard data freshness overview. Refresh covers all tracked assets, not just the current filtered view.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-            <div className="text-sm text-slate-600 dark:text-slate-300">
-              {safeBulkRefreshState.queues.length > 0
-                ? buildCompactRefreshSummary(safeBulkRefreshState)
-                : 'No provider queues are waiting right now. AMFI, Upstox, gold, and any eligible close-based rows are ready to refresh immediately.'}
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                safeBulkRefreshState.status === 'queued'
+                  ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
+                  : safeBulkRefreshState.status === 'partial'
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                    : safeBulkRefreshState.status === 'running'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300'
+              }`}>
+                {safeBulkRefreshState.status === 'running' && <RefreshCw className="h-3 w-3 animate-spin" />}
+                {formatBulkRefreshStatusLabel(safeBulkRefreshState.status)}
+              </span>
+              <span>
+                {safeBulkRefreshState.queues.length > 0
+                  ? buildCompactRefreshSummary(safeBulkRefreshState)
+                  : 'All providers are idle.'}
+              </span>
             </div>
-            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-              safeBulkRefreshState.status === 'queued'
-                ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
-                : safeBulkRefreshState.status === 'partial'
-                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                  : safeBulkRefreshState.status === 'running'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                    : 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300'
-            }`}>
-              {formatBulkRefreshStatusLabel(safeBulkRefreshState.status)}
-            </span>
+            <Button variant="outline" size="sm" onClick={refreshPrices} disabled={isRefreshing}>
+              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh Now
+            </Button>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <RefreshMetricCard label="Market-linked" value={String(globalMarketLinkedAssets.length)} tone="neutral" />
-            <RefreshMetricCard label="Updated now" value={String(safeBulkRefreshState.counts.updatedNow)} tone="positive" />
-            <RefreshMetricCard label="Using cached close" value={String(safeBulkRefreshState.counts.usingCachedClose)} tone="neutral" />
+            <RefreshMetricCard label="Tracked Assets" value={String(globalMarketLinkedAssets.length)} tone="neutral" />
+            <RefreshMetricCard label="Fresh Data" value={String(safeBulkRefreshState.counts.updatedNow)} tone="positive" />
+            <RefreshMetricCard label="Using Cached Close" value={String(safeBulkRefreshState.counts.usingCachedClose)} tone="neutral" />
             <RefreshMetricCard label="Queued" value={String(safeBulkRefreshState.counts.queued)} tone="info" />
-            <RefreshMetricCard label="Needs attention" value={String(safeBulkRefreshState.counts.needsAttention)} tone="warning" />
-            <RefreshMetricCard label="Manual" value={String(globalManualAssets.length)} tone="neutral" />
+            <RefreshMetricCard label="Action Needed" value={String(safeBulkRefreshState.counts.needsAttention)} tone="warning" />
+            <RefreshMetricCard label="Manual Entries" value={String(globalManualAssets.length)} tone="neutral" />
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Current Run</div>
+              <div className="mb-3 flex items-center gap-2">
+                <RefreshCw className="h-3.5 w-3.5 text-slate-500" />
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Provider Queues</div>
+              </div>
               <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                 {safeBulkRefreshState.queues.length > 0
                   ? safeBulkRefreshState.queues.map((queue) => (
-                      <div key={queue.provider} className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
+                      <div key={queue.provider} className="mb-2 flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950">
                         <div>
-                          <div className="font-medium text-slate-900 dark:text-slate-100">{queue.provider === 'massive' ? 'Massive queue' : 'Alpha Vantage queue'}</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
-                            {queue.pendingRows} row{queue.pendingRows === 1 ? '' : 's'} across {queue.pendingRequests} request{queue.pendingRequests === 1 ? '' : 's'}
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3.5 w-3.5 text-sky-500" />
+                            <div className="font-medium text-slate-900 dark:text-slate-100">{queue.provider === 'massive' ? 'Massive' : 'Alpha Vantage'}</div>
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {queue.pendingRows} asset{queue.pendingRows === 1 ? '' : 's'} ({queue.pendingRequests} request{queue.pendingRequests === 1 ? '' : 's'})
                           </div>
                         </div>
                         <div className="text-xs font-medium text-sky-700 dark:text-sky-300">
-                          {queue.nextRunAt ? formatQueueTime(queue.nextRunAt) : 'Waiting'}
+                          {queue.nextRunAt ? `Next: ${formatQueueTime(queue.nextRunAt)}` : 'Waiting'}
                         </div>
                       </div>
                     ))
                   : (
                     <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                      No provider queues are waiting right now.
+                      No provider queues waiting. All eligible assets are fresh.
                     </div>
                   )}
               </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Top Issues</div>
+              <div className="mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 text-slate-500" />
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Issues</div>
+              </div>
               <div className="mt-2 space-y-2">
                 {safeBulkRefreshState.issues.length > 0 ? (
                   safeBulkRefreshState.issues.map((issue) => (
-                    <div key={issue.key} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
-                      <div className="text-sm text-slate-700 dark:text-slate-200">{issue.label}</div>
+                    <div key={issue.key} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950">
+                      <div className="flex items-center gap-2">
+                        {issue.tone === 'rose' ? <XCircle className="h-3.5 w-3.5 text-rose-500" />
+                          : issue.tone === 'amber' ? <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                          : <AlertTriangle className="h-3.5 w-3.5 text-slate-400" />}
+                        <div className="text-sm text-slate-700 dark:text-slate-200">{issue.label}</div>
+                      </div>
                       <span className={getIssueBadgeClass(issue.tone)}>{issue.count}</span>
                     </div>
                   ))
                 ) : (
                   <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                    No grouped issues right now. Cached-close and queued rows are tracked separately from actionable failures.
+                    No issues. All tracked assets are up to date.
                   </div>
                 )}
               </div>
@@ -1221,7 +1301,7 @@ function FilterChip({ active, children, onClick }: React.PropsWithChildren<{ act
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${active ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${active ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200'}`}
     >
       {children}
     </button>
@@ -1278,27 +1358,31 @@ function AssetClassFilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium transition-colors ${
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
         active
-          ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900'
-          : 'border-slate-200 bg-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+          ? 'border-slate-900 bg-slate-900 text-white shadow-sm dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900'
+          : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200'
       }`}
     >
-      <AssetClassLogo name={label} image={image} className="h-6 w-6 shrink-0 rounded-full" />
+      <AssetClassLogo name={label} image={image} className="h-5 w-5 shrink-0 rounded-full" />
       <span>{label}</span>
     </button>
   );
 }
 
-function StatPill({ label, value, onClick }: React.PropsWithChildren<{ label: string; value: string; onClick?: () => void }>) {
+function StatPill({ label, value, tone = 'neutral', onClick }: React.PropsWithChildren<{ label: string; value: string; tone?: 'neutral' | 'warning'; onClick?: () => void }>) {
+  const toneBorder = tone === 'warning' ? 'border-amber-200 dark:border-amber-800 hover:border-amber-300 dark:hover:border-amber-700' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700';
+  const toneValue = tone === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-slate-900 dark:text-slate-100';
+  const toneBg = tone === 'warning' ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-white dark:bg-slate-950';
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+      className={`rounded-2xl border ${toneBorder} ${toneBg} px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-900`}
     >
       <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{value}</div>
+      <div className={`mt-1 text-xl font-semibold ${toneValue}`}>{value}</div>
     </button>
   );
 }
@@ -1375,18 +1459,25 @@ function RefreshMetricCard({
   value: string;
   tone: 'neutral' | 'positive' | 'info' | 'warning';
 }) {
-  const toneClass = tone === 'positive'
-    ? 'text-emerald-700 dark:text-emerald-300'
+  const [icon, bgClass, toneClass] = tone === 'positive'
+    ? [CheckCircle2, 'bg-emerald-50 dark:bg-emerald-950/30', 'text-emerald-700 dark:text-emerald-300']
     : tone === 'info'
-      ? 'text-sky-700 dark:text-sky-300'
+      ? [Clock, 'bg-sky-50 dark:bg-sky-950/30', 'text-sky-700 dark:text-sky-300']
       : tone === 'warning'
-        ? 'text-amber-700 dark:text-amber-300'
-        : 'text-slate-900 dark:text-slate-100';
+        ? [AlertCircle, 'bg-amber-50 dark:bg-amber-950/30', 'text-amber-700 dark:text-amber-300']
+        : [Database, 'bg-slate-50 dark:bg-slate-900', 'text-slate-900 dark:text-slate-100'];
+
+  const Icon = icon;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
-      <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</div>
-      <div className={`mt-0.5 text-lg font-semibold ${toneClass}`}>{value}</div>
+    <div className={`flex items-center gap-3 rounded-2xl border border-slate-200 ${bgClass} px-4 py-3 dark:border-slate-800`}>
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone === 'neutral' ? 'bg-white dark:bg-slate-800' : 'bg-white/70 dark:bg-slate-800/70'} shadow-sm`}>
+        <Icon className={`h-4 w-4 ${toneClass}`} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</div>
+        <div className={`mt-0.5 text-lg font-semibold ${toneClass}`}>{value}</div>
+      </div>
     </div>
   );
 }
@@ -1472,13 +1563,13 @@ function normalizeBulkRefreshState(state: unknown): NormalizedBulkRefreshState {
 function formatBulkRefreshStatusLabel(status: 'idle' | 'running' | 'queued' | 'completed' | 'partial') {
   switch (status) {
     case 'running':
-      return 'Refresh Running';
+      return 'Refreshing';
     case 'queued':
-      return 'Queue Active';
+      return 'Queued';
     case 'completed':
-      return 'Refresh Complete';
+      return 'Up to Date';
     case 'partial':
-      return 'Partial Refresh';
+      return 'Needs Refresh';
     default:
       return 'Ready';
   }
@@ -1568,9 +1659,17 @@ function CountryTableSection({
   clearColumnFilter: (columnId: FilterColumnId) => void;
 }) {
   const headerGroups = table.getHeaderGroups();
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (groupKey: string) => {
+    setCollapsedGroups((current) => ({
+      ...current,
+      [groupKey]: !current[groupKey],
+    }));
+  };
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+    <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
       <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
@@ -1588,7 +1687,7 @@ function CountryTableSection({
                 <TableHead
                   key={header.id}
                   style={{ width: TABLE_COLUMN_WIDTHS[index] }}
-                  className="min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
+                  className="sticky top-0 z-10 min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
                 >
                   {header.isPlaceholder ? null : (
                     <div className="relative">
@@ -1642,7 +1741,26 @@ function CountryTableSection({
         <TableBody>
           {displayGroups.length ? (
             displayGroups.flatMap((group) => {
+              const groupKey = `${title}:${group.assetClass}`;
+              const isCollapsed = Boolean(collapsedGroups[groupKey]);
               return [
+                <TableRow key={`group-header-${groupKey}`} className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60">
+                  <TableCell colSpan={columnsLength} className="px-4 py-2">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 text-left"
+                      onClick={() => toggleGroup(groupKey)}
+                    >
+                      <div className="inline-flex items-center gap-2">
+                        {isCollapsed ? <ChevronRight className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{group.assetClass}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{group.rows.length} holding{group.rows.length === 1 ? '' : 's'}</span>
+                      </div>
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{isCollapsed ? 'Expand' : 'Collapse'}</span>
+                    </button>
+                  </TableCell>
+                </TableRow>,
+                ...(!isCollapsed ? [
                 ...group.rows.map((row, index) => {
                   const toneClasses = getAssetToneClasses(row.original);
                   return (
@@ -1662,6 +1780,7 @@ function CountryTableSection({
                   );
                 }),
                 <ClassTotalRow key={`subtotal-${group.assetClass}-${group.metrics.currency}-${group.rows[0]?.id || 'group'}`} group={group} columnsLength={columnsLength} />,
+                ] : []),
               ];
             })
           ) : (
@@ -1684,6 +1803,26 @@ function getOwnerInitials(owner: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() || '')
     .join('') || 'NA';
+}
+
+function isEmailLike(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function findPreferredOwnerLabel(assets: Asset[]) {
+  const candidates = assets
+    .map((asset) => String(asset.owner || '').trim())
+    .filter((owner) => owner && !isEmailLike(owner));
+  if (candidates.length === 0) return null;
+  return candidates.sort((left, right) => right.length - left.length)[0] || null;
+}
+
+function getOwnerDisplayLabel(owner: string, normalizedUserEmail: string, userDisplayName: string | null | undefined, assets: Asset[]) {
+  const normalizedOwner = owner.trim().toLowerCase();
+  if (normalizedOwner && normalizedOwner === normalizedUserEmail) {
+    return userDisplayName?.trim() || findPreferredOwnerLabel(assets) || 'You';
+  }
+  return owner;
 }
 
 function getSortingForMode(sortMode: LedgerSortMode): SortingState {

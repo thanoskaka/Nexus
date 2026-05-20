@@ -27,7 +27,7 @@ describe('PricingPage', () => {
     render(<PricingPage onLaunch={vi.fn()} />);
 
     expect(screen.getByText('Free')).toBeInTheDocument();
-    expect(screen.getByText(/~\$6/)).toBeInTheDocument();
+    expect(screen.getByText('$1.99')).toBeInTheDocument();
     expect(screen.getByText('Contact us')).toBeInTheDocument();
   });
 
