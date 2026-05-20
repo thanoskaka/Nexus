@@ -121,6 +121,39 @@ export default defineConfig(({ mode }) => {
             res.end(JSON.stringify({ status: 'ok' }));
           });
 
+          // Dev stubs: API routes not handled by Vite dev server
+          server.middlewares.use('/api/user/workspace-ownership', (req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method === 'PUT') {
+              res.end(JSON.stringify({ ownership: { mode: 'hosted' } }));
+            } else {
+              res.end(JSON.stringify({ ownership: null }));
+            }
+          });
+
+          server.middlewares.use('/api/user/onboarding', (_req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            const now = Date.now();
+            res.end(JSON.stringify({
+              onboarding: {
+                uid: 'dev',
+                status: 'completed',
+                currentStep: 999,
+                primaryCountry: 'CA',
+                primaryCurrency: 'CAD',
+                secondaryCountry: 'IN',
+                secondaryCurrency: 'INR',
+                selectedAssetClasses: [],
+                providerSelections: [],
+                integrationSelections: [],
+                members: [],
+                createdAt: now,
+                updatedAt: now,
+                completedAt: now,
+              },
+            }));
+          });
+
           server.middlewares.use(async (req, res, next) => {
             if (await tryHandleSplitwiseLocalApi(req, res)) {
               return;
