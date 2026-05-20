@@ -670,16 +670,12 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
           const showsAsDebt = isDebtAssetDisplay(asset);
           const gainColor = growthTotal > 0 ? 'text-emerald-600 dark:text-emerald-400' : growthTotal < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400';
           return (
-            <div className="flex items-center gap-2.5" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              <LedgerPerfBar pct={growthPercent * 100} scale={perfScale} />
-              <div className="min-w-[64px]">
-                <div className={`text-[13px] font-bold leading-tight ${gainColor}`}>{formatPercent(growthPercent)}</div>
-                <div className={`text-[11.5px] leading-tight ${gainColor} opacity-80`}>{formatCurrency(growthTotal, displayCurrency)}</div>
-                {!showsAsDebt && xirr !== null && (
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">XIRR {formatPercent(xirr)}</div>
-                )}
-              </div>
-              <LedgerSparkline id={asset.id} gainPct={growthPercent * 100} />
+            <div style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <div className={`text-[13px] font-bold leading-tight ${gainColor}`}>{formatPercent(growthPercent)}</div>
+              <div className={`text-[11.5px] leading-tight ${gainColor} opacity-80`}>{formatCurrency(growthTotal, displayCurrency)}</div>
+              {!showsAsDebt && xirr !== null && (
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">XIRR {formatPercent(xirr)}</div>
+              )}
             </div>
           );
         },
@@ -690,9 +686,11 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         cell: (info) => {
           const asset = info.row.original;
           return (
-            <div className="space-y-1">
-              <div className="text-sm text-slate-700 dark:text-slate-200">{asset.comments || 'No comments added'}</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">{getPricingModeLabel(asset)}</div>
+            <div>
+              {asset.comments
+                ? <div className="text-sm text-slate-700 dark:text-slate-200">{asset.comments}</div>
+                : <div className="text-xs text-slate-400 dark:text-slate-500">—</div>
+              }
             </div>
           );
         },
