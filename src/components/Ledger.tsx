@@ -18,7 +18,7 @@ import { Button } from './ui/button';
 import { TickerRepairModal } from './TickerRepairModal';
 import { useSampleMode } from '../lib/samplePortfolio';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { AlertCircle, AlertTriangle, Building2, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, Database, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards, XCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Building2, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, Cloud, Database, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards, XCircle } from 'lucide-react';
 import { convertAmount, formatCurrency, formatPercent, getAssetXirr, getCurrentPrice, getCurrentTotal, getGrowthTotal, getInvestmentPrice, getInvestmentTotal, isDebtAssetClass } from '../lib/portfolioMetrics';
 import { getTickerRecommendation } from '../lib/api';
 import { Select } from './ui/select';
