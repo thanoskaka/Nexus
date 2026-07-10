@@ -100,6 +100,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
     inviteMember,
     removeMember,
     currentUserRole,
+    householdFinance,
     sharedIntegrationMembers,
     refreshSharedIntegrations,
     disconnectMemberIntegration,
@@ -1215,6 +1216,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
         primaryCurrency: sourcePrimaryCurrency,
         secondaryCurrency: sourceSecondaryCurrency,
         priceProviderSettings: sourcePriceProviderSettings,
+        householdFinance: migrationSource === 'screen' ? householdFinance : undefined,
       });
       setReplaceConfirmText('');
       setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
@@ -1245,6 +1247,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
           baseCurrency,
           primaryCurrency,
           secondaryCurrency,
+          householdFinance,
           connectedAccounts: {
             upstox: upstox ? {
               status: upstox.status,
@@ -1330,6 +1333,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
         baseCurrency: result.baseCurrency,
         primaryCurrency: result.primaryCurrency,
         secondaryCurrency: result.secondaryCurrency,
+        householdFinance: result.householdFinance,
       });
 
       // Restore checklist preferences if present

@@ -1,5 +1,6 @@
 import { DEFAULT_PRICE_PROVIDER_SETTINGS } from '../lib/api';
 import type { Asset, AssetClassDef } from './db';
+import { normalizeHouseholdFinance, type HouseholdFinanceState } from '../lib/householdFinance';
 
 export type PortfolioCurrency = 'CAD' | 'INR' | 'USD';
 export type PortfolioBaseCurrency = PortfolioCurrency | 'ORIGINAL';
@@ -59,6 +60,12 @@ export function removeLegacySelfPortfolioDuplicates<
   });
 }
 
+export function removeSupersededPortfolios<
+  T extends { document?: Partial<PortfolioDocument> }
+>(portfolios: T[]): T[] {
+  return portfolios.filter((portfolio) => !portfolio.document?.supersededByPortfolioId);
+}
+
 export function shouldHydratePersonalPortfolioFromLegacy(
   personalPortfolio?: Partial<PortfolioDocument> | null,
   legacyPortfolio?: Partial<PortfolioDocument> | null,
@@ -86,6 +93,8 @@ export interface PortfolioDocument {
   ownerEmail?: string;
   ownerUid?: string;
   isPersonal?: boolean;
+  supersededByPortfolioId?: string;
+  householdFinance?: HouseholdFinanceState;
   priceProviderSettings: typeof DEFAULT_PRICE_PROVIDER_SETTINGS;
   updatedAt?: unknown;
 }
@@ -181,6 +190,7 @@ export function createDefaultPortfolio(email?: string | null, uid?: string | nul
     ownerEmail: normalizedEmail || '',
     ownerUid: uid || '',
     isPersonal,
+    householdFinance: undefined,
     priceProviderSettings: DEFAULT_PRICE_PROVIDER_SETTINGS,
   };
 }
@@ -206,6 +216,8 @@ export function normalizePortfolio(data: Partial<PortfolioDocument>): PortfolioD
     ownerEmail: typeof data.ownerEmail === 'string' ? data.ownerEmail : '',
     ownerUid: typeof data.ownerUid === 'string' ? data.ownerUid : '',
     isPersonal: Boolean(data.isPersonal),
+    supersededByPortfolioId: typeof data.supersededByPortfolioId === 'string' ? data.supersededByPortfolioId : undefined,
+    householdFinance: normalizeHouseholdFinance(data.householdFinance),
     priceProviderSettings: {
       ...DEFAULT_PRICE_PROVIDER_SETTINGS,
       ...(data.priceProviderSettings || {}),

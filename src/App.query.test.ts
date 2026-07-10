@@ -15,4 +15,10 @@ describe('App query parsing', () => {
     expect(parsed.view).toBe('dashboard');
     expect(parsed.settingsSection).toBeUndefined();
   });
+
+  it('opens the accounts and contribution room view from the query string', () => {
+    const parsed = parseInitialViewFromQuery('http://localhost:3000/?view=accounts');
+
+    expect(parsed.view).toBe('accounts');
+  });
 });

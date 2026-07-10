@@ -8,6 +8,7 @@ import {
   isLegacySelfPortfolioCandidate,
   normalizePortfolio,
   removeLegacySelfPortfolioDuplicates,
+  removeSupersededPortfolios,
   shouldHydratePersonalPortfolioFromLegacy,
   selectActivePortfolioId,
 } from './portfolioHelpers';
@@ -240,5 +241,14 @@ describe('portfolioHelpers', () => {
       primaryCurrency: 'USD',
       secondaryCurrency: 'CAD',
     });
+  });
+
+  it('removes a personal portfolio after it is superseded by the canonical shared portfolio', () => {
+    const portfolios = removeSupersededPortfolios([
+      { id: 'personal', document: { supersededByPortfolioId: 'shared' } },
+      { id: 'shared', document: {} },
+    ]);
+
+    expect(portfolios.map((portfolio) => portfolio.id)).toEqual(['shared']);
   });
 });

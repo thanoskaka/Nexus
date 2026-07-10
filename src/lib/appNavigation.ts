@@ -1,5 +1,5 @@
 export type ParsedInitialView = {
-  view: 'dashboard' | 'assets' | 'settings' | 'setup';
+  view: 'dashboard' | 'accounts' | 'assets' | 'settings' | 'setup';
   settingsSection?: 'integrations';
 };
 
@@ -15,7 +15,7 @@ export function parseInitialViewFromQuery(href?: string): ParsedInitialView {
   const rawView = url.searchParams.get('view');
   const rawSection = url.searchParams.get('section');
 
-  const view = rawView === 'settings' || rawView === 'assets' || rawView === 'setup' ? rawView : 'dashboard';
+  const view = rawView === 'settings' || rawView === 'accounts' || rawView === 'assets' || rawView === 'setup' ? rawView : 'dashboard';
   const settingsSection = rawSection === 'integrations' ? 'integrations' : undefined;
 
   return { view, settingsSection };
