@@ -1,12 +1,13 @@
-import React, { createContext, useContext, useMemo, useState, lazy, Suspense } from 'react';
+import React, { useMemo, useState, lazy, Suspense } from 'react';
 import type { User } from 'firebase/auth';
 import type { Asset, AssetClassDef } from '../store/db';
 import type { PortfolioBaseCurrency, PortfolioCurrency, PortfolioDocument, PortfolioMember, PortfolioSummary } from '../store/portfolioHelpers';
 import type { PriceProviderSettings } from '../lib/api';
-import type { BulkRefreshRunState, ImportProgress, PortfolioContextType } from '../store/PortfolioContext';
+import { PortfolioContext, type BulkRefreshRunState, type ImportProgress, type PortfolioContextType } from '../store/PortfolioContext';
 import type { UserBrokerConnections, UserProviderOverrides } from '../store/userPreferences';
-import type { SplitwiseContextType } from '../store/SplitwiseContext';
-import type { ConnectedAccountsContextType } from '../store/ConnectedAccountsContext';
+import { SplitwiseContext, type SplitwiseContextType } from '../store/SplitwiseContext';
+import { ConnectedAccountsContext, type ConnectedAccountsContextType } from '../store/ConnectedAccountsContext';
+import { AuthContext } from '../store/AuthContext';
 import { DEFAULT_PRICE_PROVIDER_SETTINGS } from '../lib/api';
 import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES } from '../store/userPreferences';
 import {
@@ -15,21 +16,6 @@ import {
   linkPersonToMember as linkFinancePersonToMember,
   upsertRoomRecord as upsertFinanceRoomRecord,
 } from './householdFinance';
-
-// Re-create contexts locally to avoid importing store modules
-// which would trigger static imports of firebase.ts.
-interface MockAuthContextType {
-  user: User | null;
-  loading: boolean;
-  authError: string | null;
-  signInWithGoogle: () => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const MockAuthContext = createContext<MockAuthContextType | undefined>(undefined);
-const MockPortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
-const MockSplitwiseContext = createContext<SplitwiseContextType | undefined>(undefined);
-const MockConnectedAccountsContext = createContext<ConnectedAccountsContextType | undefined>(undefined);
 
 const MOCK_USER = {
   uid: 'mock-user-1',
@@ -125,6 +111,7 @@ export function MockApp() {
     user,
     loading: false,
     authError: null,
+    runtime: 'hosted' as const,
     signInWithGoogle: async () => { setUser(MOCK_USER); },
     logout: async () => { setUser(null); },
   }), [user]);
@@ -268,25 +255,19 @@ export function MockApp() {
     setImportProgress: () => {},
   }), [mergedAssets, portfolio, activePortfolioId, currentUserRole, userProviderOverrides, userBrokerConnections]);
 
-  const AuthenticatedApp = lazy(() => import('../App').then((m) => ({ default: m.AuthenticatedApp })));
+  const MockMainApp = lazy(() => import('../App').then((m) => ({ default: m.MainApp })));
 
   return (
-    <MockAuthContext.Provider value={authValue}>
-      <MockConnectedAccountsContext.Provider value={connectedAccountsValue}>
-        <MockSplitwiseContext.Provider value={splitwiseValue}>
-          <MockPortfolioContext.Provider value={portfolioValue}>
+    <AuthContext.Provider value={authValue}>
+      <ConnectedAccountsContext.Provider value={connectedAccountsValue}>
+        <SplitwiseContext.Provider value={splitwiseValue}>
+          <PortfolioContext.Provider value={portfolioValue}>
             <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Loading Nexus Portfolio (mock mode)...</div>}>
-              <AuthenticatedApp />
+              <MockMainApp />
             </Suspense>
-          </MockPortfolioContext.Provider>
-        </MockSplitwiseContext.Provider>
-      </MockConnectedAccountsContext.Provider>
-    </MockAuthContext.Provider>
+          </PortfolioContext.Provider>
+        </SplitwiseContext.Provider>
+      </ConnectedAccountsContext.Provider>
+    </AuthContext.Provider>
   );
-}
-
-export function useMockAuth() {
-  const ctx = useContext(MockAuthContext);
-  if (!ctx) throw new Error('useMockAuth must be used within MockApp');
-  return ctx;
 }

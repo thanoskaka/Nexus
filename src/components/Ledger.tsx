@@ -842,13 +842,11 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4 dark:border-slate-800">
         <div>
           <div className="flex items-center gap-2">
-            <span className="inline-block h-[5px] w-[5px] rounded-[1px] bg-emerald-500" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.6px] text-slate-500 dark:text-slate-400">Ledger</p>
             {isSampleMode && (
               <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">Sample data</span>
             )}
           </div>
-          <h1 className="mt-0.5 text-[22px] font-bold tracking-[-0.3px] text-slate-900 dark:text-white">Assets</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Assets</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400">
             {quickFilteredAssets.length} holding{quickFilteredAssets.length === 1 ? '' : 's'} · {isSampleMode ? 'sample data' : `${assets.length} total`}
           </p>
@@ -902,8 +900,7 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
       </div>
 
       {/* Toolbar row 2: quick filters + member pills + active chips */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.4px] text-slate-400 dark:text-slate-500 mr-0.5">Quick filters</span>
+      <div className="flex flex-wrap items-center gap-2 border-y border-slate-200 py-2.5 dark:border-slate-800">
         <QuickFilterPill active={quickFilter === 'all'} onClick={() => setQuickFilter('all')}>
           All <span className="ml-1 rounded px-1 py-px text-[10px] font-semibold bg-black/[0.07]">{filteredAssets.length}</span>
         </QuickFilterPill>
