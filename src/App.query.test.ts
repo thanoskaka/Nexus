@@ -16,9 +16,10 @@ describe('App query parsing', () => {
     expect(parsed.settingsSection).toBeUndefined();
   });
 
-  it('opens the accounts and contribution room view from the query string', () => {
+  it('redirects the legacy accounts view into Settings', () => {
     const parsed = parseInitialViewFromQuery('http://localhost:3000/?view=accounts');
 
-    expect(parsed.view).toBe('accounts');
+    expect(parsed.view).toBe('settings');
+    expect(parsed.settingsSection).toBe('accounts-limits');
   });
 });

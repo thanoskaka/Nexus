@@ -4,13 +4,12 @@ import { AuthProvider, useAuth } from './store/AuthContext';
 import { Asset, saveSetting } from './store/db';
 import { Dashboard } from './components/Dashboard';
 import { Ledger } from './components/Ledger';
-import { AccountsRoom } from './components/AccountsRoom';
 import { AddAssetModal } from './components/AddAssetModal';
 import { Settings, type SettingsSection } from './components/Settings';
 import { ImportProgressOverlay } from './components/ImportProgressOverlay';
 import { Button } from './components/ui/button';
 import { Select } from './components/ui/select';
-import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut, BookOpen, Rocket, Landmark } from 'lucide-react';
+import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut, BookOpen, Rocket, Plus, ChevronDown } from 'lucide-react';
 import { SplitwiseProvider, useSplitwise } from './store/SplitwiseContext';
 import { ConnectedAccountsProvider, useConnectedAccounts } from './store/ConnectedAccountsContext';
 import { parseInitialViewFromQuery } from './lib/appNavigation';
@@ -52,6 +51,7 @@ export function MainApp() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [aiKeyConfigured, setAiKeyConfigured] = useState(false);
   const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const handleStartSetupWizard = useCallback(() => {
     setIsSetupWizardOpen(true);
@@ -80,10 +80,29 @@ export function MainApp() {
     });
   };
 
+  const navigateToView = useCallback((view: AppView) => {
+    if (typeof window !== 'undefined' && view !== 'docs') {
+      const url = new URL(window.location.href);
+      if (url.pathname.startsWith('/docs')) url.pathname = '/';
+      if (view === 'dashboard') {
+        url.searchParams.delete('view');
+        url.searchParams.delete('section');
+      } else {
+        url.searchParams.set('view', view);
+        if (view !== 'settings') url.searchParams.delete('section');
+      }
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+    setCurrentView(view);
+  }, []);
+
   const navigateToSettings = useCallback((section: string) => {
     setSettingsSection(section as SettingsSection);
-    setCurrentView('settings');
-  }, []);
+    const url = new URL(window.location.href);
+    url.searchParams.set('section', section);
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    navigateToView('settings');
+  }, [navigateToView]);
 
   const navigateToDocs = useCallback(() => {
     window.history.pushState({}, '', '/docs');
@@ -104,10 +123,10 @@ export function MainApp() {
   const prevSetupVisible = useRef(setupTabVisible);
   useEffect(() => {
     if (!setupTabVisible && currentView === 'setup') {
-      setCurrentView('dashboard');
+      navigateToView('dashboard');
     }
     prevSetupVisible.current = setupTabVisible;
-  }, [setupTabVisible, currentView]);
+  }, [setupTabVisible, currentView, navigateToView]);
 
   const handleEditAsset = useCallback((asset: Asset) => {
     setEditingAsset(asset);
@@ -116,62 +135,42 @@ export function MainApp() {
 
   return (
     <div className="min-h-screen bg-[#f7f7f5] text-slate-900 dark:bg-[#111412] dark:text-slate-50 transition-colors duration-150 font-sans">
-      <header className="bg-white dark:bg-[#151816] sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 min-h-16 py-2 grid grid-cols-1 gap-2 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
-          <div className="flex items-center gap-3 cursor-pointer min-w-0 lg:justify-self-start" onClick={() => setCurrentView('dashboard')}>
+      <header className="bg-white dark:bg-[#151816] sticky top-0 z-20 border-b border-slate-200 dark:border-slate-800">
+        <div className="mx-auto flex min-h-16 max-w-[1440px] items-center gap-4 px-4 sm:px-6">
+          <div className="flex items-center gap-3 cursor-pointer min-w-0 lg:justify-self-start" onClick={() => navigateToView('dashboard')}>
             <div className="w-9 h-9 bg-[#1f6f50] rounded-lg flex items-center justify-center">
               <Wallet className="text-white h-5 w-5" />
             </div>
-            <div className="min-w-0">
+            <div className="hidden min-w-0 sm:block">
               <h1 className="text-lg font-bold tracking-tight leading-tight text-slate-900 dark:text-white">Nexus Portfolio</h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">Family wealth</p>
             </div>
           </div>
 
-          <nav aria-label="Primary" className="flex items-center justify-center gap-1 xl:justify-self-center xl:min-w-0">
+          <nav aria-label="Primary" className="ml-2 flex items-center gap-1">
             <button
-              onClick={() => setCurrentView('dashboard')}
+              onClick={() => navigateToView('dashboard')}
+              aria-label="Overview"
+              title="Overview"
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'dashboard' ? 'bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}
             >
               <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
+              <span className="hidden sm:inline">Overview</span>
             </button>
             <button
-              onClick={() => setCurrentView('accounts')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'accounts' ? 'bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}
-            >
-              <Landmark className="h-4 w-4" />
-              <span className="hidden sm:inline">Accounts</span>
-            </button>
-            <button
-              onClick={() => setCurrentView('assets')}
+              onClick={() => navigateToView('assets')}
+              aria-label="Holdings"
+              title="Holdings"
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'assets' ? 'bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}
             >
               <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Assets</span>
-            </button>
-            {setupTabVisible && (
-              <button
-                onClick={() => setCurrentView('setup')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'setup' ? 'bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}
-              >
-                <Rocket className="h-4 w-4" />
-                <span className="hidden sm:inline">Setup</span>
-              </button>
-            )}
-            <button
-              data-nav-settings
-              onClick={() => setCurrentView('settings')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'settings' ? 'bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}
-            >
-              <SettingsIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
+              <span className="hidden sm:inline">Holdings</span>
             </button>
           </nav>
 
-          <div className="flex items-center justify-end gap-2 flex-wrap xl:flex-nowrap xl:justify-self-end">
-            {portfolios.length > 0 && (
-              <div className="hidden xl:block xl:w-[210px] 2xl:w-[240px] shrink-0">
+          <div className="ml-auto flex items-center justify-end gap-2">
+            {portfolios.length > 1 && (
+              <div className="hidden w-[220px] shrink-0 lg:block">
                 <Select
                   value={activePortfolioId || ''}
                   onChange={(event) => setActivePortfolioId(event.target.value)}
@@ -187,40 +186,46 @@ export function MainApp() {
               </div>
             )}
 
-            <Button variant="outline" size="icon" onClick={refreshPrices} disabled={isRefreshing} className="h-11 w-11 rounded-lg border-slate-200 dark:border-slate-800 shrink-0">
+            <Button
+              onClick={() => {
+                if (isSampleMode) disableSampleMode();
+                setIsAddModalOpen(true);
+              }}
+              className="h-10 rounded-lg bg-[#1f6f50] px-3 text-white hover:bg-[#185c43]"
+              aria-label="Add data"
+              title="Add data"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Add data</span>
+            </Button>
+
+            <Button variant="outline" size="icon" onClick={refreshPrices} disabled={isRefreshing} className="h-10 w-10 rounded-lg border-slate-200 dark:border-slate-800 shrink-0" title="Refresh portfolio values" aria-label="Refresh portfolio values">
               <RefreshCw className={`h-4 w-4 text-slate-600 dark:text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
 
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={navigateToDocs}
-              className="h-11 w-11 rounded-lg border-slate-200 dark:border-slate-800 shrink-0"
-              title="Documentation"
-              aria-label="Open documentation"
-            >
-              <BookOpen className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-            </Button>
-
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleDarkMode}
-              className="h-11 w-11 rounded-lg border-slate-200 dark:border-slate-800 shrink-0"
-              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDarkMode ? <Sun className="h-4 w-4 text-slate-600 dark:text-slate-400" /> : <Moon className="h-4 w-4 text-slate-600 dark:text-slate-400" />}
-            </Button>
-
-            {user && (
-              <div className="hidden xl:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 min-w-0 max-w-[250px]">
-                <span className="truncate">{user.email}</span>
-                <button type="button" onClick={() => void logout()} className="text-slate-500 hover:text-slate-900 dark:hover:text-white">
-                  <LogOut className="h-4 w-4" />
-                </button>
-              </div>
-            )}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsUserMenuOpen((open) => !open)}
+                className="flex h-10 max-w-[210px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-[#151816] dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="Open account menu"
+                aria-expanded={isUserMenuOpen}
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white dark:bg-slate-100 dark:text-slate-900">{(user?.displayName || user?.email || 'U').charAt(0).toUpperCase()}</span>
+                <span className="hidden truncate lg:block">{user?.displayName || user?.email}</span>
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </button>
+              {isUserMenuOpen && (
+                <div className="absolute right-0 top-12 z-30 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-800 dark:bg-slate-950">
+                  <button type="button" data-nav-settings onClick={() => { navigateToSettings('household'); setIsUserMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-900"><SettingsIcon className="h-4 w-4" />Settings</button>
+                  {setupTabVisible && <button type="button" onClick={() => { navigateToView('setup'); setIsUserMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-900"><Rocket className="h-4 w-4" />Setup checklist</button>}
+                  <button type="button" onClick={() => { navigateToDocs(); setIsUserMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-900"><BookOpen className="h-4 w-4" />Help & documentation</button>
+                  <button type="button" onClick={() => { toggleDarkMode(); setIsUserMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-900">{isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{isDarkMode ? 'Light appearance' : 'Dark appearance'}</button>
+                  <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
+                  <button type="button" onClick={() => void logout()} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><LogOut className="h-4 w-4" />Sign out</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -230,7 +235,7 @@ export function MainApp() {
           <Dashboard onAddAsset={() => {
             if (isSampleMode) disableSampleMode();
             setIsAddModalOpen(true);
-          }} />
+          }} onManageLimits={() => navigateToSettings('accounts-limits')} />
         )}
         {currentView === 'setup' && (
           <>
@@ -259,9 +264,9 @@ export function MainApp() {
           if (isSampleMode) disableSampleMode();
           setIsAddModalOpen(true);
         }} />}
-        {currentView === 'accounts' && <AccountsRoom />}
+        {currentView === 'accounts' && <Settings initialSection="accounts-limits" onStartSetupWizard={handleStartSetupWizard} />}
         {currentView === 'settings' && <Settings initialSection={settingsSection} onStartSetupWizard={handleStartSetupWizard} />}
-        {currentView === 'docs' && <Docs onBack={() => setCurrentView('dashboard')} onStartSetupWizard={handleStartSetupWizard} />}
+        {currentView === 'docs' && <Docs onBack={() => navigateToView('dashboard')} onStartSetupWizard={handleStartSetupWizard} />}
       </main>
 
       <AddAssetModal

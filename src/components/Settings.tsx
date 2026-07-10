@@ -44,28 +44,34 @@ import { signOut } from 'firebase/auth';
 import { auth as hostedAuth } from '../lib/firebase';
 import { SetupHistoryPanel } from './SetupHistoryPanel';
 import { recordEvent, getSetupHistory, clearSetupHistory, type SetupEvent } from '../store/setupHistory';
+import { AccountsRoom } from './AccountsRoom';
 
-export type SettingsSection = 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
-type SettingsTab = 'providers' | 'structure' | 'data' | 'integrations' | 'workspace';
+export type SettingsSection = 'household' | 'accounts-limits' | 'preferences' | 'manage-members' | 'price-providers' | 'asset-classes-overview' | 'price-updates' | 'data-management' | 'cloud-sync' | 'integrations' | 'workspace';
+type SettingsTab = 'household' | 'accounts' | 'preferences' | 'connections' | 'data' | 'advanced';
 
 function getTabForSection(section?: SettingsSection): SettingsTab {
   switch (section) {
     case 'manage-members':
-      return 'workspace';
+    case 'household':
+      return 'household';
+    case 'accounts-limits':
+      return 'accounts';
+    case 'preferences':
+      return 'preferences';
     case 'price-providers':
     case 'price-updates':
-      return 'providers';
+      return 'advanced';
     case 'asset-classes-overview':
-      return 'structure';
+      return 'advanced';
     case 'data-management':
     case 'cloud-sync':
       return 'data';
     case 'workspace':
-      return 'workspace';
+      return 'household';
     case 'integrations':
-      return 'integrations';
+      return 'connections';
     default:
-      return 'providers';
+      return 'household';
   }
 }
 
@@ -401,7 +407,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
   };
 
   React.useEffect(() => {
-    if (activeTab !== 'integrations') return;
+    if (activeTab !== 'connections') return;
     const justRanRecently = Date.now() - lastIntegrationAutoRefreshRef.current < 10 * 1000;
     if (justRanRecently) return;
 
@@ -1223,7 +1229,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
       setAlertDialog({
         open: true,
         title: 'Cloud Replaced',
-        description: `Live Firebase data now matches your ${migrationSource === 'screen' ? 'current app view' : 'browser local snapshot'}: ${sourceAssets.length} assets and ${sourceAssetClasses.length} asset classes.`,
+        description: `Live Firebase data now matches your ${migrationSource === 'screen' ? 'current app view' : 'browser local snapshot'}: ${sourceAssets.length} holdings and ${sourceAssetClasses.length} legacy category mappings.`,
       });
     } catch (error) {
       setAlertDialog({
@@ -1351,7 +1357,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
       setAlertDialog({
         open: true,
         title: 'Import Successful',
-        description: `Successfully imported ${result.assets.length} assets and ${result.assetClasses.length} asset classes using ${importMode === 'replace' ? 'replace' : 'merge'} mode.`,
+        description: `Successfully imported ${result.assets.length} holdings using ${importMode === 'replace' ? 'replace' : 'merge'} mode.`,
       });
     } catch (error) {
       setAlertDialog({
@@ -1383,118 +1389,39 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
   ];
 
   const tabItems: Array<{ id: SettingsTab; label: string; description: string }> = [
-    { id: 'providers', label: 'Providers', description: 'Price sources & API keys' },
-    { id: 'structure', label: 'Structure', description: 'Classes and organization' },
-    { id: 'data', label: 'Data', description: 'Imports, sync, migration' },
-    { id: 'integrations', label: 'Integrations', description: 'Connected accounts' },
-    { id: 'workspace', label: 'Workspace', description: 'Portfolio identity and region' },
+    { id: 'household', label: 'Household', description: 'Profiles, access, workspace' },
+    { id: 'accounts', label: 'Accounts & limits', description: 'Owned accounts and contributions' },
+    { id: 'preferences', label: 'Preferences', description: 'Currency and display defaults' },
+    { id: 'connections', label: 'Connections', description: 'Connected services and sync' },
+    { id: 'data', label: 'Data & privacy', description: 'Import, export, backup, deletion' },
+    { id: 'advanced', label: 'Advanced', description: 'Providers and diagnostics' },
   ];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      <div className="mb-8 space-y-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Settings</h1>
-            {isSampleMode && (
-              <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300" title="Not your real portfolio">
-                Sample data
-              </span>
-            )}
-          </div>
-            <p className="text-lg text-slate-500 dark:text-slate-400">Configure your portfolio tracker without digging through one long page.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="text-slate-500 dark:text-slate-400">Members</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{displayMembers.length}</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="text-slate-500 dark:text-slate-400">Assets</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{displayAssets.length}</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="text-slate-500 dark:text-slate-400">Classes</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{allAssetClasses.length}</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="text-slate-500 dark:text-slate-400">Primary Currency</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{primaryCurrency}</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950">
-              <div className="text-slate-500 dark:text-slate-400">Secondary Currency</div>
-              <div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{secondaryCurrency}</div>
-            </div>
-          </div>
+    <div className="mx-auto max-w-[1180px] pb-12">
+      <div className="mb-8 border-b border-slate-200 pb-5 dark:border-slate-800">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Settings</h1>
+          {isSampleMode && <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">Sample data</span>}
         </div>
-
-        {workspaceMode && (
-          <Card className="border-none shadow-sm rounded-2xl mb-4">
-            <CardContent className="pt-6">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-start gap-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 ${
-                    workspaceMode === 'hosted'
-                      ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400'
-                  }`}>
-                    {workspaceMode === 'hosted' ? <Globe2 className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                      Workspace Mode: {workspaceMode === 'hosted' ? 'Nexus Hosted' : 'Self-Owned Firebase'}
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {workspaceMode === 'hosted'
-                        ? 'Your portfolio data is stored in Nexus-hosted infrastructure.'
-                        : 'Signed into Nexus. Portfolio data source: your Firebase project. Self-owned data routing requires additional configuration.'}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={handleResetWorkspace}
-                  disabled={workspaceResetBusy}
-                  className="shrink-0 rounded-full"
-                >
-                  <RotateCw className="h-4 w-4 mr-1.5" />
-                  Reset / Change Mode
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-5">
-            {tabItems.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  aria-pressed={isActive}
-                  className={`relative overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all ${
-                    isActive
-                      ? 'border-emerald-200 bg-white text-slate-950 shadow-md ring-1 ring-emerald-100 dark:border-emerald-800 dark:bg-slate-950 dark:text-white dark:ring-emerald-900/60'
-                      : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-white/80 hover:text-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-950/60 dark:hover:text-white'
-                  }`}
-                >
-                  {isActive && (
-                    <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-emerald-500 dark:bg-emerald-400" />
-                  )}
-                  <div className={`text-sm font-semibold ${isActive ? 'text-slate-950 dark:text-white' : ''}`}>{tab.label}</div>
-                  <div className={`mt-1 text-xs ${isActive ? 'text-slate-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>{tab.description}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Household structure, reporting preferences, connections, and data controls.</p>
       </div>
 
-      {activeTab === 'providers' && (
+      <div className="grid gap-8 md:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 md:sticky md:top-24 md:mx-0 md:block md:self-start md:space-y-1 md:overflow-visible md:p-0" aria-label="Settings sections">
+          {tabItems.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} aria-current={isActive ? 'page' : undefined} className={`w-auto shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-left transition-colors md:w-full md:whitespace-normal ${isActive ? 'bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900'}`}>
+                <div className="text-sm font-semibold">{tab.label}</div>
+                <div className="mt-0.5 hidden text-xs opacity-75 md:block">{tab.description}</div>
+              </button>
+            );
+          })}
+        </aside>
+
+        <div className="min-w-0">
+      {activeTab === 'advanced' && (
         <>
       <Card id="price-providers" className="border-none shadow-sm rounded-2xl mb-6">
         <CardHeader>
@@ -1505,56 +1432,6 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
           <CardDescription>Set up each asset type in one pass. For every route, users can stay on the system setup or override with their own credentials on this device.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Portfolio Currency Preferences</h3>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Primary is your canonical tracking currency; secondary is your alternate comparison currency.</p>
-              </div>
-              <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-600 dark:bg-slate-950 dark:text-slate-300">
-                Legacy base: {baseCurrency}
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Primary Currency</label>
-                <Select
-                  value={currencyForm.primary}
-                  onChange={(event) => setCurrencyForm((current) => ({ ...current, primary: event.target.value as 'CAD' | 'INR' | 'USD' }))}
-                  disabled={!canEditCurrencies}
-                >
-                  <option value="CAD">CAD</option>
-                  <option value="USD">USD</option>
-                  <option value="INR">INR</option>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Secondary Currency</label>
-                <Select
-                  value={currencyForm.secondary}
-                  onChange={(event) => setCurrencyForm((current) => ({ ...current, secondary: event.target.value as 'CAD' | 'INR' | 'USD' }))}
-                  disabled={!canEditCurrencies}
-                >
-                  <option value="CAD">CAD</option>
-                  <option value="USD">USD</option>
-                  <option value="INR">INR</option>
-                </Select>
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Button
-                className="rounded-full bg-[#00875A] text-white hover:bg-[#007A51]"
-                onClick={() => void saveCurrencyPreferences()}
-                disabled={!canEditCurrencies}
-              >
-                Save Currency Preferences
-              </Button>
-            </div>
-            {!canEditCurrencies && (
-              <p className="mt-3 text-sm text-slate-500">Only portfolio owners can update currency preferences.</p>
-            )}
-          </div>
-
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
             <Table className="[&_td]:py-3 [&_th]:py-3">
               <TableHeader>
@@ -1865,7 +1742,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
         </>
       )}
 
-      {activeTab === 'structure' && (
+      {false && (
         <>
       <Card id="asset-classes-overview" className="border-none shadow-sm rounded-2xl mb-6">
         <CardHeader className="flex flex-row items-start justify-between">
@@ -1984,6 +1861,29 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
         </>
       )}
 
+      {activeTab === 'accounts' && (
+        <AccountsRoom mode="accounts" embedded />
+      )}
+
+      {activeTab === 'preferences' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Reporting preferences</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose one shared currency for headline totals. Every holding keeps its native currency.</p>
+          </div>
+          <Card className="rounded-lg border border-slate-200 shadow-none dark:border-slate-800">
+            <CardContent className="space-y-5 p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2 text-sm font-medium">Reporting currency<Select disabled={!canEditCurrencies} value={currencyForm.primary} onChange={(event) => setCurrencyForm((current) => ({ ...current, primary: event.target.value as 'CAD' | 'INR' | 'USD' }))}><option value="CAD">CAD — Canadian dollar</option><option value="USD">USD — U.S. dollar</option><option value="INR">INR — Indian rupee</option></Select></label>
+                <label className="space-y-2 text-sm font-medium">Comparison currency<Select disabled={!canEditCurrencies} value={currencyForm.secondary} onChange={(event) => setCurrencyForm((current) => ({ ...current, secondary: event.target.value as 'CAD' | 'INR' | 'USD' }))}><option value="CAD">CAD — Canadian dollar</option><option value="USD">USD — U.S. dollar</option><option value="INR">INR — Indian rupee</option></Select></label>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Overview and charts use the reporting currency. Native amounts remain available in holding details and exports.</p>
+              <Button disabled={!canEditCurrencies} onClick={() => void saveCurrencyPreferences()} className="rounded-lg bg-[#1f6f50] text-white hover:bg-[#185c43]">Save currency preferences</Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {activeTab === 'data' && (
       <div id="data-management" className="space-y-6">
         <div className="mb-6">
@@ -2031,7 +1931,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
               <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Current App Portfolio (On Screen)</div>
               <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
                 <div>Assets: <span className="font-semibold text-slate-900 dark:text-white">{assets.length}</span></div>
-                <div>Asset Classes: <span className="font-semibold text-slate-900 dark:text-white">{assetClasses.length}</span></div>
+                <div>Legacy categories: <span className="font-semibold text-slate-900 dark:text-white">{assetClasses.length}</span></div>
                 <div>Primary Currency: <span className="font-semibold text-slate-900 dark:text-white">{primaryCurrency}</span></div>
                 <div>Secondary Currency: <span className="font-semibold text-slate-900 dark:text-white">{secondaryCurrency}</span></div>
                 <div>Legacy Base Currency: <span className="font-semibold text-slate-900 dark:text-white">{baseCurrency}</span></div>
@@ -2045,7 +1945,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
               ) : (
                 <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
                   <div>Assets: <span className="font-semibold text-slate-900 dark:text-white">{migrationPreview.localAssets.length}</span></div>
-                  <div>Asset Classes: <span className="font-semibold text-slate-900 dark:text-white">{migrationPreview.localClasses.length}</span></div>
+                  <div>Legacy categories: <span className="font-semibold text-slate-900 dark:text-white">{migrationPreview.localClasses.length}</span></div>
                   <div>Primary Currency: <span className="font-semibold text-slate-900 dark:text-white">{migrationPreview.localPrimaryCurrency || 'Not stored locally'}</span></div>
                   <div>Secondary Currency: <span className="font-semibold text-slate-900 dark:text-white">{migrationPreview.localSecondaryCurrency || 'Not stored locally'}</span></div>
                   <div>Legacy Base Currency: <span className="font-semibold text-slate-900 dark:text-white">{migrationPreview.localBaseCurrency || 'Not stored locally'}</span></div>
@@ -2055,7 +1955,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
             </div>
           </div>
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-            This is a full replacement. It overwrites cloud assets, asset classes, primary/secondary currency settings, legacy base currency alias, and price-provider settings with the selected source. Member access stays intact so you do not lose login access.
+            This is a full replacement. It overwrites cloud holdings, legacy category mappings, currency settings, and price-provider settings with the selected source. Member access stays intact so you do not lose login access.
           </div>
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" onClick={() => void loadMigrationPreview()}>
@@ -2072,7 +1972,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                 setConfirmDialog({
                   open: true,
                   title: 'Replace Live Portfolio',
-                  description: `Type REPLACE to overwrite the live Firebase portfolio with ${sourceAssetsCount} assets and ${sourceClassesCount} asset classes from the ${migrationSource === 'screen' ? 'current app view' : 'browser local snapshot'}.`,
+                  description: `Type REPLACE to overwrite the live Firebase portfolio with ${sourceAssetsCount} holdings and ${sourceClassesCount} legacy category mappings from the ${migrationSource === 'screen' ? 'current app view' : 'browser local snapshot'}.`,
                   onConfirm: () => {},
                 });
               }}
@@ -2161,7 +2061,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
         </CardContent>
       </Card>
 
-      <Card className="border-none shadow-sm rounded-2xl">
+      {false && (<Card className="border-none shadow-sm rounded-2xl">
         <CardHeader>
           <CardTitle>Asset Class Data</CardTitle>
           <CardDescription>Import, export, or erase custom asset class definitions.</CardDescription>
@@ -2194,7 +2094,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </Card>)}
 
       {isSampleMode && (
         <Card className="border-none shadow-sm rounded-2xl border-amber-200 dark:border-amber-900/60">
@@ -2216,7 +2116,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                 setConfirmDialog({
                   open: true,
                   title: 'Clear Sample Data',
-                  description: 'Remove all sample holdings, asset classes, and exit demo mode. Your real portfolio (if any) will remain unchanged.',
+                  description: 'Remove all sample holdings and legacy category mappings, then exit demo mode. Your real portfolio (if any) will remain unchanged.',
                   onConfirm: () => {
                     disableSampleMode();
                     setConfirmDialog(prev => ({ ...prev, open: false }));
@@ -2274,10 +2174,6 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                     <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.assets}</div>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider">Asset Classes</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.assetClasses}</div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
                     <div className="text-xs text-slate-500 uppercase tracking-wider">Connected Accounts</div>
                     <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{importPreview.connectedAccounts}</div>
                   </div>
@@ -2330,7 +2226,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                     setConfirmDialog({
                       open: true,
                       title: `${importMode === 'replace' ? 'Replace' : 'Merge'} Portfolio Data`,
-                      description: `This will ${importMode === 'replace' ? 'replace your current portfolio' : 'merge into your current portfolio'} with ${importPreview.assets} assets and ${importPreview.assetClasses} asset classes. Continue?`,
+                      description: `This will ${importMode === 'replace' ? 'replace your current portfolio' : 'merge into your current portfolio'} with ${importPreview.assets} holdings. Continue?`,
                       onConfirm: () => {
                         setConfirmDialog(prev => ({ ...prev, open: false }));
                         handleConfirmImport();
@@ -2403,7 +2299,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                 setConfirmDialog({
                   open: true,
                   title: 'Clear Sample Data',
-                  description: 'Remove all sample holdings, asset classes, and exit demo mode. Your real portfolio (if any) will remain unchanged.',
+                  description: 'Remove all sample holdings and legacy category mappings, then exit demo mode. Your real portfolio (if any) will remain unchanged.',
                   onConfirm: () => {
                     disableSampleMode();
                     setConfirmDialog(prev => ({ ...prev, open: false }));
@@ -2420,7 +2316,8 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
       </div>
       )}
 
-      {activeTab === 'workspace' && (<>
+      {activeTab === 'household' && (<>
+        <AccountsRoom mode="household" embedded />
         {workspaceMode && (
           <Card className="border-none shadow-sm rounded-2xl mb-4">
             <CardContent className="pt-6">
@@ -2458,36 +2355,12 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
           </Card>
         )}
 
-      <Card id="manage-members" className="border-none shadow-sm rounded-2xl mb-6">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-slate-700 dark:text-slate-300" />
-            <CardTitle>Family Members</CardTitle>
-          </div>
-          <CardDescription>The portfolio owners tracked in this app</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            {owners.length > 0 ? owners.map(owner => (
-              <div key={owner} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 rounded-xl border border-slate-100 dark:border-slate-800">
-                <div className="w-8 h-8 rounded-full bg-[#00875A] flex items-center justify-center text-white font-bold">
-                  {owner.charAt(0).toUpperCase()}
-                </div>
-                <span className="font-medium text-slate-700 dark:text-slate-200">{owner}</span>
-              </div>
-            )) : (
-              <p className="text-sm text-slate-500">No family members found. Import assets to see them here.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       <Card id="member-access" className="border-none shadow-sm rounded-2xl mb-6">
         <CardHeader className="flex flex-row items-start justify-between">
           <div>
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-slate-700 dark:text-slate-300" />
-              <CardTitle>Manage Members</CardTitle>
+              <CardTitle>Workspace access</CardTitle>
             </div>
             <CardDescription>Authorized Google accounts that can access and edit this shared Firebase portfolio.</CardDescription>
           </div>
@@ -2567,17 +2440,6 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
                   placeholder="e.g. Family Wealth Tracker"
                 />
                 <p className="text-xs text-slate-500">Shown in the header and portfolio selector when set.</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-900 dark:text-white">Base Currency</label>
-                <Select
-                  value={workspaceForm.baseCurrency}
-                  onChange={(event) => setWorkspaceForm((prev) => ({ ...prev, baseCurrency: event.target.value as 'CAD' | 'INR' | 'USD' }))}
-                >
-                  <option value="CAD">CAD</option>
-                  <option value="INR">INR</option>
-                  <option value="USD">USD</option>
-                </Select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-900 dark:text-white">Primary Country / Region</label>
@@ -2706,7 +2568,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
       </>
       )}
 
-      {activeTab === 'integrations' && (
+      {activeTab === 'connections' && (
         <div id="integrations" className="space-y-6">
           <div className="mb-6">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -3297,6 +3159,9 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
           />
         </div>
       )}
+
+        </div>
+      </div>
 
       <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
         <DialogHeader>

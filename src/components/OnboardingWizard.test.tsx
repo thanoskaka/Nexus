@@ -35,11 +35,13 @@ describe('OnboardingWizard', () => {
     expect(screen.getByText('Loading your setup...')).toBeInTheDocument();
   });
 
-  it('renders step 0 (primary country) after load', async () => {
+  it('starts with portfolio basics', async () => {
     renderWizard();
     await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
+      expect(screen.getByText('Portfolio basics')).toBeInTheDocument();
     });
+    expect(screen.getByLabelText('Primary country')).toBeInTheDocument();
+    expect(screen.getByLabelText('Secondary country')).toBeInTheDocument();
   });
 
   it('disables next button when no country selected on step 0', async () => {
@@ -53,7 +55,7 @@ describe('OnboardingWizard', () => {
   it('shows currency hint when country is selected', async () => {
     renderWizard();
     await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
+      expect(screen.getByText('Portfolio basics')).toBeInTheDocument();
     });
 
     const select = screen.getByLabelText('Primary country');
@@ -66,7 +68,7 @@ describe('OnboardingWizard', () => {
   it('enables next button after selecting country', async () => {
     renderWizard();
     await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
+      expect(screen.getByText('Portfolio basics')).toBeInTheDocument();
     });
 
     const select = screen.getByLabelText('Primary country');
@@ -78,10 +80,10 @@ describe('OnboardingWizard', () => {
     });
   });
 
-  it('steps through the wizard and completes', async () => {
+  it('steps through the three-part wizard and completes', async () => {
     renderWizard();
     await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
+      expect(screen.getByText('Portfolio basics')).toBeInTheDocument();
     });
 
     const select = screen.getByLabelText('Primary country');
@@ -89,35 +91,12 @@ describe('OnboardingWizard', () => {
 
     fireEvent.click(screen.getByText('Next'));
     await waitFor(() => {
-      expect(screen.getByText('Secondary Country')).toBeInTheDocument();
+      expect(screen.getByText('Household access')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Next'));
     await waitFor(() => {
-      expect(screen.getByText('Asset Classes')).toBeInTheDocument();
-    });
-
-    const checkboxes = screen.getAllByRole('checkbox');
-    fireEvent.click(checkboxes[0]);
-
-    fireEvent.click(screen.getByText('Next'));
-    await waitFor(() => {
-      expect(screen.getByText('Pricing Providers')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Next'));
-    await waitFor(() => {
-      expect(screen.getByText('Integrations')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Next'));
-    await waitFor(() => {
-      expect(screen.getByText('Family Members')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Next'));
-    await waitFor(() => {
-      expect(screen.getByText('Review & Finish')).toBeInTheDocument();
+      expect(screen.getByText('Ready to add data')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Finish Setup'));
@@ -126,11 +105,11 @@ describe('OnboardingWizard', () => {
     });
   });
 
-  it('skips optional secondary country step', async () => {
+  it('allows household invitations to be skipped', async () => {
     const onComplete = vi.fn();
     renderWizard({ onComplete });
     await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
+      expect(screen.getByText('Portfolio basics')).toBeInTheDocument();
     });
 
     const select = screen.getByLabelText('Primary country');
@@ -138,7 +117,7 @@ describe('OnboardingWizard', () => {
     fireEvent.click(screen.getByText('Next'));
 
     await waitFor(() => {
-      expect(screen.getByText('Secondary Country')).toBeInTheDocument();
+      expect(screen.getByText('Household access')).toBeInTheDocument();
     });
 
     const skipButton = screen.getByText('Skip');
@@ -146,15 +125,15 @@ describe('OnboardingWizard', () => {
     fireEvent.click(skipButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Asset Classes')).toBeInTheDocument();
+      expect(screen.getByText('Ready to add data')).toBeInTheDocument();
     });
   });
 
-  it('requires at least one asset class selected', async () => {
+  it('keeps the next action focused on household access, not asset classes', async () => {
     const user = userEvent.setup();
     renderWizard();
     await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
+      expect(screen.getByText('Portfolio basics')).toBeInTheDocument();
     });
 
     const select = screen.getByLabelText('Primary country');
@@ -162,23 +141,17 @@ describe('OnboardingWizard', () => {
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => {
-      expect(screen.getByText('Secondary Country')).toBeInTheDocument();
+      expect(screen.getByText('Household access')).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(screen.getByText('Asset Classes')).toBeInTheDocument();
-    });
-
-    const buttons = screen.getAllByRole('button', { name: 'Next' });
-    const nextButton = buttons[buttons.length - 1];
-    expect(nextButton).toBeDisabled();
+    expect(screen.queryByText('Asset Classes')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).not.toBeDisabled();
   });
 
   it('loads saved state from server for resume', async () => {
     mockGetOnboardingState.mockResolvedValue({
       uid: 'test-uid',
       status: 'in_progress',
-      currentStep: 2,
+      currentStep: 1,
       primaryCountry: 'CA',
       primaryCurrency: 'CAD',
       secondaryCountry: 'US',
@@ -194,13 +167,8 @@ describe('OnboardingWizard', () => {
     renderWizard();
 
     await waitFor(() => {
-      expect(screen.getByText('Asset Classes')).toBeInTheDocument();
+      expect(screen.getByText('Household access')).toBeInTheDocument();
     });
-
-    expect(screen.getByText('Canada')).toBeInTheDocument();
-    expect(screen.getByText('United States')).toBeInTheDocument();
-    const checkedBoxes = screen.getAllByRole('checkbox').filter((cb) => (cb as HTMLInputElement).checked);
-    expect(checkedBoxes.length).toBeGreaterThanOrEqual(1);
   });
 
   it('saves state when clicking Save button', async () => {
@@ -208,7 +176,7 @@ describe('OnboardingWizard', () => {
     renderWizard();
 
     await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
+      expect(screen.getByText('Portfolio basics')).toBeInTheDocument();
     });
 
     const saveButton = screen.getByText('Save');
@@ -216,46 +184,18 @@ describe('OnboardingWizard', () => {
     expect(mockSaveOnboardingStep).not.toHaveBeenCalled();
   });
 
-  it('resets asset classes when country changes', async () => {
+  it('updates the secondary-country choices when the primary country changes', async () => {
     const user = userEvent.setup();
     renderWizard();
     await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
+      expect(screen.getByText('Portfolio basics')).toBeInTheDocument();
     });
 
     await user.selectOptions(screen.getByLabelText('Primary country'), 'US');
-    await user.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(screen.getByText('Secondary Country')).toBeInTheDocument();
-    });
-    await user.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(screen.getByText('Asset Classes')).toBeInTheDocument();
-    });
-
-    const firstCheckbox = screen.getAllByRole('checkbox')[0];
-    await user.click(firstCheckbox);
-    expect((firstCheckbox as HTMLInputElement).checked).toBe(true);
-
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await waitFor(() => {
-      expect(screen.getByText('Secondary Country')).toBeInTheDocument();
-    });
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await waitFor(() => {
-      expect(screen.getByText('Primary Country')).toBeInTheDocument();
-    });
-
+    const secondary = screen.getByLabelText('Secondary country') as HTMLSelectElement;
+    expect(Array.from(secondary.options).map((option) => option.value)).not.toContain('US');
     await user.selectOptions(screen.getByLabelText('Primary country'), 'CA');
-    await user.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(screen.getByText('Secondary Country')).toBeInTheDocument();
-    });
-    await user.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(screen.getByText('Asset Classes')).toBeInTheDocument();
-    });
-
-    expect((screen.getAllByRole('checkbox')[0] as HTMLInputElement).checked).toBe(false);
+    expect(Array.from(secondary.options).map((option) => option.value)).toContain('US');
+    expect(Array.from(secondary.options).map((option) => option.value)).not.toContain('CA');
   });
 });

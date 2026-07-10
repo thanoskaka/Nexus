@@ -34,7 +34,7 @@ function formatMoney(value: number, currency: string) {
   }).format(value);
 }
 
-export function AccountsRoom() {
+export function AccountsRoom({ mode = 'all', embedded = false }: { mode?: 'all' | 'household' | 'accounts'; embedded?: boolean } = {}) {
   const {
     members,
     currentUserRole,
@@ -175,12 +175,12 @@ export function AccountsRoom() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between dark:border-slate-800">
+      <div className={`flex flex-col gap-4 md:flex-row md:items-end md:justify-between ${embedded ? '' : 'border-b border-slate-200 pb-5 dark:border-slate-800'}`}>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Accounts & contribution room</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Balances remain with one person and one country. Room is tracked across accounts for the same program.</p>
+          <h1 className={`${embedded ? 'text-xl' : 'text-2xl'} font-semibold tracking-tight`}>{mode === 'household' ? 'Profiles and access' : 'Accounts & limits'}</h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{mode === 'household' ? 'Profiles represent financial ownership; logins control app access.' : 'Review owned accounts and track annual limits and contribution activity.'}</p>
         </div>
-        <div className="flex gap-2">
+        {mode !== 'household' && <div className="flex gap-2">
           {householdFinance ? (
             <Button variant="outline" onClick={() => void run('refresh', refreshHouseholdFinance)} disabled={busy !== null || currentUserRole !== 'owner'} className="rounded-lg">
               <RefreshCw className={`mr-2 h-4 w-4 ${busy === 'refresh' ? 'animate-spin' : ''}`} />
@@ -192,12 +192,12 @@ export function AccountsRoom() {
               Save account structure
             </Button>
           )}
-        </div>
+        </div>}
       </div>
 
-      {!householdFinance && (
+      {!householdFinance && mode !== 'household' && (
         <div className="border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-          This is a migration preview derived from existing owner, country, asset class, and platform fields. Saving it does not change holding values.
+          This is a migration preview derived from existing owner, country, legacy category, and platform fields. Saving it does not change holding values.
         </div>
       )}
 
@@ -205,7 +205,7 @@ export function AccountsRoom() {
         <div className="border-l-4 border-rose-500 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:bg-rose-950/30 dark:text-rose-200">{error}</div>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      {(mode === 'all' || mode === 'household') && <section className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
         <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           <h2 className="font-semibold">People and access</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">A login grants access; the person profile owns the financial accounts.</p>
@@ -232,13 +232,13 @@ export function AccountsRoom() {
             </div>
           ))}
         </div>
-      </section>
+      </section>}
 
-      <section className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      {(mode === 'all' || mode === 'accounts') && <section className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 md:flex-row md:items-end md:justify-between dark:border-slate-800">
           <div>
-            <h2 className="font-semibold">Financial accounts</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Derived accounts group holdings by person, country, program, institution, and currency.</p>
+            <h2 className="font-semibold">Owned accounts</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Each account belongs to one person and one jurisdiction. Classification is derived from its holdings.</p>
           </div>
           <div className="grid grid-cols-2 gap-2 md:w-[420px]">
             <Select value={selectedPerson.id} onChange={(event) => setSelectedPersonId(event.target.value)} className="rounded-lg" aria-label="Person">
@@ -278,12 +278,12 @@ export function AccountsRoom() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
-      <section className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      {(mode === 'all' || mode === 'accounts') && <section className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
         <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-          <h2 className="font-semibold">Contribution room</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Use the room shown by the relevant authority or statement, then record activity after that baseline.</p>
+          <h2 className="font-semibold">Limits & contributions</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Use the authority or institution baseline, then record activity for the current tax period.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
@@ -357,7 +357,7 @@ export function AccountsRoom() {
             <div className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400"><Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />Transfers and withdrawals are recorded but do not reduce current-period room automatically. Use the next period’s authoritative opening room or an explicit adjustment.</div>
           </div>
         </div>
-      </section>
+      </section>}
     </div>
   );
 }

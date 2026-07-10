@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
@@ -157,6 +158,7 @@ describe('App onboarding gating flow', () => {
   });
 
   it('renders dashboard without checklist when onboarding is completed', async () => {
+    const user = userEvent.setup();
     setupAuthUser();
     storeOwnership('test-uid', 'hosted');
     mockGetOnboardingState.mockResolvedValue({
@@ -180,7 +182,8 @@ describe('App onboarding gating flow', () => {
     });
     expect(screen.queryByText('GettingStartedChecklist')).not.toBeInTheDocument();
     expect(screen.queryByText('NextActionPanel')).not.toBeInTheDocument();
-    expect(screen.getByText('Setup')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open account menu' }));
+    expect(screen.getByRole('button', { name: 'Setup checklist' })).toBeInTheDocument();
   });
 
   it('does not show wizard briefly before onboarding check resolves', async () => {

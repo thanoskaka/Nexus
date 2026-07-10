@@ -33,11 +33,10 @@ beforeEach(() => {
 });
 
 describe('Ledger filters', () => {
-  it('renders member chips', () => {
+  it('renders a person filter', () => {
     render(<Ledger />);
-    expect(screen.getByRole('button', { name: 'Both' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Alice' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Bob' })).toBeInTheDocument();
+    const filter = screen.getByLabelText('Person filter') as HTMLSelectElement;
+    expect(Array.from(filter.options).map((option) => option.text)).toEqual(['All people', 'Alice', 'Bob']);
   });
 
   it('shows no pricing filter section', () => {
@@ -50,15 +49,15 @@ describe('Ledger filters', () => {
   it('shows clear-filters when search entered and clears on click', async () => {
     const user = userEvent.setup();
     render(<Ledger />);
-    expect(screen.queryByText('Clear all filters')).not.toBeInTheDocument();
-    const input = screen.getByPlaceholderText('Search asset, ticker, platform, comments...');
+    expect(screen.queryByText('Clear all')).not.toBeInTheDocument();
+    const input = screen.getByPlaceholderText('Search assets, tickers, notes...');
     await user.type(input, 'VTI');
     await waitFor(() => {
-      expect(screen.getByText('Clear all filters')).toBeInTheDocument();
+      expect(screen.getByText('Clear all')).toBeInTheDocument();
     }, { timeout: 3000 });
-    await user.click(screen.getByText('Clear all filters'));
+    await user.click(screen.getByText('Clear all'));
     await waitFor(() => {
-      expect(screen.queryByText('Clear all filters')).not.toBeInTheDocument();
+      expect(screen.queryByText('Clear all')).not.toBeInTheDocument();
     }, { timeout: 3000 });
   });
 
