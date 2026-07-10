@@ -1390,7 +1390,7 @@ export function Settings({ initialSection, onStartSetupWizard }: { initialSectio
 
   const tabItems: Array<{ id: SettingsTab; label: string; description: string }> = [
     { id: 'household', label: 'Household', description: 'Profiles, access, workspace' },
-    { id: 'accounts', label: 'Accounts & limits', description: 'Owned accounts and contributions' },
+    { id: 'accounts', label: 'Accounts & limits', description: 'Accounts, liabilities, contribution room' },
     { id: 'preferences', label: 'Preferences', description: 'Currency and display defaults' },
     { id: 'connections', label: 'Connections', description: 'Connected services and sync' },
     { id: 'data', label: 'Data & privacy', description: 'Import, export, backup, deletion' },
