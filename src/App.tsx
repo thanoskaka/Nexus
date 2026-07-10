@@ -4,12 +4,13 @@ import { AuthProvider, useAuth } from './store/AuthContext';
 import { Asset, saveSetting } from './store/db';
 import { Dashboard } from './components/Dashboard';
 import { Ledger } from './components/Ledger';
+import { AccountsRoom } from './components/AccountsRoom';
 import { AddAssetModal } from './components/AddAssetModal';
 import { Settings, type SettingsSection } from './components/Settings';
 import { ImportProgressOverlay } from './components/ImportProgressOverlay';
 import { Button } from './components/ui/button';
 import { Select } from './components/ui/select';
-import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut, BookOpen, Rocket } from 'lucide-react';
+import { RefreshCw, Moon, Sun, Settings as SettingsIcon, LayoutDashboard, Wallet, FileText, LogOut, BookOpen, Rocket, Landmark } from 'lucide-react';
 import { SplitwiseProvider, useSplitwise } from './store/SplitwiseContext';
 import { ConnectedAccountsProvider, useConnectedAccounts } from './store/ConnectedAccountsContext';
 import { parseInitialViewFromQuery } from './lib/appNavigation';
@@ -35,7 +36,7 @@ import { setWorkspaceMode } from './lib/workspaceGuard';
 import { getWorkspacePreferencesKey, type WorkspacePreferences } from './store/userPreferences';
 import { useSetupTabVisibility } from './lib/useSetupTabVisibility';
 
-type AppView = 'dashboard' | 'assets' | 'settings' | 'docs' | 'setup';
+type AppView = 'dashboard' | 'accounts' | 'assets' | 'settings' | 'docs' | 'setup';
 
 function MainApp() {
   const { user, logout } = useAuth();
@@ -134,6 +135,13 @@ function MainApp() {
             >
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
+            </button>
+            <button
+              onClick={() => setCurrentView('accounts')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'accounts' ? 'bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}
+            >
+              <Landmark className="h-4 w-4" />
+              <span className="hidden sm:inline">Accounts</span>
             </button>
             <button
               onClick={() => setCurrentView('assets')}
@@ -251,6 +259,7 @@ function MainApp() {
           if (isSampleMode) disableSampleMode();
           setIsAddModalOpen(true);
         }} />}
+        {currentView === 'accounts' && <AccountsRoom />}
         {currentView === 'settings' && <Settings initialSection={settingsSection} onStartSetupWizard={handleStartSetupWizard} />}
         {currentView === 'docs' && <Docs onBack={() => setCurrentView('dashboard')} onStartSetupWizard={handleStartSetupWizard} />}
       </main>

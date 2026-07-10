@@ -1,6 +1,7 @@
 import type { Asset, AssetClassDef } from '../store/db';
 import type { PortfolioBaseCurrency, PortfolioCurrency } from '../store/portfolioHelpers';
 import { CHECKLIST_STORAGE_KEY } from './checklistTypes';
+import type { HouseholdFinanceState } from './householdFinance';
 
 export const NEXUS_EXPORT_VERSION = 1;
 export const NEXUS_APP_ID = 'nexus-portfolio';
@@ -23,6 +24,7 @@ export interface ExportedPortfolio {
   baseCurrency: PortfolioBaseCurrency;
   primaryCurrency?: PortfolioCurrency;
   secondaryCurrency?: PortfolioCurrency;
+  householdFinance?: HouseholdFinanceState;
 }
 
 export interface NexusExportData {
@@ -53,6 +55,7 @@ export interface ImportResult {
   baseCurrency?: PortfolioBaseCurrency;
   primaryCurrency?: PortfolioCurrency;
   secondaryCurrency?: PortfolioCurrency;
+  householdFinance?: HouseholdFinanceState;
 }
 
 export interface ValidationResult {
@@ -176,6 +179,7 @@ export function computeImportResult(
       baseCurrency: firstPortfolio.baseCurrency,
       primaryCurrency: firstPortfolio.primaryCurrency,
       secondaryCurrency: firstPortfolio.secondaryCurrency,
+      householdFinance: firstPortfolio.householdFinance,
     };
   }
 
@@ -201,6 +205,7 @@ export function computeImportResult(
     baseCurrency: firstPortfolio.baseCurrency,
     primaryCurrency: firstPortfolio.primaryCurrency,
     secondaryCurrency: firstPortfolio.secondaryCurrency,
+    householdFinance: firstPortfolio.householdFinance,
   };
 }
 
@@ -212,6 +217,7 @@ export interface ExportDataParams {
   secondaryCurrency?: PortfolioCurrency;
   portfolioId?: string;
   portfolioName?: string;
+  householdFinance?: HouseholdFinanceState;
   connectedAccounts?: {
     upstox?: {
       status: string;
@@ -253,6 +259,7 @@ export function buildExportPayload(params: ExportDataParams): NexusExportData {
         baseCurrency: params.baseCurrency,
         primaryCurrency: params.primaryCurrency,
         secondaryCurrency: params.secondaryCurrency,
+        householdFinance: params.householdFinance,
       },
     ],
     connectedAccounts: connectedAccounts.length > 0 ? connectedAccounts : undefined,

@@ -34,6 +34,7 @@ import {
   isLegacySelfPortfolioCandidate,
   normalizePortfolio,
   removeLegacySelfPortfolioDuplicates,
+  removeSupersededPortfolios,
   shouldHydratePersonalPortfolioFromLegacy,
   type PortfolioBaseCurrency,
   type PortfolioCurrency,
@@ -61,6 +62,15 @@ import { useConnectedAccounts } from './ConnectedAccountsContext';
 import { useSplitwise } from './SplitwiseContext';
 import { mapSplitwiseSummaryToAssets } from './splitwiseAssetMapper';
 import { disconnectSharedIntegration, getSharedIntegrations, refreshSharedIntegration, type SharedIntegrationMember } from '../lib/sharedIntegrationsApi';
+import {
+  addContributionEvent as appendContributionEvent,
+  buildHouseholdFinanceBaseline,
+  linkPersonToMember as linkFinancePersonToMember,
+  upsertRoomRecord as upsertFinanceRoomRecord,
+  type ContributionEvent,
+  type ContributionRoomRecord,
+  type HouseholdFinanceState,
+} from '../lib/householdFinance';
 
 export interface ImportProgress {
   visible: boolean;
@@ -77,6 +87,13 @@ export interface PortfolioContextType {
   activePortfolioId: string | null;
   setActivePortfolioId: (id: string) => void;
   currentUserRole: PortfolioMember['role'] | null;
+  householdFinance?: HouseholdFinanceState;
+  householdFinancePreview: HouseholdFinanceState;
+  initializeHouseholdFinance: () => Promise<void>;
+  refreshHouseholdFinance: () => Promise<void>;
+  linkFinancePerson: (personId: string, memberEmail: string | null) => Promise<void>;
+  upsertContributionRoom: (record: Omit<ContributionRoomRecord, 'id' | 'updatedAt'>) => Promise<void>;
+  recordContributionEvent: (event: Omit<ContributionEvent, 'id' | 'createdAt'>) => Promise<void>;
   sharedIntegrationMembers: SharedIntegrationMember[];
   refreshSharedIntegrations: () => Promise<void>;
   disconnectMemberIntegration: (provider: 'upstox' | 'splitwise', targetUid: string) => Promise<void>;
@@ -114,6 +131,7 @@ export interface PortfolioContextType {
     primaryCurrency?: PortfolioCurrency;
     secondaryCurrency?: PortfolioCurrency;
     priceProviderSettings?: PriceProviderSettings;
+    householdFinance?: HouseholdFinanceState;
   }) => Promise<void>;
   addAssetClass: (cls: Omit<AssetClassDef, 'id'>) => Promise<void>;
   updateAssetClass: (cls: AssetClassDef) => Promise<void>;
@@ -425,7 +443,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
             db,
           );
         }
-        const visiblePortfolios = removeLegacySelfPortfolioDuplicates(availablePortfolios, user.email);
+        const selectablePortfolios = removeSupersededPortfolios(availablePortfolios);
+        const visiblePortfolios = removeLegacySelfPortfolioDuplicates(selectablePortfolios, user.email);
 
         if (visiblePortfolios.length === 0) {
           setPortfolio(EMPTY_PORTFOLIO);
@@ -873,6 +892,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     primaryCurrency?: PortfolioCurrency;
     secondaryCurrency?: PortfolioCurrency;
     priceProviderSettings?: PriceProviderSettings;
+    householdFinance?: HouseholdFinanceState;
   }) => {
     await mutatePortfolio((current) => ({
       ...current,
@@ -882,6 +902,13 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       primaryCurrency: data.primaryCurrency ?? (data.baseCurrency !== 'ORIGINAL' ? data.baseCurrency : undefined) ?? current.primaryCurrency,
       secondaryCurrency: data.secondaryCurrency ?? current.secondaryCurrency,
       priceProviderSettings: data.priceProviderSettings ?? current.priceProviderSettings,
+      householdFinance: data.householdFinance ?? (current.householdFinance
+        ? buildHouseholdFinanceBaseline({
+            assets: data.assets,
+            members: current.members,
+            existing: current.householdFinance,
+          })
+        : undefined),
     }));
   };
 
@@ -944,6 +971,69 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       ...current,
       members: current.members.filter((member) => member.email.toLowerCase() !== normalizedEmail),
     }));
+  };
+
+  const initializeHouseholdFinance = async () => {
+    await mutatePortfolio((current) => ({
+      ...current,
+      householdFinance: current.householdFinance || buildHouseholdFinanceBaseline({
+        assets: current.assets,
+        members: current.members,
+      }),
+    }));
+  };
+
+  const refreshHouseholdFinance = async () => {
+    await mutatePortfolio((current) => ({
+      ...current,
+      householdFinance: buildHouseholdFinanceBaseline({
+        assets: current.assets,
+        members: current.members,
+        existing: current.householdFinance,
+      }),
+    }));
+  };
+
+  const linkFinancePerson = async (personId: string, memberEmail: string | null) => {
+    await mutatePortfolio((current) => {
+      const base = current.householdFinance || buildHouseholdFinanceBaseline({
+        assets: current.assets,
+        members: current.members,
+      });
+      const member = memberEmail
+        ? current.members.find((candidate) => candidate.email.toLowerCase() === memberEmail.toLowerCase()) || null
+        : null;
+      return {
+        ...current,
+        householdFinance: linkFinancePersonToMember(base, personId, member),
+      };
+    });
+  };
+
+  const upsertContributionRoom = async (record: Omit<ContributionRoomRecord, 'id' | 'updatedAt'>) => {
+    await mutatePortfolio((current) => {
+      const base = current.householdFinance || buildHouseholdFinanceBaseline({
+        assets: current.assets,
+        members: current.members,
+      });
+      return {
+        ...current,
+        householdFinance: upsertFinanceRoomRecord(base, record),
+      };
+    });
+  };
+
+  const recordContributionEvent = async (event: Omit<ContributionEvent, 'id' | 'createdAt'>) => {
+    await mutatePortfolio((current) => {
+      const base = current.householdFinance || buildHouseholdFinanceBaseline({
+        assets: current.assets,
+        members: current.members,
+      });
+      return {
+        ...current,
+        householdFinance: appendContributionEvent(base, event),
+      };
+    });
   };
 
   const refreshPrices = async () => {
@@ -1118,6 +1208,17 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       activePortfolioId,
       setActivePortfolioId,
       currentUserRole,
+      householdFinance: portfolio.householdFinance,
+      householdFinancePreview: buildHouseholdFinanceBaseline({
+        assets: portfolio.assets,
+        members: portfolio.members,
+        existing: portfolio.householdFinance,
+      }),
+      initializeHouseholdFinance,
+      refreshHouseholdFinance,
+      linkFinancePerson,
+      upsertContributionRoom,
+      recordContributionEvent,
       sharedIntegrationMembers,
       refreshSharedIntegrations,
       disconnectMemberIntegration,

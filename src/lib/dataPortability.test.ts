@@ -9,6 +9,7 @@ import {
   validateImportPayload,
 } from './dataPortability';
 import type { Asset, AssetClassDef } from '../store/db';
+import { buildHouseholdFinanceBaseline } from './householdFinance';
 
 function makeAsset(overrides?: Partial<Asset>): Asset {
   return {
@@ -79,6 +80,24 @@ describe('buildExportPayload', () => {
     expect(payload.portfolios[0].baseCurrency).toBe('INR');
     expect(payload.portfolios[0].primaryCurrency).toBe('INR');
     expect(payload.portfolios[0].secondaryCurrency).toBe('USD');
+  });
+
+  it('includes the person, account, and contribution-room model', () => {
+    const finance = buildHouseholdFinanceBaseline({
+      assets: [makeAsset({ owner: 'Person One', assetClass: 'TFSA' })],
+      members: [],
+      now: 1000,
+    });
+    const payload = buildExportPayload({
+      assets: [makeAsset({ owner: 'Person One', assetClass: 'TFSA' })],
+      assetClasses: [],
+      baseCurrency: 'CAD',
+      householdFinance: finance,
+    });
+
+    expect(payload.portfolios[0].householdFinance?.schemaVersion).toBe(2);
+    expect(payload.portfolios[0].householdFinance?.people).toHaveLength(1);
+    expect(payload.portfolios[0].householdFinance?.accounts).toHaveLength(1);
   });
 
   it('excludes disconnected accounts', () => {

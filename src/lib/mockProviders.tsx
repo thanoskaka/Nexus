@@ -9,6 +9,12 @@ import type { SplitwiseContextType } from '../store/SplitwiseContext';
 import type { ConnectedAccountsContextType } from '../store/ConnectedAccountsContext';
 import { DEFAULT_PRICE_PROVIDER_SETTINGS } from '../lib/api';
 import { DEFAULT_BROKER_CONNECTIONS, DEFAULT_USER_PROVIDER_OVERRIDES } from '../store/userPreferences';
+import {
+  addContributionEvent as appendContributionEvent,
+  buildHouseholdFinanceBaseline,
+  linkPersonToMember as linkFinancePersonToMember,
+  upsertRoomRecord as upsertFinanceRoomRecord,
+} from './householdFinance';
 
 // Re-create contexts locally to avoid importing store modules
 // which would trigger static imports of firebase.ts.
@@ -153,6 +159,45 @@ export function MockApp() {
     activePortfolioId,
     setActivePortfolioId: setActivePortfolioIdState,
     currentUserRole,
+    householdFinance: portfolio.householdFinance,
+    householdFinancePreview: buildHouseholdFinanceBaseline({
+      assets: portfolio.assets,
+      members: portfolio.members,
+      existing: portfolio.householdFinance,
+    }),
+    initializeHouseholdFinance: async () => {
+      setPortfolio((prev) => ({
+        ...prev,
+        householdFinance: prev.householdFinance || buildHouseholdFinanceBaseline({ assets: prev.assets, members: prev.members }),
+      }));
+    },
+    refreshHouseholdFinance: async () => {
+      setPortfolio((prev) => ({
+        ...prev,
+        householdFinance: buildHouseholdFinanceBaseline({ assets: prev.assets, members: prev.members, existing: prev.householdFinance }),
+      }));
+    },
+    linkFinancePerson: async (personId, memberEmail) => {
+      setPortfolio((prev) => {
+        const base = prev.householdFinance || buildHouseholdFinanceBaseline({ assets: prev.assets, members: prev.members });
+        const member = memberEmail
+          ? prev.members.find((candidate) => candidate.email.toLowerCase() === memberEmail.toLowerCase()) || null
+          : null;
+        return { ...prev, householdFinance: linkFinancePersonToMember(base, personId, member) };
+      });
+    },
+    upsertContributionRoom: async (record) => {
+      setPortfolio((prev) => {
+        const base = prev.householdFinance || buildHouseholdFinanceBaseline({ assets: prev.assets, members: prev.members });
+        return { ...prev, householdFinance: upsertFinanceRoomRecord(base, record) };
+      });
+    },
+    recordContributionEvent: async (event) => {
+      setPortfolio((prev) => {
+        const base = prev.householdFinance || buildHouseholdFinanceBaseline({ assets: prev.assets, members: prev.members });
+        return { ...prev, householdFinance: appendContributionEvent(base, event) };
+      });
+    },
     sharedIntegrationMembers: [],
     refreshSharedIntegrations: noop,
     disconnectMemberIntegration: async () => {},
