@@ -24,7 +24,6 @@ import {
   Maximize2,
   Plus,
   BarChart3,
-  RefreshCw,
   TrendingUp,
   Wallet,
   WalletCards,
@@ -38,12 +37,11 @@ import {
   getCurrentTotal,
   getInvestmentTotal,
   getOriginalDisplayCurrency,
-  getRelevantConversionRates,
   getStableColor,
 } from '../lib/portfolioMetrics';
 import { Asset } from '../store/db';
-import { fetchHistoricalExchangeRate } from '../lib/api';
 import { useSampleMode } from '../lib/samplePortfolio';
+import { ContributionRoomSummary } from './ContributionRoomSummary';
 
 const COLORS = ['#00875A', '#00B8D9', '#FFAB00', '#FF5630', '#6554C0', '#36B37E', '#FF8B00', '#4C9AFF'];
 const WATERFALL_COLORS = {
@@ -55,7 +53,6 @@ const WATERFALL_COLORS = {
 
 type DashboardScope = 'ALL' | 'INDIA' | 'CANADA';
 type CurrencySelection = 'ORIGINAL' | DisplayCurrency;
-type HeroCurrencySelection = 'AUTO' | DisplayCurrency;
 type ChartSlice = { name: string; value: number; currency?: DisplayCurrency };
 type GrowthPoint = { key: string; label: string; invested: number; current: number; growth: number };
 type SunburstInnerSlice = { name: string; value: number; fill: string };
@@ -89,19 +86,23 @@ type ChartAnalytics = {
   };
 };
 
-export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
-  const { assets: realAssets, rates, refreshPrices, isRefreshing, refreshQueue } = usePortfolio();
+export function Dashboard({ onAddAsset, onManageLimits }: { onAddAsset?: () => void; onManageLimits?: () => void } = {}) {
+  const { assets: realAssets, rates, refreshQueue, primaryCurrency } = usePortfolio();
   const { isSampleMode, sampleData, enableSampleMode } = useSampleMode();
   const assets = isSampleMode ? sampleData.assets : realAssets;
   const showEmptyState = !isSampleMode && realAssets.length === 0;
   const visibleAssets = useMemo(() => assets.filter((asset) => !asset.hiddenFromDashboard), [assets]);
   const [scope, setScope] = useState<DashboardScope>('ALL');
   const [memberFilter, setMemberFilter] = useState('ALL');
-  const [currencySelection, setCurrencySelection] = useState<CurrencySelection>('ORIGINAL');
-  const [heroCurrencySelection, setHeroCurrencySelection] = useState<HeroCurrencySelection>('AUTO');
-  const [fxTrendCopy, setFxTrendCopy] = useState<Record<string, string>>({});
+  const [currencySelection, setCurrencySelection] = useState<CurrencySelection>(primaryCurrency);
   const [expandedChart, setExpandedChart] = useState<ExpandedChartState | null>(null);
   const [growthWindowMonths, setGrowthWindowMonths] = useState(6);
+  const relevantRates: Array<{ label: string; value: number }> = [];
+  const fxTrendCopy: Record<string, string> = {};
+
+  useEffect(() => {
+    setCurrencySelection(primaryCurrency);
+  }, [primaryCurrency]);
 
   const scopeAssets = useMemo(() => {
     if (scope === 'INDIA') return visibleAssets.filter((asset) => asset.country === 'India');
@@ -150,12 +151,7 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
     return Array.from(new Set(filteredAssets.map((asset) => getOriginalDisplayCurrency(asset)))) as DisplayCurrency[];
   }, [currencySelection, filteredAssets]);
 
-  const defaultHeroCurrency: DisplayCurrency = useMemo(() => {
-    if (currencySelection !== 'ORIGINAL') return currencySelection;
-    if (scope === 'INDIA') return 'INR';
-    return 'CAD';
-  }, [currencySelection, scope]);
-  const heroCurrency: DisplayCurrency = heroCurrencySelection === 'AUTO' ? defaultHeroCurrency : heroCurrencySelection;
+  const heroCurrency: DisplayCurrency = primaryCurrency;
   const chartCurrencies = useMemo<DisplayCurrency[]>(
     () => (currencySelection === 'ORIGINAL' ? summaryCurrencies : [currencySelection]),
     [currencySelection, summaryCurrencies],
@@ -438,47 +434,6 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
     ) as Record<DisplayCurrency, ChartAnalytics>;
   }, [chartCurrencies, chartEligibleAssets, currencySelection, getConvertedValue, growthWindowMonths, rates]);
 
-  const relevantRates = useMemo(() => getRelevantConversionRates(rates), [rates]);
-
-  useEffect(() => {
-    if (!rates) {
-      setFxTrendCopy({});
-      return;
-    }
-
-    let isCancelled = false;
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() - 7);
-    const formattedDate = targetDate.toISOString().slice(0, 10);
-    const pairs = [
-      { label: 'USD → INR', from: 'USD', to: 'INR' },
-      { label: 'USD → CAD', from: 'USD', to: 'CAD' },
-      { label: 'CAD → INR', from: 'CAD', to: 'INR' },
-      { label: 'CAD → USD', from: 'CAD', to: 'USD' },
-      { label: 'INR → USD', from: 'INR', to: 'USD' },
-      { label: 'INR → CAD', from: 'INR', to: 'CAD' },
-    ] as const;
-
-    void Promise.all(
-      pairs.map(async (pair) => {
-        const priorRate = await fetchHistoricalExchangeRate(formattedDate, pair.from, pair.to);
-        const currentRate = convertAmount(1, pair.from, pair.to, rates);
-        if (!priorRate || !Number.isFinite(currentRate)) {
-          return [pair.label, '7-day trend unavailable right now.'] as const;
-        }
-        const deltaPct = ((currentRate - priorRate) / priorRate) * 100;
-        const direction = deltaPct >= 0 ? 'up' : 'down';
-        return [pair.label, `${pair.from} is ${direction} ${Math.abs(deltaPct).toFixed(2)}% against ${pair.to} this week.`] as const;
-      }),
-    ).then((entries) => {
-      if (!isCancelled) setFxTrendCopy(Object.fromEntries(entries));
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [rates]);
-
   const renderCountryChart = (currency: DisplayCurrency, expanded = false) => {
     const analytics = chartDataByCurrency[currency];
     if (analytics.countryData.length === 0) {
@@ -687,8 +642,8 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
           content: renderAttributionChart(expandedChart.currency, true),
         },
         memberContribution: {
-          title: 'Member Contribution',
-          subtitle: `Stacked by asset class in ${chartDataByCurrency[expandedChart.currency].subtitleLabel}`,
+          title: 'Ownership by person',
+          subtitle: `Current holdings by person and internal category in ${chartDataByCurrency[expandedChart.currency].subtitleLabel}`,
           content: renderMemberContributionChart(expandedChart.currency, true),
         },
       }[expandedChart.key]
@@ -696,22 +651,18 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
 
   return (
     <div className="space-y-6">
-      <div className="mb-2 flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800">
+      <div className="mb-2 border-b border-slate-200 pb-5 dark:border-slate-800">
         <div>
           <div className="mb-2 flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Dashboard</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Overview</h1>
             {isSampleMode && (
               <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300" title="Not your real portfolio">
                 Sample data
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{isSampleMode ? 'Sample household portfolio' : 'Household portfolio overview'}</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{isSampleMode ? 'Sample household portfolio' : 'Household position and what needs attention'}</p>
         </div>
-        <Button variant="outline" onClick={refreshPrices} disabled={isRefreshing} className="w-full sm:w-auto">
-          <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh Rates
-        </Button>
       </div>
       {refreshQueue.pending > 0 && refreshQueue.nextRunAt ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-200">
@@ -780,29 +731,8 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total household value</p>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  ['AUTO', `Auto (${defaultHeroCurrency})`],
-                  ['CAD', 'CAD'],
-                  ['USD', 'USD'],
-                  ['INR', 'INR'],
-                ] as const).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setHeroCurrencySelection(value)}
-                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      heroCurrencySelection === value
-                        ? 'border-[#1f6f50] bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200'
-                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#151816] dark:text-slate-300'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
               <h2 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">{formatCurrency(heroStats.current, heroCurrency)}</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Shown in {heroCurrency}; current filters are applied.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Reported in {heroCurrency}. Native currencies remain on each holding.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <HeroMetric label="Invested" value={formatCurrency(heroStats.invested, heroCurrency)} />
@@ -813,71 +743,28 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-none dark:border-slate-800 dark:bg-[#151816]">
-        <CardContent className="space-y-4 p-5">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-            <Filter className="h-4 w-4" />
-            Filters
-          </div>
+      <div className="flex flex-col gap-3 border-y border-slate-200 py-3 sm:flex-row sm:items-end dark:border-slate-800" aria-label="Overview scope">
+        <label className="min-w-[180px] space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">Household scope
+          <Select value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} className="h-9 rounded-lg text-sm">
+            <option value="ALL">Entire household</option>
+            {members.map((member) => <option key={member} value={member}>{member}</option>)}
+          </Select>
+        </label>
+        <label className="min-w-[180px] space-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">Account jurisdiction
+          <Select value={scope} onChange={(event) => setScope(event.target.value as DashboardScope)} className="h-9 rounded-lg text-sm">
+            <option value="ALL">All countries</option>
+            <option value="CANADA">Canada</option>
+            <option value="INDIA">India</option>
+          </Select>
+        </label>
+        <div className="pb-2 text-xs text-slate-500 dark:text-slate-400">Totals and charts use the shared {primaryCurrency} reporting preference.</div>
+      </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr_1fr]">
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">View</p>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  ['ALL', 'All Holdings'],
-                  ['INDIA', 'India Only'],
-                  ['CANADA', 'Canada Only'],
-                ] as const).map(([value, label]) => (
-                  <button
-                    key={value}
-                    onClick={() => setScope(value)}
-                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${scope === value ? 'border-[#1f6f50] bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#151816] dark:text-slate-300'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
+      <ContributionRoomSummary onManage={onManageLimits || (() => {})} />
 
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Members</p>
-              <div className="flex flex-wrap gap-2">
-                {memberChipOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setMemberFilter(option.value)}
-                    disabled={option.disabled}
-                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-                      memberFilter === option.value
-                        ? 'border-[#1f6f50] bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200'
-                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#151816] dark:text-slate-300'
-                    } ${option.disabled ? 'cursor-not-allowed opacity-50 hover:bg-white dark:hover:bg-slate-900' : ''}`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Currency</p>
-              <Select value={currencySelection} onChange={(event) => setCurrencySelection(event.target.value as CurrencySelection)}>
-                <option value="ORIGINAL">Original (per-country)</option>
-                <option value="USD">Unified — USD</option>
-                <option value="INR">Unified — INR</option>
-                <option value="CAD">Unified — CAD</option>
-              </Select>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{currencySelection === 'ORIGINAL' ? 'Keep each holding in its source currency.' : `Convert all values to ${currencySelection}.`}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.72fr)_320px]">
+      <div className="grid gap-6">
         <div className="space-y-6">
-          <div className={`grid gap-4 ${summaryCards.length > 1 ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
+          {false && <div className={`grid gap-4 ${summaryCards.length > 1 ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
             {summaryCards.map(({ currency, stats, cardTitle }) => (
               <Card key={currency} className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800">
                 <CardContent className="p-0">
@@ -899,7 +786,7 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </div>}
 
           {currencySelection === 'ORIGINAL' ? (
             <div className="space-y-6">
@@ -981,7 +868,7 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
                     <div key={`memberContribution-${currency}`}>
                       <ChartCard
                         title="Member Contribution"
-                        subtitle={`Stacked by asset class in ${analytics.subtitleLabel}`}
+                        subtitle={`Stacked by internal holding category in ${analytics.subtitleLabel}`}
                         onExpand={() => setExpandedChart({ key: 'memberContribution', currency })}
                       >
                         {renderMemberContributionChart(currency)}
@@ -997,37 +884,33 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
 
               return (
                 <div key={`charts-${currency}`} className="space-y-6">
-                  <div className="grid gap-6">
-                    <ChartCard title="By Country" subtitle={`Current allocation in ${analytics.subtitleLabel}`} onExpand={() => setExpandedChart({ key: 'country', currency })}>
-                      {renderCountryChart(currency)}
-                    </ChartCard>
+                  <div className="flex items-end justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
+                    <div><h2 className="text-lg font-semibold text-slate-900 dark:text-white">Portfolio analysis</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Allocation and exposure in {analytics.subtitleLabel}.</p></div>
                   </div>
 
                   <div className="grid gap-6 xl:grid-cols-2">
-                    <ChartCard title="Growth over time" subtitle={`Month-by-month view for the last ${growthWindowMonths} ${growthWindowMonths === 1 ? 'month' : 'months'} in ${analytics.subtitleLabel}`} onExpand={() => setExpandedChart({ key: 'growth', currency })}>
-                      {renderGrowthChart(currency)}
+                    <ChartCard title="Where accounts are held" subtitle={`Allocation by account jurisdiction in ${analytics.subtitleLabel}`} onExpand={() => setExpandedChart({ key: 'country', currency })}>
+                      {renderCountryChart(currency)}
                     </ChartCard>
-
-                    <ChartCard title="Multi-Currency Allocation" subtitle={`Nested allocation view in ${analytics.subtitleLabel}`} onExpand={() => setExpandedChart({ key: 'currency', currency })}>
+                    <ChartCard title="Currency exposure" subtitle={`Native-currency exposure translated to ${analytics.subtitleLabel}`} onExpand={() => setExpandedChart({ key: 'currency', currency })}>
                       {renderCurrencyChart(currency)}
                     </ChartCard>
                   </div>
 
-                  <div className="grid gap-6 xl:grid-cols-2">
-                    <ChartCard title="Performance Attribution" subtitle="Why did family wealth change based on current holdings?" onExpand={() => setExpandedChart({ key: 'attribution', currency })}>
-                      {renderAttributionChart(currency)}
-                    </ChartCard>
-
-                    <ChartCard title="Member Contribution" subtitle={`Stacked by asset class in ${analytics.subtitleLabel}`} onExpand={() => setExpandedChart({ key: 'memberContribution', currency })}>
-                      {renderMemberContributionChart(currency)}
-                    </ChartCard>
-                  </div>
+                  <details className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#151816]">
+                    <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-800 dark:text-slate-200">More analysis</summary>
+                    <div className="grid gap-6 border-t border-slate-200 p-5 dark:border-slate-800 xl:grid-cols-2">
+                      <ChartCard title="Estimated growth" subtitle={`Uses available holding dates; not a historical account statement`} onExpand={() => setExpandedChart({ key: 'growth', currency })}>{renderGrowthChart(currency)}</ChartCard>
+                      <ChartCard title="Estimated attribution" subtitle="Contribution and market movement based on available holding data" onExpand={() => setExpandedChart({ key: 'attribution', currency })}>{renderAttributionChart(currency)}</ChartCard>
+                      <ChartCard title="Ownership by person" subtitle={`Current holdings by person and internal category`} onExpand={() => setExpandedChart({ key: 'memberContribution', currency })}>{renderMemberContributionChart(currency)}</ChartCard>
+                    </div>
+                  </details>
                 </div>
               );
             })
           )}
 
-          <div className="grid gap-6 md:grid-cols-2">
+          {false && <div className="grid gap-6 md:grid-cols-2">
             {ownerStats.map((owner) => (
               <Card key={owner.name} className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800">
                 <CardContent className="p-0">
@@ -1063,10 +946,10 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </div>}
         </div>
 
-        <div className="space-y-6">
+        {false && <div className="space-y-6">
           <Card className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm dark:border-slate-800">
             <CardContent className="p-0">
               <div className="flex items-center justify-between border-b border-slate-50 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-900/80 dark:to-slate-950">
@@ -1137,7 +1020,7 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </div>}
       </div>
 
       <Dialog open={Boolean(expandedChartMeta)} onOpenChange={(open) => !open && setExpandedChart(null)}>

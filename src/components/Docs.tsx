@@ -829,12 +829,12 @@ npm run test:run # Run tests once`}</CodeBlock>
             Adding an asset
           </h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Click <strong>Add Asset</strong> (on the dashboard or the Assets page) and fill in the form:
+            Click <strong>Add data</strong> in the header and fill in the form:
           </p>
           <ul className="list-disc list-inside space-y-1.5 text-sm text-slate-600 dark:text-slate-400 mb-3">
             <li><strong>Name</strong> \u2014 whatever you want to call it (e.g., "HDFC Mid-Cap Fund")</li>
             <li><strong>Owner</strong> \u2014 which family member holds this asset</li>
-            <li><strong>Asset class</strong> \u2014 Mutual Fund, Stock, Gold, Real Estate, etc.</li>
+            <li><strong>Holding type</strong> \u2014 Mutual Fund, Stock, Gold, Real Estate, etc.</li>
             <li><strong>Quantity &amp; cost</strong> \u2014 how many units and what you paid</li>
             <li><strong>Ticker (optional)</strong> \u2014 the exchange symbol for live prices, e.g. <Code>NSE:RELIANCE</Code> or <Code>TSX:XIU</Code>. Leave blank to enter prices manually.</li>
           </ul>
@@ -914,12 +914,12 @@ npm run test:run # Run tests once`}</CodeBlock>
           </p>
           <ul className="list-disc list-inside space-y-1 text-sm text-slate-600 dark:text-slate-400 mb-3">
             <li>"How much of our wealth is in India vs Canada?"</li>
-            <li>"Which asset class are we most concentrated in?"</li>
+            <li>"Which holding type are we most concentrated in?"</li>
             <li>"What is our total mutual fund exposure?"</li>
           </ul>
           <p className="text-slate-600 dark:text-slate-400 text-sm">
             The AI sees your actual portfolio data. To enable it, add a free Gemini or DeepSeek key in{' '}
-            <strong>Settings \u2192 Pricing \u2192 AI Assistant</strong>. See the <strong>AI Keys</strong> section for how to get one.
+            <strong>Settings \u2192 Advanced \u2192 AI Assistant</strong>. See the <strong>AI Keys</strong> section for how to get one.
           </p>
         </div>
 
@@ -954,12 +954,12 @@ npm run test:run # Run tests once`}</CodeBlock>
         <div>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Exporting your data</h3>
           <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-            Go to <strong>Settings → Data → Data Portability</strong> and click <strong>Export Data</strong>.
+            Go to <strong>Settings → Data &amp; privacy → Data Portability</strong> and click <strong>Export Data</strong>.
             Nexus downloads a file to your computer that includes:
           </p>
           <Checklist items={[
             'All your assets — names, quantities, cost, tickers, and which family member owns each',
-            'Your asset class setup (e.g. custom categories you created)',
+            'Legacy category mappings retained for import compatibility',
             'Your currency preferences',
           ]} />
           <Tip>The export file never contains passwords, API keys, or login credentials of any kind. It is safe to store alongside other financial documents.</Tip>

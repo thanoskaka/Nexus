@@ -491,7 +491,7 @@ export function ScreenshotImportModal({ open, onOpenChange }: ScreenshotImportMo
                               onChange={(e) => updateExtractedField(candidate.id, 'assetClass', e.target.value || undefined)}
                               className="h-8 text-sm min-w-[90px]"
                               placeholder="Other"
-                              aria-label={`Asset class for ${extracted.name}`}
+                              aria-label={`Holding type for ${extracted.name}`}
                             />
                           </TableCell>
                           <TableCell>

@@ -31,13 +31,9 @@ import type {
 } from '../server/user/onboardingTypes';
 
 const STEPS = [
-  { id: 'primary-country', title: 'Primary Country', description: 'Choose your primary country and currency' },
-  { id: 'secondary-country', title: 'Secondary Country', description: 'Add a secondary country (optional)' },
-  { id: 'asset-classes', title: 'Asset Classes', description: 'Select the asset classes you track' },
-  { id: 'providers', title: 'Pricing Providers', description: 'Configure price data providers' },
-  { id: 'integrations', title: 'Integrations', description: 'Connect your brokerage and data sources' },
-  { id: 'members', title: 'Family Members', description: 'Add family members to your portfolio' },
-  { id: 'review', title: 'Review & Finish', description: 'Review your selections before finishing' },
+  { id: 'basics', title: 'Portfolio basics', description: 'Set your reporting currency and the countries where you hold accounts' },
+  { id: 'members', title: 'Household access', description: 'Invite the people who should access this workspace' },
+  { id: 'review', title: 'Ready to add data', description: 'Review the baseline, then import, connect, or add holdings manually' },
 ];
 
 interface WizardFormState {
@@ -211,7 +207,7 @@ export function OnboardingWizard({ onComplete, onLogout }: OnboardingWizardProps
             members: state.members || [],
           };
           dispatch({ type: 'LOAD_SERVER_STATE', state: serverForm, currentStep: state.currentStep });
-          setCurrentStep(state.currentStep);
+          setCurrentStep(Math.min(state.currentStep, STEPS.length - 1));
         }
       })
       .catch((err) => {
@@ -267,9 +263,7 @@ export function OnboardingWizard({ onComplete, onLogout }: OnboardingWizardProps
     switch (currentStep) {
       case 0:
         return !form.primaryCountry;
-      case 2:
-        return form.selectedAssetClasses.length === 0;
-      case 5:
+      case 1:
         return form.members.some((m) => !isValidEmail(m.email));
       default:
         return false;
@@ -299,7 +293,7 @@ export function OnboardingWizard({ onComplete, onLogout }: OnboardingWizardProps
   }, [currentStep, form]);
 
   const handleNext = useCallback(async () => {
-    if (currentStep === 5) {
+    if (currentStep === 1) {
       const errors: Record<number, string> = {};
       form.members.forEach((m, i) => {
         if (!isValidEmail(m.email)) errors[i] = 'Invalid email address.';
@@ -413,13 +407,14 @@ export function OnboardingWizard({ onComplete, onLogout }: OnboardingWizardProps
             <CardDescription>{STEPS[currentStep].description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {currentStep === 0 && renderPrimaryCountryStep(form, dispatch)}
-            {currentStep === 1 && renderSecondaryCountryStep(form, dispatch, allCountries)}
-            {currentStep === 2 && renderAssetClassesStep(form, dispatch, relevantAssetClasses)}
-            {currentStep === 3 && renderProvidersStep(form, dispatch, relevantProviders)}
-            {currentStep === 4 && renderIntegrationsStep(form, dispatch, relevantIntegrations)}
-            {currentStep === 5 && renderMembersStep(form, dispatch, memberErrors)}
-            {currentStep === 6 && renderReviewStep(form)}
+            {currentStep === 0 && (
+              <div className="space-y-8">
+                {renderPrimaryCountryStep(form, dispatch)}
+                <div className="border-t border-slate-200 pt-6 dark:border-slate-800">{renderSecondaryCountryStep(form, dispatch, allCountries)}</div>
+              </div>
+            )}
+            {currentStep === 1 && renderMembersStep(form, dispatch, memberErrors)}
+            {currentStep === 2 && renderReviewStep(form)}
 
             {serverError && (
               <p className="text-sm text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950 rounded-lg p-3">
@@ -437,7 +432,7 @@ export function OnboardingWizard({ onComplete, onLogout }: OnboardingWizardProps
                 Back
               </Button>
             )}
-            {(currentStep === 1 || currentStep === 5) && (
+            {currentStep === 1 && (
               <Button variant="ghost" size="sm" onClick={handleNext} className="text-slate-500">
                 Skip
               </Button>
@@ -492,7 +487,7 @@ function renderPrimaryCountryStep(
     <div className="space-y-6">
       <div>
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Where do you primarily reside?
+          Primary reporting country
         </label>
         <Select
           value={form.primaryCountry}
@@ -524,7 +519,7 @@ function renderPrimaryCountryStep(
 
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50">
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Your primary country determines the base currency for your portfolio. Asset classes, pricing providers, and integrations will be suggested based on this selection.
+          Nexus will use this currency for household totals. Every holding still keeps its native currency.
         </p>
       </div>
     </div>
@@ -540,7 +535,7 @@ function renderSecondaryCountryStep(
     <div className="space-y-6">
       <div>
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Do you track assets in another country? (optional)
+          Do you hold accounts in another country? (optional)
         </label>
         <Select
           value={form.secondaryCountry}
@@ -575,7 +570,7 @@ function renderSecondaryCountryStep(
 
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50">
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Adding a secondary country lets you track assets denominated in another currency. You can skip this step and configure it later.
+          This helps Nexus recognize account jurisdictions during import. It does not change the reporting currency.
         </p>
       </div>
     </div>
@@ -832,54 +827,6 @@ function renderReviewStep(form: WizardFormState) {
         </div>
 
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
-          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Asset Classes ({form.selectedAssetClasses.length})</h4>
-          <div className="flex flex-wrap gap-2">
-            {form.selectedAssetClasses.length === 0 ? (
-              <p className="text-sm text-slate-500">None selected</p>
-            ) : (
-              form.selectedAssetClasses.map((id) => (
-                <span key={id} className="inline-flex items-center gap-1 rounded-full bg-[#00875A]/10 px-2.5 py-1 text-xs font-medium text-[#00875A]">
-                  <PieChart className="h-3 w-3" />
-                  {id.split('-').slice(1).join(' ')}
-                </span>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
-          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Pricing Providers ({form.providerSelections.length})</h4>
-          <div className="flex flex-wrap gap-2">
-            {form.providerSelections.length === 0 ? (
-              <p className="text-sm text-slate-500">None selected</p>
-            ) : (
-              form.providerSelections.map((p) => (
-                <span key={p.providerId} className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900 dark:text-sky-300">
-                  <Sliders className="h-3 w-3" />
-                  {PRICING_PROVIDERS.find((pp) => pp.id === p.providerId)?.name || p.providerId}
-                </span>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
-          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Integrations ({form.integrationSelections.length})</h4>
-          <div className="flex flex-wrap gap-2">
-            {form.integrationSelections.length === 0 ? (
-              <p className="text-sm text-slate-500">None selected</p>
-            ) : (
-              form.integrationSelections.map((i) => (
-                <span key={i.integrationId} className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700 dark:bg-violet-900 dark:text-violet-300">
-                  <Link2 className="h-3 w-3" />
-                  {i.integrationId}
-                </span>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Family Members ({form.members.length})</h4>
           {form.members.length === 0 ? (
             <p className="text-sm text-slate-500">No members added</p>
@@ -893,6 +840,11 @@ function renderReviewStep(form: WizardFormState) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+        <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Next: bring in your holdings</h4>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">After setup, choose Add data to import a statement, connect a supported service, or enter a holding manually. Nexus will classify holdings and detect accounts for your review.</p>
       </div>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-4">

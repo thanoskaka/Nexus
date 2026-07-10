@@ -51,7 +51,18 @@ type MemberFilterOption = {
 };
 
 const TABLE_COLUMN_WIDTHS = ['20px', '32%', '10%', '10%', '11%', '11%', '14%', '7%', '2%'];
-const HIDDEN_LEDGER_COLUMNS = { defaultOrder: false } as const;
+const HIDDEN_LEDGER_COLUMNS = { defaultOrder: false, weight: false, assetClass: false, notes: false } as const;
+function getLedgerColumnWidth(columnId: string) {
+  const widths: Record<string, string> = {
+    name: '34%',
+    position: '12%',
+    currentPrice: '15%',
+    marketValue: '17%',
+    performance: '14%',
+    actions: '56px',
+  };
+  return widths[columnId] || 'auto';
+}
 const SORT_MODE_OPTIONS: Array<{ value: LedgerSortMode; label: string }> = [
   { value: 'default', label: 'Default' },
   { value: 'name', label: 'Name' },
@@ -103,6 +114,7 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
   const safeBulkRefreshState = normalizeBulkRefreshState(bulkRefreshState);
   const [sortMode, setSortMode] = useState<LedgerSortMode>('default');
   const [memberFilter, setMemberFilter] = useState('ALL');
+  const [countryFilter, setCountryFilter] = useState<'ALL' | 'Canada' | 'India'>('ALL');
   const [assetClassFilter, setAssetClassFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [tickerRepairAsset, setTickerRepairAsset] = useState<Asset | undefined>(undefined);
@@ -199,6 +211,7 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
   const baseFilteredAssets = useMemo(
     () => assets.filter((asset) => {
       const matchesMember = memberFilter === 'ALL' || (memberOwnerSetByKey.get(memberFilter)?.has(asset.owner) ?? false);
+      const matchesCountry = countryFilter === 'ALL' || getAssetCountryForFilter(asset) === countryFilter;
       const matchesClass = assetClassFilter === 'ALL' || buildAssetClassFilterValue(getAssetCountryForFilter(asset), getCanonicalAssetClass(asset.assetClass)) === assetClassFilter;
       const normalizedSearch = searchQuery.trim().toLowerCase();
       const matchesSearch =
@@ -207,9 +220,9 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedSearch));
 
-      return matchesMember && matchesClass && matchesSearch;
+      return matchesMember && matchesCountry && matchesClass && matchesSearch;
     }),
-    [assetClassFilter, assets, memberFilter, memberOwnerSetByKey, searchQuery],
+    [assetClassFilter, assets, countryFilter, memberFilter, memberOwnerSetByKey, searchQuery],
   );
 
   useEffect(() => {
@@ -393,13 +406,15 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
 
   const hasActiveFilters = useMemo(() => {
     if (memberFilter !== 'ALL') return true;
+    if (countryFilter !== 'ALL') return true;
     if (assetClassFilter !== 'ALL') return true;
     if (searchQuery.trim() !== '') return true;
     return (Object.values(columnFilters) as FilterState[keyof FilterState][]).some((filter) => filter.selected.length > 0 || filter.min.trim() !== '' || filter.max.trim() !== '');
-  }, [memberFilter, assetClassFilter, searchQuery, columnFilters]);
+  }, [memberFilter, countryFilter, assetClassFilter, searchQuery, columnFilters]);
 
   const clearAllFilters = React.useCallback(() => {
     setMemberFilter('ALL');
+    setCountryFilter('ALL');
     setAssetClassFilter('ALL');
     setSearchQuery('');
     setColumnFilters(EMPTY_FILTER_STATE);
@@ -443,83 +458,17 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
           const asset = info.row.original;
           const supportsTickerPricing = showsTickerManagement(asset);
           const hasFailedPrice = supportsTickerPricing && hasActionablePriceFailure(asset);
-          const rowRefreshStatus = getBulkRefreshRowStatus(asset);
-          const providerForRecommendation = asset.priceProvider === 'finnhub' || asset.priceProvider === 'alphavantage' || asset.priceProvider === 'yahoo' ? asset.priceProvider : 'yahoo';
-          const assetMeta = [shouldDisplayTicker(asset) ? asset.ticker || null : null, getCanonicalAssetClass(asset.assetClass), asset.owner].filter(Boolean).join(' • ');
-          const isRowRefreshing = refreshingRowIds.includes(asset.id);
-          const toneClasses = getAssetToneClasses(asset);
-          const assetMV = getConvertedValue(getCurrentTotal(asset), asset.currency, baseCurrency);
-          const assetAlloc = totalPortfolioMV > 0 ? (assetMV / totalPortfolioMV) * 100 : 0;
-          const assetTier = assetAlloc > 5 ? 3 : assetAlloc > 2 ? 2 : assetAlloc > 0.8 ? 1 : 0;
-          const tierNameSize = ['text-sm', 'text-sm', 'text-[15px]', 'text-[16px]'][assetTier];
-          const tierNameWeight = assetTier >= 2 ? 'font-bold' : 'font-semibold';
+          const assetMeta = [shouldDisplayTicker(asset) ? asset.ticker || null : null, asset.holdingPlatform || null].filter(Boolean).join(' · ');
+          const ownerLabel = getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets);
 
           return (
-            <div className="space-y-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              <div className="flex items-start gap-3">
-                <AssetMarketLogo asset={asset} className={`mt-0.5 h-9 w-9 ${toneClasses.iconTile}`} />
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`truncate ${tierNameSize} ${tierNameWeight} text-slate-900 dark:text-slate-100`}>{asset.name}</span>
-                    {assetTier >= 2 && (
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3, color: TONE_DESIGN_META[getAssetToneKey(asset)].color, background: TONE_DESIGN_META[getAssetToneKey(asset)].tint, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                        TOP {assetTier === 3 ? '5%' : '10%'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="truncate text-xs text-slate-500 dark:text-slate-400">{assetMeta}</div>
-                </div>
+            <div className="flex min-w-0 items-center gap-3 py-1">
+              <AssetMarketLogo asset={asset} className="h-8 w-8 shrink-0 rounded-md" />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{asset.name}</div>
+                <div className="truncate text-xs text-slate-500 dark:text-slate-400">{assetMeta || getCanonicalAssetClass(asset.assetClass)} · {ownerLabel} · {asset.country}</div>
+                {supportsTickerPricing && hasFailedPrice && <button type="button" onClick={() => setTickerRepairAsset(asset)} className="mt-1 text-xs font-medium text-amber-700 hover:underline dark:text-amber-300"><AlertTriangle className="mr-1 inline h-3 w-3" />Price needs attention</button>}
               </div>
-              <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                  <MemberAvatar name={getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets)} />
-                  {getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets)}
-                </span>
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${toneClasses.chip}`}>
-                  {asset.holdingPlatform || getCanonicalAssetClass(asset.assetClass)}
-                </span>
-                {asset.sourceManaged ? (
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                    asset.connectedProvider === 'splitwise'
-                      ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200'
-                      : 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200'
-                  }`}>
-                    <Cloud className="h-3 w-3" />
-                    {asset.connectedProvider === 'splitwise' ? 'Via Splitwise' : 'Cloud-synced'}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                    Manual entry
-                  </span>
-                )}
-              </div>
-              {supportsTickerPricing ? (
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setTickerRepairAsset(asset)}
-                      className={`inline-flex items-center gap-1 text-xs font-medium ${hasFailedPrice ? 'text-amber-600 hover:text-amber-700' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100'}`}
-                      title={hasFailedPrice ? `${asset.priceFetchMessage || 'Price fetch failed.'} ${getTickerRecommendation(asset.ticker || '', providerForRecommendation)}` : isGoldAsset(asset) ? 'Adjust system gold pricing settings' : 'Check or update ticker/provider'}
-                    >
-                      {hasFailedPrice ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
-                      {getPricingActionLabel(asset)}
-                    </button>
-                    {((!isGoldAsset(asset) && asset.ticker) || asset.connectedProvider === 'splitwise') ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleRefreshRow(asset.id)}
-                        disabled={isRowRefreshing}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-slate-100"
-                        title="Refresh only this row"
-                      >
-                        <RefreshCw className={`h-3.5 w-3.5 ${isRowRefreshing ? 'animate-spin' : ''}`} />
-                        Refresh row
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
             </div>
           );
         },
@@ -831,6 +780,16 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
+  const combinedTable = useReactTable<Asset>({
+    data: quickFilteredAssets,
+    columns,
+    state: {
+      sorting: ledgerSorting,
+      columnVisibility: HIDDEN_LEDGER_COLUMNS,
+    },
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
   const canadaDisplayGroups = buildLedgerDisplayGroups(canadaTable.getRowModel().rows, baseCurrency, rates);
   const indiaDisplayGroups = buildLedgerDisplayGroups(indiaTable.getRowModel().rows, baseCurrency, rates);
 
@@ -846,7 +805,7 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
               <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">Sample data</span>
             )}
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Assets</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Holdings</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400">
             {quickFilteredAssets.length} holding{quickFilteredAssets.length === 1 ? '' : 's'} · {isSampleMode ? 'sample data' : `${assets.length} total`}
           </p>
@@ -863,7 +822,7 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         </div>
       </div>
 
-      {/* Toolbar row 1: search + sort + actions */}
+      {/* One toolbar: search, saved view, filters, and actions. */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -874,8 +833,26 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
             className="h-9 rounded-lg border-slate-200 bg-slate-50 pl-9 text-[13px] dark:border-slate-800 dark:bg-slate-900"
           />
         </div>
-        <Select value={sortMode} onChange={(e) => setSortMode(e.target.value as LedgerSortMode)} className="h-9 rounded-lg border-slate-200 bg-white text-[13px] dark:border-slate-800 dark:bg-slate-950 w-auto">
-          {SORT_MODE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+        <Select aria-label="Saved view" value={quickFilter} onChange={(event) => setQuickFilter(event.target.value as QuickFilter)} className="h-9 w-auto rounded-lg border-slate-200 bg-white text-[13px] dark:border-slate-800 dark:bg-slate-950">
+          <option value="all">All holdings</option>
+          <option value="gainers">Gainers</option>
+          <option value="losers">Losers</option>
+          <option value="top10">Largest positions</option>
+          <option value="taxloss">Tax-loss candidates</option>
+        </Select>
+        <Select aria-label="Person filter" value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} className="h-9 w-auto rounded-lg border-slate-200 bg-white text-[13px] dark:border-slate-800 dark:bg-slate-950">
+          <option value="ALL">All people</option>
+          {memberFilterOptions.map((member) => <option key={member.key} value={member.key}>{member.label}</option>)}
+        </Select>
+        <Select aria-label="Country filter" value={countryFilter} onChange={(event) => setCountryFilter(event.target.value as 'ALL' | 'Canada' | 'India')} className="h-9 w-auto rounded-lg border-slate-200 bg-white text-[13px] dark:border-slate-800 dark:bg-slate-950">
+          <option value="ALL">All countries</option>
+          <option value="Canada">Canada</option>
+          <option value="India">India</option>
+        </Select>
+        <Select aria-label="Sort holdings" value={sortMode} onChange={(event) => setSortMode(event.target.value as LedgerSortMode)} className="h-9 w-auto rounded-lg border-slate-200 bg-white text-[13px] md:hidden dark:border-slate-800 dark:bg-slate-950">
+          {SORT_MODE_OPTIONS.filter((option) => option.value !== 'assetClass').map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
         </Select>
         <div className="ml-auto flex items-center gap-2">
           {globalFailedAssets.length > 0 && (
@@ -888,43 +865,11 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
               {globalFailedAssets.length} needs attention
             </button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setRefreshCenterOpen(true)} className="h-9 gap-1.5 rounded-lg text-[13px]">
-            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-          <Button onClick={onAddAsset} size="sm" className="h-9 gap-1.5 rounded-lg bg-[#059669] hover:bg-[#047857] text-white text-[13px] font-semibold">
-            <Plus className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Add Asset</span>
-          </Button>
         </div>
       </div>
 
-      {/* Toolbar row 2: quick filters + member pills + active chips */}
-      <div className="flex flex-wrap items-center gap-2 border-y border-slate-200 py-2.5 dark:border-slate-800">
-        <QuickFilterPill active={quickFilter === 'all'} onClick={() => setQuickFilter('all')}>
-          All <span className="ml-1 rounded px-1 py-px text-[10px] font-semibold bg-black/[0.07]">{filteredAssets.length}</span>
-        </QuickFilterPill>
-        <QuickFilterPill active={quickFilter === 'gainers'} onClick={() => setQuickFilter('gainers')}>
-          Gainers
-        </QuickFilterPill>
-        <QuickFilterPill active={quickFilter === 'losers'} onClick={() => setQuickFilter('losers')}>
-          Losers
-        </QuickFilterPill>
-        <QuickFilterPill active={quickFilter === 'top10'} onClick={() => setQuickFilter('top10')}>Top 10</QuickFilterPill>
-        <QuickFilterPill active={quickFilter === 'taxloss'} onClick={() => setQuickFilter('taxloss')}>Tax-loss</QuickFilterPill>
-
-        {memberFilterOptions.length > 1 && (
-          <>
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
-            <QuickFilterPill active={memberFilter === 'ALL'} onClick={() => setMemberFilter('ALL')}>All members</QuickFilterPill>
-            {memberFilterOptions.map((member) => (
-              <QuickFilterPill key={member.key} active={memberFilter === member.key} onClick={() => setMemberFilter(member.key)}>
-                {member.label}
-              </QuickFilterPill>
-            ))}
-          </>
-        )}
-
+      <div className="flex flex-wrap items-center gap-2 border-y border-slate-200 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <span>{quickFilteredAssets.length} of {assets.length} holdings</span>
         {assetClassFilter !== 'ALL' && (
           <>
             <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
@@ -944,29 +889,13 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
       </div>
 
       {/* Desktop table view */}
-      <div className="hidden space-y-6 md:block">
+      <div className="hidden md:block">
         <CountryTableSection
-          title="Canada Assets"
-          subtitle="Group totals update automatically with your current filters and sort mode."
-          table={canadaTable}
-          displayGroups={canadaDisplayGroups}
-          columnsLength={columns.length}
-          columnFilters={columnFilters}
-          openColumnFilter={openColumnFilter}
-          setOpenColumnFilter={setOpenColumnFilter}
-          columnFilterOptions={columnFilterOptions}
-          setColumnFilterSelected={setColumnFilterSelected}
-          setColumnFilterRange={setColumnFilterRange}
-          setColumnFilterSearch={setColumnFilterSearch}
-          clearColumnFilter={clearColumnFilter}
-          totalPortfolioMV={totalPortfolioMV}
-          perfScale={perfScale}
-        />
-        <CountryTableSection
-          title="India Assets"
-          subtitle="Group totals update automatically with your current filters and sort mode."
-          table={indiaTable}
-          displayGroups={indiaDisplayGroups}
+          title="All holdings"
+          subtitle="One row per holding. Account, owner, and country stay in context."
+          table={combinedTable}
+          displayGroups={[]}
+          flat
           columnsLength={columns.length}
           columnFilters={columnFilters}
           openColumnFilter={openColumnFilter}
@@ -981,151 +910,48 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:hidden">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Sort</p>
-            <Select value={sortMode} onChange={(event) => setSortMode(event.target.value as LedgerSortMode)} className="h-11 rounded-2xl">
-              {SORT_MODE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-        {[...canadaTable.getRowModel().rows, ...indiaTable.getRowModel().rows].length ? (
-          [...canadaDisplayGroups, ...indiaDisplayGroups].flatMap((group) => {
-            const cards = group.rows.map((row, index, allRows) => {
+      <div className="grid grid-cols-1 gap-2 md:hidden">
+        {combinedTable.getRowModel().rows.length ? (
+          combinedTable.getRowModel().rows.map((row) => {
             const asset = row.original;
             const displayCurrency = getDisplayCurrency(asset);
             const investmentTotal = getConvertedValue(getInvestmentTotal(asset), asset.currency, baseCurrency);
-            const investmentPrice = getConvertedValue(getInvestmentPrice(asset), asset.currency, baseCurrency);
-            const currentPrice = getConvertedValue(getCurrentPrice(asset), asset.currency, baseCurrency);
             const currentTotal = getConvertedValue(getCurrentTotal(asset), asset.currency, baseCurrency);
             const growthTotal = getConvertedValue(getGrowthTotal(asset), asset.currency, baseCurrency);
-            const xirr = getAssetXirr(asset, displayCurrency, rates);
-            const showsAsDebt = isDebtAssetDisplay(asset);
-            const isRowRefreshing = refreshingRowIds.includes(asset.id);
             const toneClasses = getAssetToneClasses(asset);
 
             return (
-              <React.Fragment key={row.id}>
-                <div className={`rounded-lg border p-4 bg-white dark:bg-slate-950 dark:border-slate-800 space-y-3 shadow-sm ${toneClasses.mobileCard}`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <AssetMarketLogo asset={asset} className={`h-10 w-10 ${toneClasses.iconTile}`} />
-                        <div>
-                          <div className="font-semibold text-lg">{asset.name}</div>
-                          <div className="text-sm text-slate-500 inline-flex items-center gap-2">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white dark:bg-slate-100 dark:text-slate-900">
-                              {getOwnerInitials(asset.owner)}
-                            </span>
-                            {asset.owner} • {asset.country}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {!asset.sourceManaged ? (
-                        <Button variant="ghost" size="icon" onClick={() => onEditAsset?.(asset)}>
-                          <Edit className="h-4 w-4 text-slate-500" />
-                        </Button>
-                      ) : null}
-                      {!asset.sourceManaged ? (
-                        <Button variant="ghost" size="icon" onClick={() => removeAsset(asset.id)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      ) : null}
+              <div key={row.id} className={`rounded-lg border bg-white p-4 dark:border-slate-800 dark:bg-slate-950 ${toneClasses.mobileCard}`}>
+                <div className="flex items-start gap-3">
+                  <AssetMarketLogo asset={asset} className={`h-10 w-10 shrink-0 ${toneClasses.iconTile}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold text-slate-900 dark:text-white">{asset.name}</div>
+                    <div className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {asset.holdingPlatform || asset.ticker || asset.currency} · {asset.owner} · {asset.country}
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t">
-                    <div>
-                      <div className="text-slate-500">Asset Class</div>
-                      <div className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${toneClasses.chip}`}>{getCanonicalAssetClass(asset.assetClass)}</div>
+                  {!asset.sourceManaged ? (
+                    <Button variant="ghost" size="icon" onClick={() => onEditAsset?.(asset)} aria-label={`Edit ${asset.name}`} className="h-8 w-8 shrink-0">
+                      <Edit className="h-4 w-4 text-slate-500" />
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-sm dark:border-slate-800">
+                  <div>
+                    <div className="text-xs text-slate-500">Market value</div>
+                    <div className="mt-0.5 font-semibold">{formatCurrency(currentTotal, displayCurrency)}</div>
+                    <div className="text-xs text-slate-500">Cost {formatCurrency(investmentTotal, displayCurrency)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500">Performance</div>
+                    <div className={`mt-0.5 font-semibold ${growthTotal >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {formatCurrency(growthTotal, displayCurrency)}
                     </div>
-                    <div>
-                      <div className="text-slate-500">Total Quantity</div>
-                      <div>{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
-                    </div>
-                      <div>
-                        <div className="text-slate-500">Ticker</div>
-                        {showsTickerManagement(asset) ? (
-                          <>
-                            <div>{shouldDisplayTicker(asset) ? (asset.ticker || '-') : 'System gold feed'}</div>
-                            <button
-                              type="button"
-                              onClick={() => setTickerRepairAsset(asset)}
-                              className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${hasActionablePriceFailure(asset) ? 'text-amber-600' : 'text-slate-500'}`}
-                              title={hasActionablePriceFailure(asset) ? asset.priceFetchMessage || 'Price fetch failed.' : isGoldAsset(asset) ? 'Adjust system gold pricing settings' : 'Check or update ticker/provider'}
-                            >
-                              {hasActionablePriceFailure(asset) ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
-                              {getPricingActionLabel(asset)}
-                            </button>
-                            {((!isGoldAsset(asset) && asset.ticker) || asset.connectedProvider === 'splitwise') ? (
-                              <button
-                                type="button"
-                                onClick={() => void handleRefreshRow(asset.id)}
-                                disabled={isRowRefreshing}
-                                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                title="Refresh only this row"
-                              >
-                                <RefreshCw className={`h-3.5 w-3.5 ${isRowRefreshing ? 'animate-spin' : ''}`} />
-                                Refresh row
-                              </button>
-                            ) : null}
-                          </>
-                        ) : (
-                          <div>{getPricingModeLabel(asset)}</div>
-                        )}
-                      </div>
-                    <div>
-                      <div className="text-slate-500">Holding Platform</div>
-                      <div>{asset.holdingPlatform || '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">Comments</div>
-                      <div>{asset.comments || '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">{showsAsDebt ? 'Debt Balance' : 'Investment Total'}</div>
-                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{formatCurrency(investmentTotal, displayCurrency)}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">{showsAsDebt ? 'Balance per Unit' : 'Investment Price'}</div>
-                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{formatCurrency(investmentPrice, displayCurrency)}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">{showsAsDebt ? 'Current Balance per Unit' : 'Current Price'}</div>
-                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{asset.currentPrice ? formatCurrency(currentPrice, displayCurrency) : '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">{showsAsDebt ? 'Current Debt' : 'Current Total'}</div>
-                      <div className={`font-semibold ${showsAsDebt ? 'text-red-500' : ''}`}>{formatCurrency(currentTotal, displayCurrency)}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">Total Growth</div>
-                      <div className={growthTotal >= 0 ? 'font-medium text-emerald-600' : 'font-medium text-red-500'}>
-                        {formatCurrency(growthTotal, displayCurrency)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">XIRR</div>
-                      <div>{showsAsDebt ? 'Not applicable for debt' : formatPercent(xirr)}</div>
-                    </div>
+                    <div className="text-xs text-slate-500">{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })} units</div>
                   </div>
                 </div>
-              </React.Fragment>
+              </div>
             );
-            });
-
-            cards.push(
-              <MobileClassTotalCard key={`subtotal-${group.assetClass}-${group.metrics.currency}-${group.rows[0]?.id || 'group'}`} group={group} />
-            );
-
-            return cards;
           })
         ) : (
           <div className="text-center py-8 text-slate-500">No assets found.</div>
@@ -1680,6 +1506,7 @@ function CountryTableSection({
   subtitle,
   table,
   displayGroups,
+  flat = false,
   columnsLength,
   columnFilters,
   openColumnFilter,
@@ -1696,6 +1523,7 @@ function CountryTableSection({
   subtitle: string;
   table: ReturnType<typeof useReactTable<Asset>>;
   displayGroups: LedgerDisplayGroup[];
+  flat?: boolean;
   columnsLength: number;
   columnFilters: FilterState;
   openColumnFilter: FilterColumnId | null;
@@ -1719,25 +1547,21 @@ function CountryTableSection({
   };
 
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex items-center gap-2 px-5 py-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">{title}</span>
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</span>
         <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
       </div>
-      <Table className="min-w-[1280px] w-full table-fixed">
-        <colgroup>
-          {TABLE_COLUMN_WIDTHS.map((width, index) => (
-            <col key={`${width}-${index}`} style={{ width }} />
-          ))}
-        </colgroup>
+      <Table className="min-w-[920px] w-full table-fixed">
         <TableHeader className="sticky top-0 z-10 bg-white/95 backdrop-blur dark:bg-slate-950/95">
           {headerGroups.map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header, index) => (
                 <TableHead
                   key={header.id}
-                  style={{ width: TABLE_COLUMN_WIDTHS[index] }}
-                  className="sticky top-0 z-10 min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
+                  style={{ width: getLedgerColumnWidth(header.column.id) }}
+                  className="sticky top-0 z-10 min-w-0 border-b border-slate-200 bg-white/95 px-3 py-3 text-left text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
                 >
                   {header.isPlaceholder ? null : (
                     <div className="relative">
@@ -1745,25 +1569,6 @@ function CountryTableSection({
                         className="flex items-center gap-2"
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
-                        {isFilterableColumn(header.column.id) ? (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              const columnId = header.column.id as FilterColumnId;
-                              setOpenColumnFilter(openColumnFilter === columnId ? null : columnId);
-                            }}
-                            className={`inline-flex h-6 w-6 items-center justify-center rounded-md border transition-colors ${
-                              isColumnFilterActive(columnFilters[header.column.id as FilterColumnId])
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                : 'border-transparent text-slate-400 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-600 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-300'
-                            }`}
-                            title="Filter this column"
-                          >
-                            <Filter className="h-3.5 w-3.5" />
-                          </button>
-                        ) : null}
                       </div>
                       {isFilterableColumn(header.column.id) && openColumnFilter === header.column.id ? (
                         <ColumnFilterMenu
@@ -1789,7 +1594,17 @@ function CountryTableSection({
           ))}
         </TableHeader>
         <TableBody>
-          {displayGroups.length ? (
+          {flat && table.getRowModel().rows.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} className="border-b border-slate-100 align-middle hover:bg-slate-50/70 dark:border-slate-900 dark:hover:bg-slate-900/50">
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} style={{ width: getLedgerColumnWidth(cell.column.id) }} className="min-w-0 px-3 py-3 text-sm leading-5">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : displayGroups.length ? (
             displayGroups.flatMap((group) => {
               const groupKey = `${title}:${group.assetClass}`;
               const isCollapsed = Boolean(collapsedGroups[groupKey]);
@@ -1811,7 +1626,7 @@ function CountryTableSection({
                         {row.getVisibleCells().map((cell, cellIndex) => (
                           <TableCell
                             key={cell.id}
-                            style={{ width: TABLE_COLUMN_WIDTHS[cellIndex] }}
+                            style={{ width: getLedgerColumnWidth(cell.column.id) }}
                             className="min-w-0 px-4 py-4 text-sm leading-6"
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}

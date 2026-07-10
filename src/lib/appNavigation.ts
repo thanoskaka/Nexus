@@ -1,6 +1,6 @@
 export type ParsedInitialView = {
-  view: 'dashboard' | 'accounts' | 'assets' | 'settings' | 'setup';
-  settingsSection?: 'integrations';
+  view: 'dashboard' | 'assets' | 'settings' | 'setup';
+  settingsSection?: 'household' | 'accounts-limits' | 'preferences' | 'integrations' | 'data-management';
 };
 
 export function parseInitialViewFromQuery(href?: string): ParsedInitialView {
@@ -15,8 +15,12 @@ export function parseInitialViewFromQuery(href?: string): ParsedInitialView {
   const rawView = url.searchParams.get('view');
   const rawSection = url.searchParams.get('section');
 
-  const view = rawView === 'settings' || rawView === 'accounts' || rawView === 'assets' || rawView === 'setup' ? rawView : 'dashboard';
-  const settingsSection = rawSection === 'integrations' ? 'integrations' : undefined;
+  const legacyAccounts = rawView === 'accounts';
+  const view = legacyAccounts ? 'settings' : rawView === 'settings' || rawView === 'assets' || rawView === 'setup' ? rawView : 'dashboard';
+  const allowedSections = ['household', 'accounts-limits', 'preferences', 'integrations', 'data-management'] as const;
+  const settingsSection = legacyAccounts
+    ? 'accounts-limits'
+    : allowedSections.find((section) => section === rawSection);
 
   return { view, settingsSection };
 }

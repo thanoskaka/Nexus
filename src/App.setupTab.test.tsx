@@ -138,7 +138,8 @@ describe('App setup tab', () => {
     expect(screen.queryByText('NextActionPanel')).not.toBeInTheDocument();
   });
 
-  it('shows Setup nav button when tab is visible', async () => {
+  it('shows Setup checklist in the account menu when setup is incomplete', async () => {
+    const user = userEvent.setup();
     setupAuthUser();
     storeOwnership('test-uid', 'hosted');
     mockUseSetupTabVisibility.mockReturnValue({ visible: true });
@@ -146,11 +147,14 @@ describe('App setup tab', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Setup')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open account menu' })).toBeInTheDocument();
     });
+    await user.click(screen.getByRole('button', { name: 'Open account menu' }));
+    expect(screen.getByRole('button', { name: 'Setup checklist' })).toBeInTheDocument();
   });
 
-  it('hides Setup nav button when tab is hidden by hook', async () => {
+  it('hides Setup checklist from the account menu when setup is complete', async () => {
+    const user = userEvent.setup();
     setupAuthUser();
     storeOwnership('test-uid', 'hosted');
     mockUseSetupTabVisibility.mockReturnValue({ visible: false });
@@ -160,7 +164,8 @@ describe('App setup tab', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(1);
     });
-    expect(screen.queryByText('Setup')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open account menu' }));
+    expect(screen.queryByRole('button', { name: 'Setup checklist' })).not.toBeInTheDocument();
   });
 
   it('renders GettingStartedChecklist and NextActionPanel on the setup tab', async () => {
@@ -172,10 +177,11 @@ describe('App setup tab', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Setup')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open account menu' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('Setup'));
+    await user.click(screen.getByRole('button', { name: 'Open account menu' }));
+    await user.click(screen.getByRole('button', { name: 'Setup checklist' }));
 
     expect(screen.getByText('GettingStartedChecklist')).toBeInTheDocument();
     expect(screen.getByText('NextActionPanel')).toBeInTheDocument();
@@ -189,25 +195,24 @@ describe('App setup tab', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Setup')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open account menu' })).toBeInTheDocument();
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByText('Setup'));
+    await user.click(screen.getByRole('button', { name: 'Open account menu' }));
+    await user.click(screen.getByRole('button', { name: 'Setup checklist' }));
 
     expect(screen.getByText('GettingStartedChecklist')).toBeInTheDocument();
 
     mockUseSetupTabVisibility.mockReturnValue({ visible: false });
-    await user.click(screen.getByText('Dashboard'));
-
-    const { rerender } = render(<App />);
-    rerender(<App />);
+    await user.click(screen.getByRole('button', { name: 'Overview' }));
 
     await waitFor(() => {
       expect(screen.getAllByText('Dashboard').length).toBeGreaterThanOrEqual(1);
     });
     expect(screen.queryByText('GettingStartedChecklist')).not.toBeInTheDocument();
-    expect(screen.queryByText('Setup')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open account menu' }));
+    expect(screen.queryByRole('button', { name: 'Setup checklist' })).not.toBeInTheDocument();
   });
 
   it('does not redirect from dashboard to setup when app loads', async () => {
