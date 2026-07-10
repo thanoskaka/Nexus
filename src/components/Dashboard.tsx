@@ -23,6 +23,7 @@ import {
   Info,
   Maximize2,
   Plus,
+  BarChart3,
   RefreshCw,
   TrendingUp,
   Wallet,
@@ -437,12 +438,6 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
     ) as Record<DisplayCurrency, ChartAnalytics>;
   }, [chartCurrencies, chartEligibleAssets, currencySelection, getConvertedValue, growthWindowMonths, rates]);
 
-  const scopeCopy = {
-    ALL: 'All filters apply first, then dashboard totals and charts are shown in the selected currency logic.',
-    INDIA: 'Only India holdings are considered before charting and conversion.',
-    CANADA: 'Only Canada holdings are considered before charting and conversion.',
-  } as const;
-
   const relevantRates = useMemo(() => getRelevantConversionRates(rates), [rates]);
 
   useEffect(() => {
@@ -660,7 +655,9 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
       </div>
       <div className="flex flex-wrap gap-3">
         {analytics.memberContributionData.classNames.map((assetClass) => (
-          <LegendRow key={assetClass} label={assetClass} value="" color={analytics.memberContributionData.classColors[assetClass]} />
+          <div key={assetClass}>
+            <LegendRow label={assetClass} value="" color={analytics.memberContributionData.classColors[assetClass]} />
+          </div>
         ))}
       </div>
     </div>
@@ -699,17 +696,17 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
 
   return (
     <div className="space-y-6">
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="mb-2 flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800">
         <div>
           <div className="mb-2 flex items-center gap-3">
-            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Dashboard</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Dashboard</h1>
             {isSampleMode && (
               <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300" title="Not your real portfolio">
                 Sample data
               </span>
             )}
           </div>
-          <p className="text-lg text-slate-500 dark:text-slate-400">{isSampleMode ? 'Exploring a sample portfolio' : "Your family's wealth at a glance"}</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{isSampleMode ? 'Sample household portfolio' : 'Household portfolio overview'}</p>
         </div>
         <Button variant="outline" onClick={refreshPrices} disabled={isRefreshing} className="w-full sm:w-auto">
           <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -778,11 +775,11 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         </div>
       ) : null}
 
-      <Card className="overflow-hidden rounded-3xl border-none bg-[radial-gradient(circle_at_top_left,_rgba(0,135,90,0.22),_transparent_40%),linear-gradient(135deg,_#052e2b,_#0f3d37_55%,_#0b5b46)] text-white shadow-[0_30px_90px_rgba(5,46,43,0.28)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(61,255,191,0.18),_transparent_42%),linear-gradient(135deg,_#020617,_#052e2b_55%,_#0b5b46)]">
-        <CardContent className="p-6 sm:p-8">
+      <Card className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-none dark:border-slate-800 dark:bg-[#151816]">
+        <CardContent className="p-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-100/85">Total Combined Family Wealth</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total household value</p>
               <div className="flex flex-wrap gap-2">
                 {([
                   ['AUTO', `Auto (${defaultHeroCurrency})`],
@@ -794,22 +791,18 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
                     key={value}
                     type="button"
                     onClick={() => setHeroCurrencySelection(value)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition-colors ${
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                       heroCurrencySelection === value
-                        ? 'bg-white text-emerald-900'
-                        : 'bg-white/10 text-emerald-50 hover:bg-white/20'
+                        ? 'border-[#1f6f50] bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#151816] dark:text-slate-300'
                     }`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              <h2 className="text-4xl font-black tracking-tight sm:text-5xl">{formatCurrency(heroStats.current, heroCurrency)}</h2>
-              <p className="max-w-2xl text-sm text-emerald-50/85">
-                {heroCurrencySelection === 'AUTO'
-                  ? `Hero total is normalized into ${heroCurrency} so you can see the full family wealth in one number. Country and member filters are already applied.`
-                  : `Hero total is being shown in ${heroCurrency}. This switch only changes the banner and leaves the rest of the dashboard as-is.`}
-              </p>
+              <h2 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">{formatCurrency(heroStats.current, heroCurrency)}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Shown in {heroCurrency}; current filters are applied.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <HeroMetric label="Invested" value={formatCurrency(heroStats.invested, heroCurrency)} />
@@ -820,11 +813,11 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
-        <CardContent className="space-y-5 p-6">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+      <Card className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-none dark:border-slate-800 dark:bg-[#151816]">
+        <CardContent className="space-y-4 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
             <Filter className="h-4 w-4" />
-            Dashboard Filters
+            Filters
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr_1fr]">
@@ -839,13 +832,12 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
                   <button
                     key={value}
                     onClick={() => setScope(value)}
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${scope === value ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${scope === value ? 'border-[#1f6f50] bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#151816] dark:text-slate-300'}`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{scopeCopy[scope]}</p>
             </div>
 
             <div className="space-y-3">
@@ -857,10 +849,10 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
                     type="button"
                     onClick={() => setMemberFilter(option.value)}
                     disabled={option.disabled}
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
                       memberFilter === option.value
-                        ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                        : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                        ? 'border-[#1f6f50] bg-[#e8f2ed] text-[#185c43] dark:bg-[#20372d] dark:text-emerald-200'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#151816] dark:text-slate-300'
                     } ${option.disabled ? 'cursor-not-allowed opacity-50 hover:bg-white dark:hover:bg-slate-900' : ''}`}
                   >
                     {option.label}
@@ -877,11 +869,7 @@ export function Dashboard({ onAddAsset }: { onAddAsset?: () => void } = {}) {
                 <option value="INR">Unified — INR</option>
                 <option value="CAD">Unified — CAD</option>
               </Select>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {currencySelection === 'ORIGINAL'
-                  ? 'Original shows India holdings in INR and Canada holdings in CAD — charts are duplicated per currency. Pick a single currency to see everything in one view.'
-                  : `Unified view: all values shown in ${currencySelection}. Charts appear once with converted totals.`}
-              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{currencySelection === 'ORIGINAL' ? 'Keep each holding in its source currency.' : `Convert all values to ${currencySelection}.`}</p>
             </div>
           </div>
         </CardContent>
@@ -1179,12 +1167,12 @@ function HeroMetric({
   tone?: 'neutral' | 'positive' | 'negative';
 }) {
   const toneClass =
-    tone === 'positive' ? 'text-emerald-100' : tone === 'negative' ? 'text-rose-100' : 'text-white';
+    tone === 'positive' ? 'text-emerald-700 dark:text-emerald-300' : tone === 'negative' ? 'text-red-600 dark:text-red-300' : 'text-slate-900 dark:text-white';
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-100/80">{label}</div>
-      <div className={`mt-2 text-lg font-semibold ${toneClass}`}>{value}</div>
+    <div className="border-l border-slate-200 px-4 py-1 dark:border-slate-700">
+      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+      <div className={`mt-1 text-base font-semibold ${toneClass}`}>{value}</div>
     </div>
   );
 }

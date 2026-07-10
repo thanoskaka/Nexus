@@ -105,7 +105,7 @@ vi.mock('../lib/sharedIntegrationsApi', () => ({
 }));
 
 vi.mock('../App', () => ({
-  AuthenticatedApp: () => <div data-testid="authenticated-app">Authenticated App</div>,
+  MainApp: () => <div data-testid="main-app">Main App</div>,
 }));
 
 beforeEach(() => {
@@ -113,13 +113,13 @@ beforeEach(() => {
 });
 
 describe('MockApp', () => {
-  it('renders AuthenticatedApp without Firebase error', async () => {
+  it('renders MainApp through the real application contexts', async () => {
     const { MockApp } = await import('./mockProviders');
     render(<MockApp />);
 
-    const app = await screen.findByTestId('authenticated-app');
+    const app = await screen.findByTestId('main-app');
     expect(app).not.toBeNull();
-    expect(app.textContent).toContain('Authenticated App');
+    expect(app.textContent).toContain('Main App');
   });
 
   it('renders without throwing', async () => {
