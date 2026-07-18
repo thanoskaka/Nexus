@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
@@ -31,12 +31,12 @@ beforeEach(() => {
   });
   mockUseSampleMode.mockReturnValue({ isSampleMode: false, sampleData: { assets: [], assetClasses: [], members: [], rates: {} }, toggleSampleMode: vi.fn() });
 });
-
 describe('Ledger filters', () => {
-  it('renders a person filter', () => {
+  it('renders member chips', () => {
     render(<Ledger />);
-    const filter = screen.getByLabelText('Person filter') as HTMLSelectElement;
-    expect(Array.from(filter.options).map((option) => option.text)).toEqual(['All people', 'Alice', 'Bob']);
+    expect(screen.getByRole('button', { name: 'Both' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bob' })).toBeInTheDocument();
   });
 
   it('shows no pricing filter section', () => {
@@ -49,15 +49,15 @@ describe('Ledger filters', () => {
   it('shows clear-filters when search entered and clears on click', async () => {
     const user = userEvent.setup();
     render(<Ledger />);
-    expect(screen.queryByText('Clear all')).not.toBeInTheDocument();
-    const input = screen.getByPlaceholderText('Search assets, tickers, notes...');
+    expect(screen.queryByText('Clear all filters')).not.toBeInTheDocument();
+    const input = screen.getByPlaceholderText('Search asset, ticker, platform, comments...');
     await user.type(input, 'VTI');
     await waitFor(() => {
-      expect(screen.getByText('Clear all')).toBeInTheDocument();
+      expect(screen.getByText('Clear all filters')).toBeInTheDocument();
     }, { timeout: 3000 });
-    await user.click(screen.getByText('Clear all'));
+    await user.click(screen.getByText('Clear all filters'));
     await waitFor(() => {
-      expect(screen.queryByText('Clear all')).not.toBeInTheDocument();
+      expect(screen.queryByText('Clear all filters')).not.toBeInTheDocument();
     }, { timeout: 3000 });
   });
 
@@ -66,5 +66,24 @@ describe('Ledger filters', () => {
     const theads = document.querySelectorAll('thead');
     expect(theads.length).toBeGreaterThanOrEqual(1);
     theads.forEach((t) => expect(t.className).toContain('sticky'));
+  });
+
+  it('collapses an asset-class group without hiding its subtotal context', async () => {
+    const user = userEvent.setup();
+    render(<Ledger />);
+
+    expect(screen.getAllByText('VTI').length).toBeGreaterThan(0);
+    const canadaStocksToggle = screen.getAllByRole('button', { name: /Stocks.*Collapse/i })[0];
+    await user.click(canadaStocksToggle);
+
+    const canadaSection = screen.getByText('Canada Assets').closest('section');
+    expect(canadaSection).not.toBeNull();
+    expect(within(canadaSection as HTMLElement).queryByText('VTI')).not.toBeInTheDocument();
+    expect(within(canadaSection as HTMLElement).getByText('Stocks total')).toBeInTheDocument();
+  });
+
+  it('shows India holdings in their source currency', () => {
+    render(<Ledger />);
+    expect(screen.getAllByText('₹640.00').length).toBeGreaterThan(0);
   });
 });

@@ -18,7 +18,7 @@ import { Button } from './ui/button';
 import { TickerRepairModal } from './TickerRepairModal';
 import { useSampleMode } from '../lib/samplePortfolio';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { AlertCircle, AlertTriangle, Building2, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, Cloud, Database, Download, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Trash2, WalletCards, XCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Building2, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, Cloud, Database, Edit, Ellipsis, Filter, Gem, Landmark, LineChart, PiggyBank, Plus, RefreshCw, ShieldCheck, Trash2, WalletCards, XCircle } from 'lucide-react';
 import { convertAmount, formatCurrency, formatPercent, getAssetXirr, getCurrentPrice, getCurrentTotal, getGrowthTotal, getInvestmentPrice, getInvestmentTotal, isDebtAssetClass } from '../lib/portfolioMetrics';
 import { getTickerRecommendation } from '../lib/api';
 import { Select } from './ui/select';
@@ -50,19 +50,8 @@ type MemberFilterOption = {
   owners: string[];
 };
 
-const TABLE_COLUMN_WIDTHS = ['20px', '32%', '10%', '10%', '11%', '11%', '14%', '7%', '2%'];
-const HIDDEN_LEDGER_COLUMNS = { defaultOrder: false, weight: false, assetClass: false, notes: false } as const;
-function getLedgerColumnWidth(columnId: string) {
-  const widths: Record<string, string> = {
-    name: '34%',
-    position: '12%',
-    currentPrice: '15%',
-    marketValue: '17%',
-    performance: '14%',
-    actions: '56px',
-  };
-  return widths[columnId] || 'auto';
-}
+const TABLE_COLUMN_WIDTHS = ['34%', '10%', '10%', '13%', '13%', '10%', '8%', '2%'] as const;
+const HIDDEN_LEDGER_COLUMNS = { defaultOrder: false } as const;
 const SORT_MODE_OPTIONS: Array<{ value: LedgerSortMode; label: string }> = [
   { value: 'default', label: 'Default' },
   { value: 'name', label: 'Name' },
@@ -72,19 +61,6 @@ const SORT_MODE_OPTIONS: Array<{ value: LedgerSortMode; label: string }> = [
   { value: 'marketValue', label: 'Market Value' },
   { value: 'performance', label: 'Performance' },
 ];
-
-type QuickFilter = 'all' | 'gainers' | 'losers' | 'top10' | 'taxloss';
-
-const TONE_DESIGN_META: Record<AssetToneKey, { color: string; tint: string; glyph: string }> = {
-  stocks:      { color: '#2563eb', tint: '#eff6ff', glyph: 'E'  },
-  mutualFunds: { color: '#7c3aed', tint: '#f5f3ff', glyph: 'M'  },
-  gold:        { color: '#b45309', tint: '#fffbeb', glyph: 'Au' },
-  cash:        { color: '#0891b2', tint: '#ecfeff', glyph: '$'  },
-  retirement:  { color: '#475569', tint: '#f1f5f9', glyph: 'FD' },
-  realEstate:  { color: '#059669', tint: '#ecfdf5', glyph: 'RE' },
-  credit:      { color: '#dc2626', tint: '#fef2f2', glyph: 'D'  },
-  neutral:     { color: '#64748b', tint: '#f8fafc', glyph: '·'  },
-};
 
 const EMPTY_FILTER_STATE: FilterState = {
   name: { selected: [], search: '', min: '', max: '' },
@@ -99,11 +75,9 @@ const EMPTY_FILTER_STATE: FilterState = {
 function getAssetCountryForFilter(asset: Asset): 'Canada' | 'India' {
   return asset.country === 'India' ? 'India' : 'Canada';
 }
-
 function buildAssetClassFilterValue(country: 'Canada' | 'India', assetClass: string): string {
   return `${country}::${assetClass}`;
 }
-
 export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asset) => void; onAddAsset?: () => void }) {
   const { user } = useAuth();
   const { assets: realAssets, assetClasses: realClasses, baseCurrency, rates: realRates, priceProviderSettings, removeAsset, duplicateAsset, refreshAsset, refreshPrices, refreshFailedPrices, isRefreshing, refreshQueue, bulkRefreshState } = usePortfolio();
@@ -111,10 +85,10 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
   const assets = isSampleMode ? sampleData.assets : realAssets;
   const assetClasses = isSampleMode ? sampleData.assetClasses : realClasses;
   const rates = isSampleMode ? sampleData.rates : realRates;
+  const indiaDisplayCurrency: SubtotalCurrency = 'INR';
   const safeBulkRefreshState = normalizeBulkRefreshState(bulkRefreshState);
   const [sortMode, setSortMode] = useState<LedgerSortMode>('default');
   const [memberFilter, setMemberFilter] = useState('ALL');
-  const [countryFilter, setCountryFilter] = useState<'ALL' | 'Canada' | 'India'>('ALL');
   const [assetClassFilter, setAssetClassFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [tickerRepairAsset, setTickerRepairAsset] = useState<Asset | undefined>(undefined);
@@ -124,7 +98,6 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
   const [statsModal, setStatsModal] = useState<{ type: 'rows' | 'failed' | 'manual'; open: boolean }>({ type: 'rows', open: false });
   const [refreshCenterOpen, setRefreshCenterOpen] = useState(false);
   const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const rowMenuRef = useRef<HTMLDivElement | null>(null);
   const ledgerSorting = useMemo(() => getSortingForMode(sortMode), [sortMode]);
 
@@ -204,14 +177,13 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
   );
 
   const getDisplayCurrency = React.useCallback(
-    (asset: Asset): 'CAD' | 'INR' | 'USD' => (baseCurrency === 'ORIGINAL' ? asset.currency : baseCurrency),
-    [baseCurrency],
+    (asset: Asset): 'CAD' | 'INR' | 'USD' => asset.currency,
+    [],
   );
 
   const baseFilteredAssets = useMemo(
     () => assets.filter((asset) => {
       const matchesMember = memberFilter === 'ALL' || (memberOwnerSetByKey.get(memberFilter)?.has(asset.owner) ?? false);
-      const matchesCountry = countryFilter === 'ALL' || getAssetCountryForFilter(asset) === countryFilter;
       const matchesClass = assetClassFilter === 'ALL' || buildAssetClassFilterValue(getAssetCountryForFilter(asset), getCanonicalAssetClass(asset.assetClass)) === assetClassFilter;
       const normalizedSearch = searchQuery.trim().toLowerCase();
       const matchesSearch =
@@ -220,9 +192,9 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedSearch));
 
-      return matchesMember && matchesCountry && matchesClass && matchesSearch;
+      return matchesMember && matchesClass && matchesSearch;
     }),
-    [assetClassFilter, assets, countryFilter, memberFilter, memberOwnerSetByKey, searchQuery],
+    [assetClassFilter, assets, memberFilter, memberOwnerSetByKey, searchQuery],
   );
 
   useEffect(() => {
@@ -318,55 +290,6 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
     });
   }), [baseFilteredAssets, columnFilters, getNumericFilterValue, getTextFilterTokens]);
 
-  const quickFilteredAssets = useMemo(() => {
-    switch (quickFilter) {
-      case 'gainers':
-        return filteredAssets.filter((a) => getConvertedValue(getGrowthTotal(a), a.currency, baseCurrency) > 0);
-      case 'losers':
-        return filteredAssets.filter((a) => getConvertedValue(getGrowthTotal(a), a.currency, baseCurrency) < 0);
-      case 'top10':
-        return [...filteredAssets]
-          .sort((a, b) =>
-            getConvertedValue(getCurrentTotal(b), b.currency, baseCurrency) -
-            getConvertedValue(getCurrentTotal(a), a.currency, baseCurrency),
-          )
-          .slice(0, 10);
-      case 'taxloss': {
-        return filteredAssets.filter((a) => {
-          const inv = getConvertedValue(getInvestmentTotal(a), a.currency, baseCurrency);
-          const g = getConvertedValue(getGrowthTotal(a), a.currency, baseCurrency);
-          return inv > 0 && g / inv < -0.05;
-        });
-      }
-      default:
-        return filteredAssets;
-    }
-  }, [filteredAssets, quickFilter, baseCurrency, getConvertedValue]);
-
-  const totalPortfolioMV = useMemo(
-    () => quickFilteredAssets.reduce((sum, a) => sum + getConvertedValue(getCurrentTotal(a), a.currency, baseCurrency), 0),
-    [quickFilteredAssets, baseCurrency, getConvertedValue],
-  );
-
-  const portfolioTotalInvested = useMemo(
-    () => quickFilteredAssets.reduce((sum, a) => sum + getConvertedValue(getInvestmentTotal(a), a.currency, baseCurrency), 0),
-    [quickFilteredAssets, baseCurrency, getConvertedValue],
-  );
-
-  const portfolioTotalGain = useMemo(
-    () => quickFilteredAssets.reduce((sum, a) => sum + getConvertedValue(getGrowthTotal(a), a.currency, baseCurrency), 0),
-    [quickFilteredAssets, baseCurrency, getConvertedValue],
-  );
-
-  const perfScale = useMemo(() => {
-    const vals = quickFilteredAssets.map((a) => {
-      const inv = getConvertedValue(getInvestmentTotal(a), a.currency, baseCurrency);
-      const g = getConvertedValue(getGrowthTotal(a), a.currency, baseCurrency);
-      return inv !== 0 ? Math.abs(g / inv) * 100 : 0;
-    });
-    return Math.max(...vals, 1);
-  }, [quickFilteredAssets, baseCurrency, getConvertedValue]);
-
   const setColumnFilterSelected = React.useCallback((columnId: FilterColumnId, selected: string[]) => {
     setColumnFilters((current) => ({
       ...current,
@@ -406,15 +329,13 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
 
   const hasActiveFilters = useMemo(() => {
     if (memberFilter !== 'ALL') return true;
-    if (countryFilter !== 'ALL') return true;
     if (assetClassFilter !== 'ALL') return true;
     if (searchQuery.trim() !== '') return true;
     return (Object.values(columnFilters) as FilterState[keyof FilterState][]).some((filter) => filter.selected.length > 0 || filter.min.trim() !== '' || filter.max.trim() !== '');
-  }, [memberFilter, countryFilter, assetClassFilter, searchQuery, columnFilters]);
+  }, [memberFilter, assetClassFilter, searchQuery, columnFilters]);
 
   const clearAllFilters = React.useCallback(() => {
     setMemberFilter('ALL');
-    setCountryFilter('ALL');
     setAssetClassFilter('ALL');
     setSearchQuery('');
     setColumnFilters(EMPTY_FILTER_STATE);
@@ -430,27 +351,6 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         enableHiding: true,
         cell: () => null,
       }),
-      columnHelper.display({
-        id: 'weight',
-        enableColumnFilter: false,
-        enableSorting: false,
-        header: () => null,
-        cell: (info) => {
-          const asset = info.row.original;
-          const mv = getConvertedValue(getCurrentTotal(asset), asset.currency, baseCurrency);
-          const alloc = totalPortfolioMV > 0 ? (mv / totalPortfolioMV) * 100 : 0;
-          const fill = Math.min(1, Math.sqrt(alloc / 30));
-          const toneKey = getAssetToneKey(asset);
-          const meta = TONE_DESIGN_META[toneKey];
-          return (
-            <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center', height: '100%', padding: '4px 0' }}>
-              <div style={{ position: 'relative', width: 6, borderRadius: 3, background: '#f1f5f9' }} className="dark:!bg-slate-800">
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: 3, background: meta.color, height: `${fill * 100}%`, opacity: alloc > 2 ? 1 : 0.6, transition: 'height 0.3s ease' }} />
-              </div>
-            </div>
-          );
-        },
-      }),
       columnHelper.accessor('name', {
         id: 'name',
         header: 'Asset',
@@ -458,17 +358,71 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
           const asset = info.row.original;
           const supportsTickerPricing = showsTickerManagement(asset);
           const hasFailedPrice = supportsTickerPricing && hasActionablePriceFailure(asset);
-          const assetMeta = [shouldDisplayTicker(asset) ? asset.ticker || null : null, asset.holdingPlatform || null].filter(Boolean).join(' · ');
-          const ownerLabel = getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets);
+          const rowRefreshStatus = getBulkRefreshRowStatus(asset);
+          const providerForRecommendation = asset.priceProvider === 'finnhub' || asset.priceProvider === 'alphavantage' || asset.priceProvider === 'yahoo' ? asset.priceProvider : 'yahoo';
+          const assetMeta = [shouldDisplayTicker(asset) ? asset.ticker || null : null, getCanonicalAssetClass(asset.assetClass), asset.owner].filter(Boolean).join(' • ');
+          const isRowRefreshing = refreshingRowIds.includes(asset.id);
+          const toneClasses = getAssetToneClasses(asset);
 
           return (
-            <div className="flex min-w-0 items-center gap-3 py-1">
-              <AssetMarketLogo asset={asset} className="h-8 w-8 shrink-0 rounded-md" />
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{asset.name}</div>
-                <div className="truncate text-xs text-slate-500 dark:text-slate-400">{assetMeta || getCanonicalAssetClass(asset.assetClass)} · {ownerLabel} · {asset.country}</div>
-                {supportsTickerPricing && hasFailedPrice && <button type="button" onClick={() => setTickerRepairAsset(asset)} className="mt-1 text-xs font-medium text-amber-700 hover:underline dark:text-amber-300"><AlertTriangle className="mr-1 inline h-3 w-3" />Price needs attention</button>}
+            <div className="space-y-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <div className="flex items-start gap-3">
+                <AssetMarketLogo asset={asset} className={`mt-0.5 h-9 w-9 ${toneClasses.iconTile}`} />
+                <div className="min-w-0 space-y-1">
+                  <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{asset.name}</div>
+                  <div className="truncate text-xs text-slate-500 dark:text-slate-400">{assetMeta}</div>
+                </div>
               </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                  <MemberAvatar name={getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets)} />
+                  {getOwnerDisplayLabel(asset.owner, normalizedUserEmail, user?.displayName, assets)}
+                </span>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${toneClasses.chip}`}>
+                  {asset.holdingPlatform || getCanonicalAssetClass(asset.assetClass)}
+                </span>
+                {asset.sourceManaged ? (
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                    asset.connectedProvider === 'splitwise'
+                      ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/40 dark:text-violet-200'
+                      : 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200'
+                  }`}>
+                    <Cloud className="h-3 w-3" />
+                    {asset.connectedProvider === 'splitwise' ? 'Via Splitwise' : 'Cloud-synced'}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                    Manual entry
+                  </span>
+                )}
+              </div>
+              {supportsTickerPricing ? (
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setTickerRepairAsset(asset)}
+                      className={`inline-flex items-center gap-1 text-xs font-medium ${hasFailedPrice ? 'text-amber-600 hover:text-amber-700' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-100'}`}
+                      title={hasFailedPrice ? `${asset.priceFetchMessage || 'Price fetch failed.'} ${getTickerRecommendation(asset.ticker || '', providerForRecommendation)}` : isGoldAsset(asset) ? 'Adjust system gold pricing settings' : 'Check or update ticker/provider'}
+                    >
+                      {hasFailedPrice ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                      {getPricingActionLabel(asset)}
+                    </button>
+                    {((!isGoldAsset(asset) && asset.ticker) || asset.connectedProvider === 'splitwise') ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleRefreshRow(asset.id)}
+                        disabled={isRowRefreshing}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-slate-100"
+                        title="Refresh only this row"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${isRowRefreshing ? 'animate-spin' : ''}`} />
+                        Refresh row
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           );
         },
@@ -492,7 +446,7 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         cell: (info) => {
           const asset = info.row.original;
           const displayCurrency = getDisplayCurrency(asset);
-          const investmentPrice = getConvertedValue(getInvestmentPrice(asset), asset.currency, baseCurrency);
+          const investmentPrice = getInvestmentPrice(asset);
           const showsAsDebt = isDebtAssetDisplay(asset);
 
           return (
@@ -532,9 +486,9 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
           const providerForRecommendation = asset.priceProvider === 'finnhub' || asset.priceProvider === 'alphavantage' || asset.priceProvider === 'yahoo' ? asset.priceProvider : 'yahoo';
           const previousClose = getPreviousClose(asset);
           const currentPrice = hasFailedPrice
-            ? (asset.currentPrice ? getConvertedValue(getCurrentPrice(asset), asset.currency, baseCurrency) : getConvertedValue(getInvestmentPrice(asset), asset.currency, baseCurrency))
-            : getConvertedValue(getCurrentPrice(asset), asset.currency, baseCurrency);
-          const convertedPreviousClose = previousClose ? getConvertedValue(previousClose, asset.currency, baseCurrency) : null;
+            ? (asset.currentPrice ? getCurrentPrice(asset) : getInvestmentPrice(asset))
+            : getCurrentPrice(asset);
+          const convertedPreviousClose = previousClose ?? null;
           const dailyChange = convertedPreviousClose !== null ? currentPrice - convertedPreviousClose : null;
           const dailyChangePercent = convertedPreviousClose ? dailyChange! / convertedPreviousClose : null;
 
@@ -588,19 +542,16 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         cell: (info) => {
           const asset = info.row.original;
           const displayCurrency = getDisplayCurrency(asset);
-          const currentTotal = info.getValue() as number;
-          const investmentTotal = getConvertedValue(getInvestmentTotal(asset), asset.currency, baseCurrency);
+          const currentTotal = getCurrentTotal(asset);
+          const investmentTotal = getInvestmentTotal(asset);
           const showsAsDebt = isDebtAssetDisplay(asset);
-          const alloc = totalPortfolioMV > 0 ? (currentTotal / totalPortfolioMV) * 100 : 0;
-          const mvTier = alloc > 5 ? 3 : alloc > 2 ? 2 : alloc > 0.8 ? 1 : 0;
-          const mvFontSize = ['text-sm', 'text-sm', 'text-base', 'text-[17px]'][mvTier];
           return (
             <div className="space-y-1" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              <div className={`${mvFontSize} font-bold leading-tight ${showsAsDebt ? 'text-red-500' : 'text-slate-900 dark:text-slate-100'}`} style={{ letterSpacing: mvTier >= 2 ? '-0.2px' : undefined }}>
+              <div className={`text-sm font-semibold ${showsAsDebt ? 'text-red-500' : 'text-slate-900 dark:text-slate-100'}`}>
                 {formatCurrency(currentTotal, displayCurrency)}
               </div>
-              <div className={`text-[11px] ${showsAsDebt ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
-                {alloc > 0.01 ? `${alloc.toFixed(1)}% · ` : ''}{showsAsDebt ? `Debt: ${formatCurrency(investmentTotal, displayCurrency)}` : `Cost: ${formatCurrency(investmentTotal, displayCurrency)}`}
+              <div className={`text-xs ${showsAsDebt ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                {showsAsDebt ? `Debt balance: ${formatCurrency(investmentTotal, displayCurrency)}` : `Cost basis: ${formatCurrency(investmentTotal, displayCurrency)}`}
               </div>
             </div>
           );
@@ -611,20 +562,27 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         header: 'Performance',
         cell: (info) => {
           const asset = info.row.original;
-          const growthTotal = info.getValue() as number;
+          const growthTotal = getGrowthTotal(asset);
           const displayCurrency = getDisplayCurrency(asset);
-          const investmentTotal = getConvertedValue(getInvestmentTotal(asset), asset.currency, baseCurrency);
+          const investmentTotal = getInvestmentTotal(asset);
           const growthPercent = investmentTotal !== 0 ? growthTotal / investmentTotal : 0;
           const xirr = getAssetXirr(asset, displayCurrency, rates);
           const showsAsDebt = isDebtAssetDisplay(asset);
-          const gainColor = growthTotal > 0 ? 'text-emerald-600 dark:text-emerald-400' : growthTotal < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400';
+          const tone = growthTotal >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300';
+
           return (
-            <div style={{ fontVariantNumeric: 'tabular-nums' }}>
-              <div className={`text-[13px] font-bold leading-tight ${gainColor}`}>{formatPercent(growthPercent)}</div>
-              <div className={`text-[11.5px] leading-tight ${gainColor} opacity-80`}>{formatCurrency(growthTotal, displayCurrency)}</div>
-              {!showsAsDebt && xirr !== null && (
-                <div className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">XIRR {formatPercent(xirr)}</div>
-              )}
+            <div className="space-y-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>
+                  {formatPercent(growthPercent)}
+                </span>
+                <span className={`text-sm font-semibold ${getStatusColor(growthTotal)}`}>
+                  {formatCurrency(growthTotal, displayCurrency)}
+                </span>
+              </div>
+              <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                {showsAsDebt ? 'XIRR: Not applicable for debt' : `XIRR: ${formatPercent(xirr)}`}
+              </div>
             </div>
           );
         },
@@ -635,11 +593,9 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         cell: (info) => {
           const asset = info.row.original;
           return (
-            <div>
-              {asset.comments
-                ? <div className="text-sm text-slate-700 dark:text-slate-200">{asset.comments}</div>
-                : <div className="text-xs text-slate-400 dark:text-slate-500">—</div>
-              }
+            <div className="space-y-1">
+              <div className="text-sm text-slate-700 dark:text-slate-200">{asset.comments || 'No comments added'}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">{getPricingModeLabel(asset)}</div>
             </div>
           );
         },
@@ -710,15 +666,15 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
         },
       }),
     ];
-  }, [baseCurrency, duplicateAsset, getConvertedValue, getDisplayCurrency, handleRefreshRow, onEditAsset, openRowMenuId, perfScale, rates, refreshFailedPrices, refreshingRowIds, removeAsset, totalPortfolioMV, user?.displayName, user?.email]);
+  }, [baseCurrency, duplicateAsset, getConvertedValue, getDisplayCurrency, handleRefreshRow, onEditAsset, openRowMenuId, rates, refreshFailedPrices, refreshingRowIds, removeAsset, user?.displayName, user?.email]);
 
   const canadaAssets = useMemo(
-    () => quickFilteredAssets.filter((asset) => asset.country === 'Canada'),
-    [quickFilteredAssets],
+    () => filteredAssets.filter((asset) => asset.country === 'Canada'),
+    [filteredAssets],
   );
   const indiaAssets = useMemo(
-    () => quickFilteredAssets.filter((asset) => asset.country === 'India'),
-    [quickFilteredAssets],
+    () => filteredAssets.filter((asset) => asset.country === 'India'),
+    [filteredAssets],
   );
   const failedAssets = useMemo(
     () => filteredAssets.filter((asset) => hasActionablePriceFailure(asset)),
@@ -780,122 +736,177 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
-  const combinedTable = useReactTable<Asset>({
-    data: quickFilteredAssets,
-    columns,
-    state: {
-      sorting: ledgerSorting,
-      columnVisibility: HIDDEN_LEDGER_COLUMNS,
-    },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
-  const canadaDisplayGroups = buildLedgerDisplayGroups(canadaTable.getRowModel().rows, baseCurrency, rates);
-  const indiaDisplayGroups = buildLedgerDisplayGroups(indiaTable.getRowModel().rows, baseCurrency, rates);
-
-  const statCurrency = baseCurrency === 'ORIGINAL' ? (assets[0]?.currency ?? 'CAD') : baseCurrency;
+  const canadaDisplayGroups = buildLedgerDisplayGroups(canadaTable.getRowModel().rows, 'CAD', rates);
+  const indiaDisplayGroups = buildLedgerDisplayGroups(indiaTable.getRowModel().rows, indiaDisplayCurrency, rates);
 
   return (
-    <div className="space-y-4">
-      {/* Page header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4 dark:border-slate-800">
+    <div className="space-y-6">
+      <div className="mb-8 flex justify-between items-start gap-3">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Assets</h1>
             {isSampleMode && (
-              <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">Sample data</span>
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300" title="Not your real portfolio">
+                Sample data
+              </span>
             )}
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Holdings</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400">
-            {quickFilteredAssets.length} holding{quickFilteredAssets.length === 1 ? '' : 's'} · {isSampleMode ? 'sample data' : `${assets.length} total`}
-          </p>
+          <p className="text-lg text-slate-500 dark:text-slate-400">{isSampleMode ? 'Exploring sample holdings' : "Manage your family's individual holdings"}</p>
         </div>
-        <div className="hidden sm:flex items-center gap-6">
-          <LedgerStatBlock label="Total Value" value={formatCurrency(totalPortfolioMV, statCurrency)} />
-          <LedgerStatBlock label="Invested" value={formatCurrency(portfolioTotalInvested, statCurrency)} muted />
-          <LedgerStatBlock
-            label="Gain / Loss"
-            value={formatCurrency(portfolioTotalGain, statCurrency)}
-            gainColor={portfolioTotalGain > 0 ? 'text-emerald-600 dark:text-emerald-400' : portfolioTotalGain < 0 ? 'text-red-600 dark:text-red-400' : undefined}
-            sub={portfolioTotalInvested > 0 ? `${portfolioTotalGain >= 0 ? '+' : ''}${(portfolioTotalGain / portfolioTotalInvested * 100).toFixed(2)}%` : undefined}
-          />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={refreshPrices} disabled={isRefreshing} className="hidden sm:flex items-center gap-2">
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh Rates
+          </Button>
+          <Button onClick={onAddAsset} className="bg-[#00875A] hover:bg-[#007A51] text-white rounded-lg shrink-0 px-4">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Asset</span>
+          </Button>
         </div>
       </div>
 
-      {/* One toolbar: search, saved view, filters, and actions. */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search assets, tickers, notes..."
-            className="h-9 rounded-lg border-slate-200 bg-slate-50 pl-9 text-[13px] dark:border-slate-800 dark:bg-slate-900"
-          />
-        </div>
-        <Select aria-label="Saved view" value={quickFilter} onChange={(event) => setQuickFilter(event.target.value as QuickFilter)} className="h-9 w-auto rounded-lg border-slate-200 bg-white text-[13px] dark:border-slate-800 dark:bg-slate-950">
-          <option value="all">All holdings</option>
-          <option value="gainers">Gainers</option>
-          <option value="losers">Losers</option>
-          <option value="top10">Largest positions</option>
-          <option value="taxloss">Tax-loss candidates</option>
-        </Select>
-        <Select aria-label="Person filter" value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} className="h-9 w-auto rounded-lg border-slate-200 bg-white text-[13px] dark:border-slate-800 dark:bg-slate-950">
-          <option value="ALL">All people</option>
-          {memberFilterOptions.map((member) => <option key={member.key} value={member.key}>{member.label}</option>)}
-        </Select>
-        <Select aria-label="Country filter" value={countryFilter} onChange={(event) => setCountryFilter(event.target.value as 'ALL' | 'Canada' | 'India')} className="h-9 w-auto rounded-lg border-slate-200 bg-white text-[13px] dark:border-slate-800 dark:bg-slate-950">
-          <option value="ALL">All countries</option>
-          <option value="Canada">Canada</option>
-          <option value="India">India</option>
-        </Select>
-        <Select aria-label="Sort holdings" value={sortMode} onChange={(event) => setSortMode(event.target.value as LedgerSortMode)} className="h-9 w-auto rounded-lg border-slate-200 bg-white text-[13px] md:hidden dark:border-slate-800 dark:bg-slate-950">
-          {SORT_MODE_OPTIONS.filter((option) => option.value !== 'assetClass').map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </Select>
-        <div className="ml-auto flex items-center gap-2">
-          {globalFailedAssets.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setRefreshCenterOpen(true)}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[12px] font-semibold text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-            >
-              <AlertTriangle className="h-3.5 w-3.5" />
-              {globalFailedAssets.length} needs attention
-            </button>
-          )}
+      <div className="flex flex-col gap-4">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,0.8fr)]">
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Search</p>
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search asset, ticker, platform, comments..."
+                  className="h-11 rounded-2xl border-slate-200 bg-slate-50 px-4 dark:border-slate-800 dark:bg-slate-900"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Members</p>
+                <div className="flex flex-wrap gap-2">
+                  <FilterChip active={memberFilter === 'ALL'} onClick={() => setMemberFilter('ALL')}>Both</FilterChip>
+                  {memberFilterOptions.map((member) => (
+                    <FilterChip key={member.key} active={memberFilter === member.key} onClick={() => setMemberFilter(member.key)}>
+                      {member.label}
+                    </FilterChip>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Asset Classes</p>
+                <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
+                  <div className="sm:row-span-2">
+                    <AssetClassFilterChip
+                      label="All Assets"
+                      active={assetClassFilter === 'ALL'}
+                      onClick={() => setAssetClassFilter('ALL')}
+                    />
+                  </div>
+                  <AssetClassFilterRow
+                    country="Canada"
+                    assetClasses={assetClassOptionsByCountry.Canada}
+                    activeAssetClass={assetClassFilter}
+                    onSelect={setAssetClassFilter}
+                    assetClassesMeta={assetClasses}
+                  />
+                  <AssetClassFilterRow
+                    country="India"
+                    assetClasses={assetClassOptionsByCountry.India}
+                    activeAssetClass={assetClassFilter}
+                    onSelect={setAssetClassFilter}
+                    assetClassesMeta={assetClasses}
+                  />
+                </div>
+              </div>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="3" y1="3" x2="13" y2="13" />
+                    <line x1="13" y1="3" x2="3" y2="13" />
+                  </svg>
+                  Clear all filters
+                </button>
+              )}
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Data Freshness</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                    safeBulkRefreshState.status === 'queued'
+                      ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
+                      : safeBulkRefreshState.status === 'partial'
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                        : safeBulkRefreshState.status === 'running'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                  }`}>
+                    {safeBulkRefreshState.status === 'running' && <RefreshCw className="h-3 w-3 animate-spin" />}
+                    {formatBulkRefreshStatusLabel(safeBulkRefreshState.status)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StatPill label="Total Assets" value={String(assets.length)} onClick={() => setStatsModal({ type: 'rows', open: true })} />
+                <StatPill label="Manual Entries" value={String(globalManualAssets.length)} onClick={() => setStatsModal({ type: 'manual', open: true })} />
+                <StatPill label="Needs Review" value={String(globalFailedAssets.length)} tone={globalFailedAssets.length > 0 ? 'warning' : 'neutral'} onClick={() => setStatsModal({ type: 'failed', open: true })} />
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <RefreshMetricCard label="Tracked Assets" value={String(globalMarketLinkedAssets.length)} tone="neutral" />
+                <RefreshMetricCard label="Fresh Data" value={String(safeBulkRefreshState.counts.updatedNow)} tone="positive" />
+                <RefreshMetricCard label="Queued" value={String(safeBulkRefreshState.counts.queued)} tone="info" />
+                <RefreshMetricCard label="Action Needed" value={String(safeBulkRefreshState.counts.needsAttention)} tone="warning" />
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {safeBulkRefreshState.queues.length > 0
+                    ? buildCompactRefreshSummary(safeBulkRefreshState)
+                    : 'All tracked assets are up to date. Use the control center for detailed queue and issue breakdowns.'}
+                  {queuedAssets.length > 0 && (
+                    <span className="ml-1 text-sky-600 dark:text-sky-400">{queuedAssets.length} row{queuedAssets.length === 1 ? '' : 's'} queued.</span>
+                  )}
+                </p>
+                <Button variant="outline" size="sm" className="rounded-full" onClick={() => setRefreshCenterOpen(true)}>
+                  Control Center
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-y border-slate-200 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        <span>{quickFilteredAssets.length} of {assets.length} holdings</span>
-        {assetClassFilter !== 'ALL' && (
-          <>
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[12px] text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-              <span className="text-slate-500">Class:</span>
-              <span className="font-semibold">{assetClassFilter.split('::')[1]}</span>
-              <button type="button" onClick={() => setAssetClassFilter('ALL')} className="ml-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100">×</button>
-            </span>
-          </>
-        )}
-
-        {hasActiveFilters && (
-          <button type="button" onClick={clearAllFilters} className="ml-auto text-[12px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-100">
-            Clear all
-          </button>
-        )}
-      </div>
-
-      {/* Desktop table view */}
-      <div className="hidden md:block">
+      <div className="hidden space-y-6 md:block">
+        <div className="flex items-center justify-between rounded-[24px] border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Sort</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Apply one sort mode across both country tables.</p>
+          </div>
+          <div className="w-full max-w-[260px]">
+            <Select value={sortMode} onChange={(event) => setSortMode(event.target.value as LedgerSortMode)} className="h-11 rounded-2xl">
+              {SORT_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
         <CountryTableSection
-          title="All holdings"
-          subtitle="One row per holding. Account, owner, and country stay in context."
-          table={combinedTable}
-          displayGroups={[]}
-          flat
+          title="Canada Assets"
+          subtitle="Group totals update automatically with your current filters and sort mode."
+          table={canadaTable}
+          displayGroups={canadaDisplayGroups}
           columnsLength={columns.length}
           columnFilters={columnFilters}
           openColumnFilter={openColumnFilter}
@@ -905,53 +916,169 @@ export function Ledger({ onEditAsset, onAddAsset }: { onEditAsset?: (asset: Asse
           setColumnFilterRange={setColumnFilterRange}
           setColumnFilterSearch={setColumnFilterSearch}
           clearColumnFilter={clearColumnFilter}
-          totalPortfolioMV={totalPortfolioMV}
-          perfScale={perfScale}
+        />
+        <CountryTableSection
+          title="India Assets"
+          subtitle="Group totals update automatically with your current filters and sort mode."
+          table={indiaTable}
+          displayGroups={indiaDisplayGroups}
+          columnsLength={columns.length}
+          columnFilters={columnFilters}
+          openColumnFilter={openColumnFilter}
+          setOpenColumnFilter={setOpenColumnFilter}
+          columnFilterOptions={columnFilterOptions}
+          setColumnFilterSelected={setColumnFilterSelected}
+          setColumnFilterRange={setColumnFilterRange}
+          setColumnFilterSearch={setColumnFilterSearch}
+          clearColumnFilter={clearColumnFilter}
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-2 md:hidden">
-        {combinedTable.getRowModel().rows.length ? (
-          combinedTable.getRowModel().rows.map((row) => {
+      <div className="grid grid-cols-1 gap-4 md:hidden">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Sort</p>
+            <Select value={sortMode} onChange={(event) => setSortMode(event.target.value as LedgerSortMode)} className="h-11 rounded-2xl">
+              {SORT_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+        {[...canadaTable.getRowModel().rows, ...indiaTable.getRowModel().rows].length ? (
+          [...canadaDisplayGroups, ...indiaDisplayGroups].flatMap((group) => {
+            const cards = group.rows.map((row, index, allRows) => {
             const asset = row.original;
             const displayCurrency = getDisplayCurrency(asset);
-            const investmentTotal = getConvertedValue(getInvestmentTotal(asset), asset.currency, baseCurrency);
-            const currentTotal = getConvertedValue(getCurrentTotal(asset), asset.currency, baseCurrency);
-            const growthTotal = getConvertedValue(getGrowthTotal(asset), asset.currency, baseCurrency);
+            const investmentTotal = getInvestmentTotal(asset);
+            const investmentPrice = getInvestmentPrice(asset);
+            const currentPrice = getCurrentPrice(asset);
+            const currentTotal = getCurrentTotal(asset);
+            const growthTotal = getGrowthTotal(asset);
+            const xirr = getAssetXirr(asset, displayCurrency, rates);
+            const showsAsDebt = isDebtAssetDisplay(asset);
+            const isRowRefreshing = refreshingRowIds.includes(asset.id);
             const toneClasses = getAssetToneClasses(asset);
 
             return (
-              <div key={row.id} className={`rounded-lg border bg-white p-4 dark:border-slate-800 dark:bg-slate-950 ${toneClasses.mobileCard}`}>
-                <div className="flex items-start gap-3">
-                  <AssetMarketLogo asset={asset} className={`h-10 w-10 shrink-0 ${toneClasses.iconTile}`} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-slate-900 dark:text-white">{asset.name}</div>
-                    <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                      {asset.holdingPlatform || asset.ticker || asset.currency} · {asset.owner} · {asset.country}
+              <React.Fragment key={row.original.id}>
+                <div className={`rounded-lg border p-4 bg-white dark:bg-slate-950 dark:border-slate-800 space-y-3 shadow-sm ${toneClasses.mobileCard}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <AssetMarketLogo asset={asset} className={`h-10 w-10 ${toneClasses.iconTile}`} />
+                        <div>
+                          <div className="font-semibold text-lg">{asset.name}</div>
+                          <div className="text-sm text-slate-500 inline-flex items-center gap-2">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white dark:bg-slate-100 dark:text-slate-900">
+                              {getOwnerInitials(asset.owner)}
+                            </span>
+                            {asset.owner} • {asset.country}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!asset.sourceManaged ? (
+                        <Button variant="ghost" size="icon" onClick={() => onEditAsset?.(asset)}>
+                          <Edit className="h-4 w-4 text-slate-500" />
+                        </Button>
+                      ) : null}
+                      {!asset.sourceManaged ? (
+                        <Button variant="ghost" size="icon" onClick={() => removeAsset(asset.id)}>
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
-                  {!asset.sourceManaged ? (
-                    <Button variant="ghost" size="icon" onClick={() => onEditAsset?.(asset)} aria-label={`Edit ${asset.name}`} className="h-8 w-8 shrink-0">
-                      <Edit className="h-4 w-4 text-slate-500" />
-                    </Button>
-                  ) : null}
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-sm dark:border-slate-800">
-                  <div>
-                    <div className="text-xs text-slate-500">Market value</div>
-                    <div className="mt-0.5 font-semibold">{formatCurrency(currentTotal, displayCurrency)}</div>
-                    <div className="text-xs text-slate-500">Cost {formatCurrency(investmentTotal, displayCurrency)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs text-slate-500">Performance</div>
-                    <div className={`mt-0.5 font-semibold ${growthTotal >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {formatCurrency(growthTotal, displayCurrency)}
+
+                  <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t">
+                    <div>
+                      <div className="text-slate-500">Asset Class</div>
+                      <div className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${toneClasses.chip}`}>{getCanonicalAssetClass(asset.assetClass)}</div>
                     </div>
-                    <div className="text-xs text-slate-500">{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })} units</div>
+                    <div>
+                      <div className="text-slate-500">Total Quantity</div>
+                      <div>{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
+                    </div>
+                      <div>
+                        <div className="text-slate-500">Ticker</div>
+                        {showsTickerManagement(asset) ? (
+                          <>
+                            <div>{shouldDisplayTicker(asset) ? (asset.ticker || '-') : 'System gold feed'}</div>
+                            <button
+                              type="button"
+                              onClick={() => setTickerRepairAsset(asset)}
+                              className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${hasActionablePriceFailure(asset) ? 'text-amber-600' : 'text-slate-500'}`}
+                              title={hasActionablePriceFailure(asset) ? asset.priceFetchMessage || 'Price fetch failed.' : isGoldAsset(asset) ? 'Adjust system gold pricing settings' : 'Check or update ticker/provider'}
+                            >
+                              {hasActionablePriceFailure(asset) ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                              {getPricingActionLabel(asset)}
+                            </button>
+                            {((!isGoldAsset(asset) && asset.ticker) || asset.connectedProvider === 'splitwise') ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleRefreshRow(asset.id)}
+                                disabled={isRowRefreshing}
+                                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                title="Refresh only this row"
+                              >
+                                <RefreshCw className={`h-3.5 w-3.5 ${isRowRefreshing ? 'animate-spin' : ''}`} />
+                                Refresh row
+                              </button>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div>{getPricingModeLabel(asset)}</div>
+                        )}
+                      </div>
+                    <div>
+                      <div className="text-slate-500">Holding Platform</div>
+                      <div>{asset.holdingPlatform || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Comments</div>
+                      <div>{asset.comments || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">{showsAsDebt ? 'Debt Balance' : 'Investment Total'}</div>
+                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{formatCurrency(investmentTotal, displayCurrency)}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">{showsAsDebt ? 'Balance per Unit' : 'Investment Price'}</div>
+                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{formatCurrency(investmentPrice, displayCurrency)}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">{showsAsDebt ? 'Current Balance per Unit' : 'Current Price'}</div>
+                      <div className={showsAsDebt ? 'font-medium text-red-500' : ''}>{asset.currentPrice ? formatCurrency(currentPrice, displayCurrency) : '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">{showsAsDebt ? 'Current Debt' : 'Current Total'}</div>
+                      <div className={`font-semibold ${showsAsDebt ? 'text-red-500' : ''}`}>{formatCurrency(currentTotal, displayCurrency)}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Total Growth</div>
+                      <div className={growthTotal >= 0 ? 'font-medium text-emerald-600' : 'font-medium text-red-500'}>
+                        {formatCurrency(growthTotal, displayCurrency)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">XIRR</div>
+                      <div>{showsAsDebt ? 'Not applicable for debt' : formatPercent(xirr)}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </React.Fragment>
             );
+            });
+
+            cards.push(
+              <MobileClassTotalCard key={`subtotal-${group.assetClass}-${group.metrics.currency}-${group.rows[0]?.id || 'group'}`} group={group} />
+            );
+
+            return cards;
           })
         ) : (
           <div className="text-center py-8 text-slate-500">No assets found.</div>
@@ -1506,7 +1633,6 @@ function CountryTableSection({
   subtitle,
   table,
   displayGroups,
-  flat = false,
   columnsLength,
   columnFilters,
   openColumnFilter,
@@ -1516,14 +1642,11 @@ function CountryTableSection({
   setColumnFilterRange,
   setColumnFilterSearch,
   clearColumnFilter,
-  totalPortfolioMV: _totalPortfolioMV,
-  perfScale: _perfScale,
 }: {
   title: string;
   subtitle: string;
   table: ReturnType<typeof useReactTable<Asset>>;
   displayGroups: LedgerDisplayGroup[];
-  flat?: boolean;
   columnsLength: number;
   columnFilters: FilterState;
   openColumnFilter: FilterColumnId | null;
@@ -1533,8 +1656,6 @@ function CountryTableSection({
   setColumnFilterRange: (columnId: FilterColumnId, key: 'min' | 'max', value: string) => void;
   setColumnFilterSearch: (columnId: FilterColumnId, value: string) => void;
   clearColumnFilter: (columnId: FilterColumnId) => void;
-  totalPortfolioMV?: number;
-  perfScale?: number;
 }) {
   const headerGroups = table.getHeaderGroups();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -1547,21 +1668,25 @@ function CountryTableSection({
   };
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</span>
-        <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+    <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
       </div>
-      <Table className="min-w-[920px] w-full table-fixed">
+      <Table className="min-w-[1280px] w-full table-fixed">
+        <colgroup>
+          {TABLE_COLUMN_WIDTHS.map((width, index) => (
+            <col key={`${width}-${index}`} style={{ width }} />
+          ))}
+        </colgroup>
         <TableHeader className="sticky top-0 z-10 bg-white/95 backdrop-blur dark:bg-slate-950/95">
           {headerGroups.map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header, index) => (
                 <TableHead
                   key={header.id}
-                  style={{ width: getLedgerColumnWidth(header.column.id) }}
-                  className="sticky top-0 z-10 min-w-0 border-b border-slate-200 bg-white/95 px-3 py-3 text-left text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
+                  style={{ width: TABLE_COLUMN_WIDTHS[index] }}
+                  className="sticky top-0 z-10 min-w-0 border-b border-slate-200 bg-white/95 px-4 py-4 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/95 dark:text-slate-400"
                 >
                   {header.isPlaceholder ? null : (
                     <div className="relative">
@@ -1569,6 +1694,25 @@ function CountryTableSection({
                         className="flex items-center gap-2"
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
+                        {isFilterableColumn(header.column.id) ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const columnId = header.column.id as FilterColumnId;
+                              setOpenColumnFilter(openColumnFilter === columnId ? null : columnId);
+                            }}
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded-md border transition-colors ${
+                              isColumnFilterActive(columnFilters[header.column.id as FilterColumnId])
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : 'border-transparent text-slate-400 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-600 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-300'
+                            }`}
+                            title="Filter this column"
+                          >
+                            <Filter className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
                       </div>
                       {isFilterableColumn(header.column.id) && openColumnFilter === header.column.id ? (
                         <ColumnFilterMenu
@@ -1594,39 +1738,36 @@ function CountryTableSection({
           ))}
         </TableHeader>
         <TableBody>
-          {flat && table.getRowModel().rows.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className="border-b border-slate-100 align-middle hover:bg-slate-50/70 dark:border-slate-900 dark:hover:bg-slate-900/50">
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} style={{ width: getLedgerColumnWidth(cell.column.id) }} className="min-w-0 px-3 py-3 text-sm leading-5">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : displayGroups.length ? (
+          {displayGroups.length ? (
             displayGroups.flatMap((group) => {
               const groupKey = `${title}:${group.assetClass}`;
               const isCollapsed = Boolean(collapsedGroups[groupKey]);
               return [
-                <LedgerGroupBannerRow
-                  key={`group-header-${groupKey}`}
-                  group={group}
-                  groupKey={groupKey}
-                  isCollapsed={isCollapsed}
-                  columnsLength={columnsLength}
-                  onToggle={() => toggleGroup(groupKey)}
-                />,
-                ...(!isCollapsed ? [
-                ...group.rows.map((row, index) => {
+                <TableRow key={`group-header-${groupKey}`} className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60">
+                  <TableCell colSpan={columnsLength} className="px-4 py-2">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 text-left"
+                      onClick={() => toggleGroup(groupKey)}
+                    >
+                      <div className="inline-flex items-center gap-2">
+                        {isCollapsed ? <ChevronRight className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{group.assetClass}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{group.rows.length} holding{group.rows.length === 1 ? '' : 's'}</span>
+                      </div>
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{isCollapsed ? 'Expand' : 'Collapse'}</span>
+                    </button>
+                  </TableCell>
+                </TableRow>,
+                ...(!isCollapsed ? group.rows.map((row, index) => {
                   const toneClasses = getAssetToneClasses(row.original);
                   return (
-                    <React.Fragment key={row.id}>
+                    <React.Fragment key={row.original.id}>
                       <TableRow className={`align-top border-l-[3px] transition-colors ${toneClasses.rowAccent} ${toneClasses.rowSurface} ${toneClasses.rowHover}`}>
                         {row.getVisibleCells().map((cell, cellIndex) => (
                           <TableCell
                             key={cell.id}
-                            style={{ width: getLedgerColumnWidth(cell.column.id) }}
+                            style={{ width: TABLE_COLUMN_WIDTHS[cellIndex] }}
                             className="min-w-0 px-4 py-4 text-sm leading-6"
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -1635,9 +1776,8 @@ function CountryTableSection({
                       </TableRow>
                     </React.Fragment>
                   );
-                }),
+                }) : []),
                 <ClassTotalRow key={`subtotal-${group.assetClass}-${group.metrics.currency}-${group.rows[0]?.id || 'group'}`} group={group} columnsLength={columnsLength} />,
-                ] : []),
               ];
             })
           ) : (
@@ -2184,182 +2324,6 @@ function ColumnFilterMenu({
           Excel-style
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── V2 Design atoms ─────────────────────────────────────────────────────────
-
-function LedgerPerfBar({ pct, scale }: { pct: number; scale: number }) {
-  const width = 96;
-  const height = 8;
-  const half = width / 2;
-  const filled = scale > 0 ? Math.min(Math.abs(pct) / scale, 1) * half : 0;
-  const positive = pct >= 0;
-  const color = pct > 0 ? '#059669' : pct < 0 ? '#dc2626' : '#94a3b8';
-  return (
-    <div style={{ position: 'relative', width, height, flex: '0 0 auto' }}>
-      <div style={{ position: 'absolute', inset: 0, background: '#f1f5f9', borderRadius: height / 2 }} className="dark:!bg-slate-800" />
-      <div style={{ position: 'absolute', top: 0, height: '100%', left: positive ? half : half - filled, width: filled, background: color, borderRadius: height / 2, transition: 'width 0.2s' }} />
-      <div style={{ position: 'absolute', top: -1, bottom: -1, left: half - 0.5, width: 1, background: 'rgba(15,23,42,0.4)' }} />
-    </div>
-  );
-}
-
-function LedgerSparkline({ id, gainPct }: { id: string; gainPct: number }) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  const rand = () => { h = (h * 1664525 + 1013904223) >>> 0; return ((h >>> 8) & 0xffff) / 0xffff; };
-  const N = 20;
-  const pts: number[] = [];
-  let v = 0;
-  for (let i = 0; i < N; i++) { v += (rand() - 0.5) * 0.6; pts.push(v); }
-  const tilt = (gainPct / 100) * 0.6;
-  for (let i = 0; i < N; i++) pts[i] += tilt * (i / (N - 1));
-  const min = Math.min(...pts), max = Math.max(...pts);
-  const span = (max - min) || 1;
-  const W = 52, H = 18;
-  const stepX = W / (N - 1);
-  const d = pts.map((p, i) => {
-    const x = i * stepX;
-    const y = H - ((p - min) / span) * H;
-    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
-  }).join(' ');
-  const color = gainPct > 0 ? '#059669' : gainPct < 0 ? '#dc2626' : '#64748b';
-  return (
-    <svg width={W} height={H} style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
-      <path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function LedgerGroupBannerRow({ group, groupKey: _groupKey, isCollapsed, columnsLength, onToggle }: {
-  key?: React.Key;
-  group: LedgerDisplayGroup;
-  groupKey: string;
-  isCollapsed: boolean;
-  columnsLength: number;
-  onToggle: () => void;
-}) {
-  const toneKey = getAssetToneKeyFromClass(group.assetClass);
-  const meta = TONE_DESIGN_META[toneKey];
-  const gainers = group.rows.filter((r) => getGrowthTotal(r.original) > 0).length;
-  const losers = group.rows.filter((r) => getGrowthTotal(r.original) < 0).length;
-  const gainPct = group.metrics.invested > 0 ? group.metrics.gain / group.metrics.invested : 0;
-  const currency = group.metrics.currency;
-
-  return (
-    <TableRow style={{ borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }} className="dark:border-slate-800">
-      <TableCell colSpan={columnsLength} style={{ padding: 0 }}>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="flex w-full items-center gap-4 text-left"
-          style={{
-            padding: '12px 20px 12px 12px',
-            background: `linear-gradient(90deg, ${meta.tint} 0%, ${meta.tint} 30%, transparent 100%)`,
-          }}
-        >
-          {/* Color rail */}
-          <div style={{ width: 4, alignSelf: 'stretch', background: meta.color, borderRadius: 2, flexShrink: 0 }} />
-
-          {/* Glyph chip */}
-          <div style={{
-            width: 32, height: 32, borderRadius: 8, background: '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 700, fontSize: 11, color: meta.color, flexShrink: 0,
-            boxShadow: `inset 0 0 0 1.5px ${meta.color}`,
-          }}>{meta.glyph}</div>
-
-          {/* Title + count */}
-          <div className="min-w-0">
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: -0.1 }} className="dark:!text-slate-100">
-              {group.assetClass}
-            </div>
-            <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>
-              {group.rows.length} holding{group.rows.length === 1 ? '' : 's'}
-              {gainers > 0 && <span style={{ color: '#059669', fontWeight: 600, marginLeft: 6 }}>{gainers} ↑</span>}
-              {losers > 0 && <span style={{ color: '#dc2626', fontWeight: 600, marginLeft: 6 }}>{losers} ↓</span>}
-            </div>
-          </div>
-
-          {/* Stats cluster */}
-          <div className="ml-auto hidden lg:flex items-center gap-6">
-            <div className="text-right">
-              <div style={{ fontSize: 10.5, fontWeight: 500, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4 }}>Subtotal</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }} className="dark:!text-slate-100">{formatCurrency(group.metrics.current, currency)}</div>
-            </div>
-            <div className="text-right">
-              <div style={{ fontSize: 10.5, fontWeight: 500, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4 }}>Gain</div>
-              <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: group.metrics.gain >= 0 ? '#059669' : '#dc2626' }}>
-                {formatPercent(gainPct)}
-              </div>
-              <div style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: group.metrics.gain >= 0 ? '#059669' : '#dc2626' }}>
-                {formatCurrency(group.metrics.gain, currency)}
-              </div>
-            </div>
-          </div>
-
-          {/* Chevron */}
-          <div style={{ marginLeft: '8px', flexShrink: 0 }}>
-            {isCollapsed
-              ? <ChevronRight className="h-4 w-4 text-slate-400" />
-              : <ChevronDown className="h-4 w-4 text-slate-400" />}
-          </div>
-        </button>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-function getAssetToneKeyFromClass(assetClass: string): AssetToneKey {
-  const normalized = assetClass.trim().toLowerCase();
-  if (normalized === 'stocks') return 'stocks';
-  if (normalized === 'mutual funds') return 'mutualFunds';
-  if (normalized === 'gold') return 'gold';
-  if (normalized.includes('cash') || normalized.includes('bank account')) return 'cash';
-  if (normalized === 'pf' || normalized === 'ppf' || normalized === 'fd' || normalized === 'nps') return 'retirement';
-  if (normalized.includes('real estate') || normalized.includes('property')) return 'realEstate';
-  if (normalized.includes('credit') || normalized.includes('debt') || normalized.includes('loan')) return 'credit';
-  return 'neutral';
-}
-
-function QuickFilterPill({ active, children, onClick }: React.PropsWithChildren<{ active: boolean; onClick: () => void }>) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors border ${
-        active
-          ? 'border-[#059669] bg-[#ecfdf5] text-[#065f46] dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
-          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-200'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function LedgerStatBlock({
-  label,
-  value,
-  muted,
-  gainColor,
-  sub,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-  gainColor?: string;
-  sub?: string;
-}) {
-  return (
-    <div className="text-right">
-      <div className="text-[11px] font-medium uppercase tracking-[0.4px] text-slate-500 dark:text-slate-400">{label}</div>
-      <div className={`text-[20px] font-bold tabular-nums leading-tight ${muted ? 'text-slate-400 dark:text-slate-500' : gainColor || 'text-slate-900 dark:text-slate-100'}`}>
-        {value}
-      </div>
-      {sub && <div className={`text-[12px] font-semibold tabular-nums ${gainColor || 'text-slate-500'}`}>{sub}</div>}
     </div>
   );
 }
